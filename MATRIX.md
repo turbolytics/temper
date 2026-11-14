@@ -11,7 +11,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 
 | covered | exempt | failing | missing | unenforced |
 | ---: | ---: | ---: | ---: | ---: |
-| 36 | 0 | 0 | 0 | 0 |
+| 39 | 0 | 0 | 0 | 0 |
 
 ## Features
 
@@ -19,6 +19,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 | --- | --- | --- | --- |
 | `adapter.go` | Lets a Go test state what it proves and records how it ended. | ✅ | — |
 | `declarations.load` | Reads every declaration into one model, rejecting unknown fields. | ✅ | — |
+| `declarations.extension_fields` | Ignores x- fields, so a project keeps its own metadata beside Temper's. | ✅ | — |
 | `cli.check` | Validates declarations without running any test and names each problem's file, id and rule. | ✅ | ✅ |
 | `cli.matrix` | Joins declarations with evidence and writes the committed statuses and MATRIX.md. | ✅ | ✅ |
 | `cli.matrix_json` | Prints the full matrix, errors and summary as JSON for CI and agents. | — | ✅ |
@@ -50,15 +51,19 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 
 | Invariant | Subject | unit | integration |
 | --- | --- | --- | --- |
+| `declarations.ambiguous_answer_rejected` | `cli` | ✅ | — |
 | `matrix.exact_reference_only` | `cli` | ✅ | — |
 | `matrix.exemption_needs_passing_proof` | `cli` | ✅ | ✅ |
+| `matrix.requires_any_one_level_proves_it` | `cli` | ✅ | — |
 | `matrix.scenario_needs_declaration` | `cli` | ✅ | — |
 | `matrix.skip_never_covers` | `cli` | ✅ | ✅ |
 | `matrix.test_only_credits_nothing` | `cli` | ✅ | — |
 | `matrix.unknown_reference_fails` | `cli` | ✅ | ✅ |
 
+- `declarations.ambiguous_answer_rejected` — A lattice answer map that does not say exactly one of supported: true and unsupported: true is an error; it is never read as supported.
 - `matrix.exact_reference_only` — Evidence credits only the item its reference names exactly; never by test name, id prefix, file path or level.
 - `matrix.exemption_needs_passing_proof` — A cell is exempt only while a passing exempts record from the declared proven_by test exists; a covers record, another test, a skip or a failure leaves it missing or failing.
+- `matrix.requires_any_one_level_proves_it` — An invariant with requires_any is proven by a pass, or a proven exemption, at any one listed level; it is a gap once, per subject, only when no level is proven; and a failure at any level is still a gap.
 - `matrix.scenario_needs_declaration` — A member of a scenario-covered lattice is credited only by evidence from a declared scenario that lists it, and a member no scenario lists is a gap before any test runs.
 - `matrix.skip_never_covers` — A skipped test never makes a cell covered, at any level.
 - `matrix.test_only_credits_nothing` — Evidence for a test-only subject credits no cell.

@@ -7,3 +7,4 @@ sku.units/weight_kg: {unit: covered, integration: not_required}
 store.persists_across_restart: {unit: not_required, integration: exempt}
 store.reserve.never_negative: {unit: covered, integration: not_required}
 store.reserve.no_oversell_under_concurrency: {unit: not_required, integration: unenforced}
+store.restock.adds_exactly: {unit: covered, integration: not_required}

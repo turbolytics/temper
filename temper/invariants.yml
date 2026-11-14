@@ -78,6 +78,25 @@ invariants:
     family: output
     requires: [unit]
 
+  - id: matrix.requires_any_one_level_proves_it
+    claim: >
+      An invariant with requires_any is proven by a pass, or a proven
+      exemption, at any one listed level; it is a gap once, per subject, only
+      when no level is proven; and a failure at any level is still a gap.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
+
+  - id: declarations.ambiguous_answer_rejected
+    claim: >
+      A lattice answer map that does not say exactly one of supported: true
+      and unsupported: true is an error; it is never read as supported.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
+
   # What every adapter must never do.
 
   - id: adapter.failure_never_passes
