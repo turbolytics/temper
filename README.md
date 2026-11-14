@@ -204,6 +204,10 @@ required level.
   violated_once: ["#88"]   # history: the incidents that made this a rule
 ```
 
+`requires` needs evidence at every level it lists. A claim that does not name
+its level uses `requires_any: [unit, integration]` instead, and proof at any
+one of them is enough: each subject is proven at the level that suits it.
+
 ### Exemption
 
 A subject that legitimately cannot hold an invariant declares why, and
@@ -387,8 +391,19 @@ temper.Subject("store.file"))`. Unsupported members are proven with
 temper/subjects/store.memory.yml: store.memory does not answer sku.units/weight_kg (R6 gap)
 ```
 
-Answers can carry your own fields, such as a type table's column types or
-expected renderings. Temper ignores keys it doesn't define.
+A map answer must say which way it goes, with `supported: true` or
+`unsupported: true`. Temper will not guess: a map that says neither is an
+error, because a field like `outcome: unsupported` would otherwise be read as
+support. Beyond that, answers can carry your own fields, such as a type
+table's column types or expected renderings. Temper ignores keys it doesn't
+define.
+
+```yaml
+answers:
+  sink.types:
+    float64: {supported: true, columns: [{type: Float64, expect: "1.5"}]}
+    decimal(*, *): {unsupported: true, reason: fails loudly with user.sink.type_unsupported, tracked_by: "#31"}
+```
 
 ### Cover a classifier's rules with scenarios
 
@@ -424,6 +439,34 @@ t.Run(sc.ID, func(t *testing.T) {
 A member of a `covered_by: scenarios` lattice is credited only by evidence
 from a declared scenario that lists it. A rule that no scenario covers is
 reported by `temper check` before any test runs.
+
+### Prove a claim at the level that suits each subject
+
+Some claims do not name a level. The memory store proves "restocking adds
+exactly what you add" in-process, and the file store proves it against a real
+file. Declare `requires_any`, and each subject needs proof at one of the
+levels, not all of them:
+
+```yaml
+- id: store.restock.adds_exactly
+  claim: Restocking n units of a SKU adds exactly n to its stock.
+  applies_to: store
+  requires_any: [unit, integration]
+```
+
+| Invariant | Subject | unit | integration |
+| --- | --- | --- | --- |
+| `store.restock.adds_exactly` | `store.file` | — | ✅ |
+| `store.restock.adds_exactly` | `store.memory` | ✅ | — |
+
+A level that isn't needed reads — once another level proves the claim. With
+no proof anywhere, it's a single gap per subject:
+
+```
+temper/invariants.yml: store.restock.adds_exactly for store.file is missing at every level it may be proven at (unit, integration)
+```
+
+A failure at any level is still a gap, whatever else passed.
 
 ### Track a known gap
 
@@ -532,7 +575,7 @@ When several apply, the highest wins.
   "cells": [{
     "kind": "invariant", "item": "store.persists_across_restart", "member": "",
     "subject": "store.memory", "level": "integration", "status": "exempt",
-    "enforced": true, "judged": true,
+    "enforced": true, "judged": true, "any": false,
     "evidence": [{"test": "TestIntegration_MemoryStoreForgetsOnRestart", "outcome": "pass"}]
   }],
   "summary": {"covered": 20, "exempt": 2, "failing": 0, "missing": 0, "unenforced": 2, "gaps": 0},
@@ -540,8 +583,8 @@ When several apply, the highest wins.
 }
 ```
 
-`kind` is `feature`, `invariant` or `lattice`. Lists are always arrays,
-never `null`. The shape is stable within spec 0.1.
+`kind` is `feature`, `invariant` or `lattice`. `any` is true for a cell of a
+`requires_any` group. Lists are always arrays, never `null`. The shape is stable within spec 0.1.
 
 ### Configuration
 
@@ -554,6 +597,20 @@ levels:                      # matrix columns, in the order they run
 evidence: .temper/evidence   # optional; default shown
 dir: temper                  # optional; declarations and status/
 matrix: MATRIX.md            # optional
+```
+
+### Your own metadata
+
+Temper rejects unknown fields in declarations, which catches typos. To keep
+your own metadata beside Temper's, prefix the key with `x-`. Temper ignores it
+wherever it appears:
+
+```yaml
+- id: sink.flush.keeps_batch
+  claim: A failed Flush leaves every undelivered row buffered.
+  applies_to: sink
+  requires_any: [unit, integration]
+  x-verified_by: harness      # yours; Temper ignores it
 ```
 
 ### Layout

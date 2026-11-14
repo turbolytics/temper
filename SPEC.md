@@ -149,8 +149,11 @@ Evidence records, scenarios and exemptions refer to declared items:
 Feature, invariant and scenario ids share one namespace for references, so
 they must not collide. A reference is split on its first `/`.
 
-Lattice member keys are not ids: a key is any string without whitespace or
-`/` (`list<int64>`, `up.working`).
+Lattice member keys are not ids: a key is the closed set's own name for a
+member, so it may hold spaces and slashes (`list<int64>`, `decimal(*, *)`,
+`interval[day/time]`). It must be non-empty, with no control characters and no
+leading or trailing whitespace. A reference splits on its first `/` and a
+lattice id holds none, so a slash in a key is unambiguous.
 
 ## 6. Configuration — `temper.yml`
 
@@ -235,13 +238,34 @@ invariants:
 | `applies_to` | yes | A subject `kind` (every subject of that kind must hold it) or a single subject id (a claim only that subject makes; the invariant id should start with the subject's namespace). |
 | `class` | no | `safety` (nothing bad happens) or `liveness` (something good eventually happens). |
 | `family` | no | Free grouping for reports (`resilience`, `lifecycle`, …). |
-| `requires` | yes | Levels at which evidence must exist, per applicable subject. |
+| `requires` | one of | Levels at which evidence must exist, per applicable subject. Every listed level needs it. |
+| `requires_any` | one of | Levels at which evidence may exist: proof at any one of them is enough. For a claim that does not name its level (§8, below). |
 | `enforced` | no | Default `true` once `requires` is non-empty. `false` reports without failing. |
 | `violated_once` | no | References to the incidents or issues where it was broken and fixed. |
 | `tracked_by` | no | Reference to the issue for an invariant the code does not yet satisfy. Renders as *declared, unenforced*. |
 
 **Cells:** one per (invariant, applicable subject, level) for each level in
 `requires`, unless the subject is exempt (§10).
+
+**`requires_any`.** Some claims do not name a level. A console sink proves
+"a failed flush keeps the batch" in-process, while a Kafka sink needs a
+container; demanding one level would force a container on the first or accept
+a fake for the second. `requires_any: [unit, integration]` says proof at any
+one of those levels is enough, so each subject is proven at the level that
+suits it. An invariant declares `requires` or `requires_any`, not both
+(`requires: []` beside `requires_any` means the same as leaving it out).
+
+The cells are the same as for `requires`, one per listed level, but they are
+one claim:
+
+- A pass, or a proven exemption (§10), at any listed level satisfies it. The
+  levels with no proof then read `not_required` rather than `missing`.
+- With no proof at any level, and every level judged, it is a gap once per
+  subject, not once per level.
+- A failure at any listed level is still a gap, whatever else passed: a pass
+  at one level never hides a failure at another.
+- A level that did not run is not judged (§13), so a group with an unrun level
+  is never called unproven.
 
 ## 9. Lattice
 
@@ -330,7 +354,12 @@ answers:
 | `feature` | yes, unless `test_only` | The feature this subject delivers. |
 | `implements` | no | Optional capabilities beyond the kind's base contract; invariants may apply only to subjects implementing one (`applies_to: sink+Prober`). |
 | `exempt` | no | Invariants that cannot apply, each with `reason` and `proven_by`: the test that emits a passing `exempts` evidence record for it (§12). |
-| `answers` | per lattice | For each applicable lattice, every member: `supported`, or a map with `unsupported: true`, a `reason`, and `proven_by` or `tracked_by`. Other keys in a map are the project's own payload and are ignored. |
+| `answers` | per lattice | For each applicable lattice, every member: `supported`, or a map that says which way it goes: `supported: true`, or `unsupported: true` with a `reason` and `proven_by` or `tracked_by`. Other keys in a map are the project's own payload and are ignored. |
+
+A map answer must say exactly one of `supported: true` and `unsupported: true`.
+A map that says neither is an error, never read as supported: a payload such as
+`outcome: unsupported` would otherwise be credited as support without anyone
+having said so.
 | `test_only` | no | A test double. Gets no cells and needs no feature; its evidence credits no real subject. |
 
 Answers are written by reading the subject, never generated from it: a table
@@ -492,9 +521,14 @@ wins.
 8. A scenario `covers` reference that does not resolve, and a member of a
    scenario-covered lattice that no scenario lists (gap).
 9. A level named anywhere that is not in `temper.yml`.
+10. An invariant that declares neither `requires` nor `requires_any`, one that
+    declares both with a non-empty `requires`, or an empty `requires_any`.
 
 An unknown field in a declaration is an error (a typo), except inside lattice
-answers and scenario events, which carry the project's own payload.
+answers and scenario events, which carry the project's own payload, and any
+field whose name starts with `x-`. An `x-` field is the project's own metadata
+(`x-verified_by`, `x-owner`): Temper ignores it wherever it appears, and still
+rejects every other unknown field.
 
 Every error names the file, the id and the rule it breaks, in a form an agent
 can act on:
