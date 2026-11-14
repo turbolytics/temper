@@ -37,7 +37,7 @@ func checkLatticeShape(p *model.Project) diag.List {
 		for _, m := range l.Members {
 			switch {
 			case !ref.ValidKey(m.Key):
-				add(fmt.Sprintf("member %q is not a valid key (no whitespace, no slash)", m.Key))
+				add(fmt.Sprintf("member %q is not a valid key (no control characters, no leading or trailing whitespace)", m.Key))
 			case seen[m.Key]:
 				add(fmt.Sprintf("member %q is declared twice", m.Key))
 			}
