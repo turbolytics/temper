@@ -500,7 +500,7 @@ fails if the committed statuses disagree with what the evidence produces.
 
 ```yaml
 # .github/workflows/ci.yml
-- run: go install github.com/turbolytics/temper/cmd/temper@latest
+- run: go install github.com/turbolytics/temper/cmd/temper@v0.1.0   # pin the version CI was tested with
 - run: temper clean
 - run: temper run --level unit -- go test ./...
 - run: temper run --level integration -- go test -tags integration -run '^TestIntegration' ./...
