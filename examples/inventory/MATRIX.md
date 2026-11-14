@@ -11,7 +11,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 
 | covered | exempt | failing | missing | unenforced |
 | ---: | ---: | ---: | ---: | ---: |
-| 20 | 2 | 0 | 0 | 2 |
+| 22 | 2 | 0 | 0 | 2 |
 
 ## Features
 
@@ -33,9 +33,12 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 | `store.reserve.never_negative` | `store.memory` | ✅ | — |
 | `store.reserve.no_oversell_under_concurrency` | `store.file` | — | ⏳ |
 | `store.reserve.no_oversell_under_concurrency` | `store.memory` | — | ⏳ |
+| `store.restock.adds_exactly` | `store.file` | — | ✅ |
+| `store.restock.adds_exactly` | `store.memory` | ✅ | — |
 
 - `store.reserve.never_negative` — A reservation larger than the stock is refused and leaves the stock unchanged; stock never goes below zero.
 - `store.reserve.no_oversell_under_concurrency` — Two processes reserving the last units at once never both succeed. Tracked by #12.
+- `store.restock.adds_exactly` — Restocking n units of a SKU adds exactly n to its stock, never more and never less. Proven at any one of: unit, integration.
 
 ### durability
 

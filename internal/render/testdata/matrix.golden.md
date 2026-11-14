@@ -11,7 +11,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 
 | covered | exempt | failing | missing | unenforced |
 | ---: | ---: | ---: | ---: | ---: |
-| 5 | 2 | 1 | 2 | 1 |
+| 7 | 2 | 1 | 2 | 1 |
 
 ## Features
 
@@ -26,9 +26,12 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 
 | Invariant | Subject | unit | integration |
 | --- | --- | --- | --- |
+| `sink.any` | `sink.kafka` | ✅ | — |
+| `sink.any` | `sink.pg` | — | ✅ |
 | `sink.flush.keeps_batch` | `sink.kafka` | — | ☑️ |
 | `sink.flush.keeps_batch` | `sink.pg` | — | ⬜ |
 
+- `sink.any` — Holds wherever the sink can be exercised. Proven at any one of: unit, integration.
 - `sink.flush.keeps_batch` — A failed Flush leaves every undelivered row buffered. Violated once: #221.
 
 ### Other

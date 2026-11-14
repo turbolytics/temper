@@ -300,3 +300,44 @@ func TestCLI_CheckJudgesEveryLevel(t *testing.T) {
 		t.Fatalf("--check with no integration evidence = %d, want 3 (integration judged, statuses stale)\n%s", code, out)
 	}
 }
+
+// An invariant proven at any one level: unproven, it is one line per subject
+// that names every level it could be proven at; proven at different levels
+// for different subjects, it passes.
+func TestCLI_RequiresAnyEndToEnd(t *testing.T) {
+	temper.Covers(t, "cli.matrix")
+	temper.Covers(t, "matrix.requires_any_one_level_proves_it", temper.Subject("cli"))
+	root := fixture(t, "valid")
+	edit(t, root, "temper/invariants.yml", func(s string) string {
+		return s + "\n  - id: sink.any\n    claim: Holds wherever the sink can be exercised.\n    applies_to: sink\n    requires_any: [unit, integration]\n"
+	})
+
+	code, out, _ := cli(t, "matrix", "--all-levels", "--root", root)
+	if code != 1 {
+		t.Fatalf("unproven requires_any = %d, want 1\n%s", code, out)
+	}
+	var lines []string
+	for _, l := range strings.Split(out, "\n") {
+		if strings.Contains(l, "sink.any") {
+			lines = append(lines, l)
+		}
+	}
+	want := []string{
+		"temper/invariants.yml: sink.any for sink.kafka is missing at every level it may be proven at (unit, integration)",
+		"temper/invariants.yml: sink.any for sink.postgres is missing at every level it may be proven at (unit, integration)",
+	}
+	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("gap lines =\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
+	}
+
+	addEvidence(t, root, `{"covers":"sink.any","subject":"sink.kafka","test":"TestAnyK","level":"unit","outcome":"pass"}`)
+	addEvidence(t, root, `{"covers":"sink.any","subject":"sink.postgres","test":"TestAnyP","level":"integration","outcome":"pass"}`)
+	code, out, errOut := cli(t, "matrix", "--all-levels", "--json", "--root", root)
+	if code != 0 {
+		t.Fatalf("proven at one level each = %d\n%s%s", code, out, errOut)
+	}
+	if !strings.Contains(out, `"item":"sink.any","member":"","subject":"sink.postgres","level":"unit","status":"not_required"`) ||
+		!strings.Contains(out, `"any":true`) {
+		t.Fatalf("JSON should show the other level not_required and the cell marked any:\n%s", out)
+	}
+}

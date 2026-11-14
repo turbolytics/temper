@@ -22,12 +22,15 @@ func TestValidID(t *testing.T) {
 
 func TestValidKey(t *testing.T) {
 	temper.Covers(t, "cli.check")
-	for _, ok := range []string{"int64", "list<int64>", "up.working", "a:b", "#x"} {
+	// Keys are the closed set's own names, so they may hold the spaces and
+	// slashes real names do: Arrow's decimal(*, *), an interval[day/time].
+	for _, ok := range []string{"int64", "list<int64>", "up.working", "a:b", "#x",
+		"decimal(*, *)", "timestamp[us, tz=*]", "list<decimal(*, *)>", "interval[day/time]"} {
 		if !ValidKey(ok) {
 			t.Errorf("ValidKey(%q) = false, want true", ok)
 		}
 	}
-	for _, bad := range []string{"", "a b", "a/b", "a\tb", "a b"} {
+	for _, bad := range []string{"", " a", "a ", "\ta", "a\tb", "a\nb", "a\u00a0", "\u00a0a"} {
 		if ValidKey(bad) {
 			t.Errorf("ValidKey(%q) = true, want false", bad)
 		}
@@ -47,5 +50,10 @@ func TestParse(t *testing.T) {
 	r = Parse("l/a/b")
 	if r != (Ref{Item: "l", Member: "a/b"}) {
 		t.Fatalf("Parse splits on the first slash: %+v", r)
+	}
+	// A key may hold a slash and spaces, because a lattice id holds neither.
+	r = Parse("sink.types/interval[day/time]")
+	if r != (Ref{Item: "sink.types", Member: "interval[day/time]"}) {
+		t.Fatalf("Parse of a key with a slash: %+v", r)
 	}
 }

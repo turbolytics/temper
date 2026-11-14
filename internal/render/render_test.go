@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/turbolytics/temper"
@@ -29,6 +30,8 @@ func fixture() (*model.Project, status.Set) {
 				Family: "resilience", Requires: levels("integration"), ViolatedOnce: []string{"#221"}},
 			{ID: "sink.error.classifies", Claim: "Every error carries a code.", AppliesTo: "sink", Requires: levels("unit"), TrackedBy: "#240"},
 			{ID: "sink.later", Claim: "Someday.", AppliesTo: "sink", Requires: levels()},
+			{ID: "sink.any", Claim: "Holds wherever the sink can be exercised.", AppliesTo: "sink",
+				Family: "resilience", RequiresAny: levels("unit", "integration")},
 		},
 		Lattices: []model.Lattice{
 			{ID: "sink.types", Description: "Every Arrow type.", AppliesTo: "sink", Requires: []string{"integration"},
@@ -53,6 +56,8 @@ func fixture() (*model.Project, status.Set) {
 	put("invariant", "sink.flush.keeps_batch", "", "sink.pg", status.NotRequired, status.Missing)
 	put("invariant", "sink.error.classifies", "", "sink.kafka", status.Unenforced, status.NotRequired)
 	put("invariant", "sink.error.classifies", "", "sink.pg", status.Covered, status.NotRequired)
+	put("invariant", "sink.any", "", "sink.kafka", status.Covered, status.NotRequired)
+	put("invariant", "sink.any", "", "sink.pg", status.NotRequired, status.Covered)
 	put("lattice", "sink.types", "int64", "sink.kafka", status.NotRequired, status.Covered)
 	put("lattice", "sink.types", "list<int64>", "sink.kafka", status.NotRequired, status.Exempt)
 	put("lattice", "sink.types", "int64", "sink.pg", status.NotRequired, status.Missing)
@@ -95,5 +100,35 @@ func TestMarkdown_RowsWithoutStatusReadMissing(t *testing.T) {
 	out := string(Markdown(p, status.NewSet()))
 	if !bytes.Contains([]byte(out), []byte("| `sink.kafka` | Publishes rows to Kafka. | ⬜ | ⬜ |")) {
 		t.Fatalf("a required cell with no committed status must render missing:\n%s", out)
+	}
+}
+
+// A requires_any invariant has rows like any other, and its entry says it is
+// proven at any one level rather than at none.
+func TestMarkdown_RequiresAnyHasRowsAndSaysSo(t *testing.T) {
+	temper.Covers(t, "cli.render")
+	out := string(Markdown(fixture()))
+	for _, want := range []string{
+		"| `sink.any` | `sink.kafka` | ✅ | — |",
+		"| `sink.any` | `sink.pg` | — | ✅ |",
+		"Proven at any one of: unit, integration.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "`sink.any` — Holds wherever the sink can be exercised. (declared, no levels required)") {
+		t.Fatal("a requires_any invariant is not 'declared, no levels required'")
+	}
+}
+
+// An unproven group with no committed status reads missing at every level,
+// so a fresh project shows the claim as open, not as satisfied.
+func TestMarkdown_RequiresAnyWithoutStatusReadsMissing(t *testing.T) {
+	temper.Covers(t, "cli.render")
+	p, _ := fixture()
+	out := string(Markdown(p, status.NewSet()))
+	if !strings.Contains(out, "| `sink.any` | `sink.kafka` | ⬜ | ⬜ |") {
+		t.Fatalf("an unknown requires_any row must read missing at each of its levels:\n%s", out)
 	}
 }

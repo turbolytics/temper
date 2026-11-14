@@ -86,12 +86,27 @@ func TestCheck_LatticeShape(t *testing.T) {
 		"temper/lattices/sink.types.yml", "§9", "sink.types", "exactly one")
 	expect(t, Check(project(withTypes(bothSupported), shape(func(l *model.Lattice) { l.AppliesTo = ""; l.CoveredBy = "tests" }))),
 		"temper/lattices/sink.types.yml", "§9", "sink.types", "tests")
-	expect(t, Check(project(withTypes(bothSupported), shape(func(l *model.Lattice) { l.Members = append(l.Members, model.Member{Key: "a b"}) }))),
-		"temper/lattices/sink.types.yml", "§9", "sink.types", "a b")
+	expect(t, Check(project(withTypes(bothSupported), shape(func(l *model.Lattice) { l.Members = append(l.Members, model.Member{Key: " padded"}) }))),
+		"temper/lattices/sink.types.yml", "§9", "sink.types", "not a valid key")
 	expect(t, Check(project(withTypes(bothSupported), shape(func(l *model.Lattice) { l.Members = append(l.Members, model.Member{Key: "int64"}) }))),
 		"temper/lattices/sink.types.yml", "§9", "sink.types", "twice")
 	expect(t, Check(project(withTypes(bothSupported), shape(func(l *model.Lattice) { l.Description = "" }))),
 		"temper/lattices/sink.types.yml", "§9", "sink.types", "description")
 	expect(t, Check(project(withTypes(bothSupported), shape(func(l *model.Lattice) { l.AppliesTo = "widget" }))),
 		"temper/lattices/sink.types.yml", "§9", "sink.types", "widget")
+}
+
+// Keys are the closed set's own names: a space or a slash in one is fine.
+func TestCheck_LatticeKeysMayHoldSpacesAndSlashes(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	keys := []string{"decimal(*, *)", "interval[day/time]"}
+	answers := map[string]model.Answer{}
+	var members []model.Member
+	for _, k := range keys {
+		answers[k] = model.Answer{Supported: true}
+		members = append(members, model.Member{Key: k})
+	}
+	if errs := Check(project(withTypes(answers), func(p *model.Project) { p.Lattices[0].Members = members })); len(errs) != 0 {
+		t.Fatalf("errors:\n%s", render(errs))
+	}
 }

@@ -12,14 +12,17 @@ var idPattern = regexp.MustCompile(`^[a-z0-9_]+(\.[a-z0-9_]+)*$`)
 // ValidID reports whether s is a well-formed id (spec §5).
 func ValidID(s string) bool { return idPattern.MatchString(s) }
 
-// ValidKey reports whether s can be a lattice member key: non-empty, no
-// whitespace, no slash. Keys are looser than ids (`list<int64>`).
+// ValidKey reports whether s can be a lattice member key: non-empty, with no
+// control characters and no leading or trailing whitespace. Keys are the
+// closed set's own names, so they may hold the spaces and slashes real names
+// do (`decimal(*, *)`, `interval[day/time]`). A reference splits on its first
+// slash and a lattice id holds none, so a slash in a key is unambiguous.
 func ValidKey(s string) bool {
-	if s == "" {
+	if s == "" || s != strings.TrimSpace(s) {
 		return false
 	}
 	for _, r := range s {
-		if r == '/' || unicode.IsSpace(r) {
+		if unicode.IsControl(r) {
 			return false
 		}
 	}

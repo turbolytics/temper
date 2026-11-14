@@ -34,6 +34,7 @@ type Cell struct {
 	Status   status.Status `json:"status"`
 	Enforced bool          `json:"enforced"`
 	Judged   bool          `json:"judged"`
+	Any      bool          `json:"any"` // one of a requires_any group: proof at any one level is enough
 	Evidence []Evidence    `json:"evidence"`
 }
 
@@ -45,13 +46,50 @@ type Result struct {
 	Set    status.Set
 }
 
-// Gaps returns the cells that fail the build: enforced, judged, and missing
-// or failing.
+// Gaps returns the cells that fail the build.
+//
+// A cell of an enforced item is a gap when it is judged and missing or
+// failing. The cells of a requires_any group are one claim: the group is a gap
+// once, on its first cell, when every level was judged and none has proof; and
+// a failing cell is a gap whatever else passed, because a pass at one level
+// never hides a failure at another.
 func (r Result) Gaps() []Cell {
-	var out []Cell
+	type group struct{ kind, item, member, subject string }
+	groups := map[group][]Cell{}
 	for _, c := range r.Cells {
-		if c.Enforced && c.Judged && (c.Status == status.Missing || c.Status == status.Failing) {
+		if c.Any {
+			g := group{c.Kind, c.Item, c.Member, c.Subject}
+			groups[g] = append(groups[g], c)
+		}
+	}
+	unproven := func(g group) bool {
+		for _, c := range groups[g] {
+			if !c.Judged || c.Status != status.Missing {
+				return false
+			}
+		}
+		return true
+	}
+
+	var out []Cell
+	reported := map[group]bool{}
+	for _, c := range r.Cells {
+		if !c.Enforced {
+			continue
+		}
+		switch {
+		case !c.Any:
+			if c.Judged && (c.Status == status.Missing || c.Status == status.Failing) {
+				out = append(out, c)
+			}
+		case c.Judged && c.Status == status.Failing:
 			out = append(out, c)
+		case c.Status == status.Missing:
+			g := group{c.Kind, c.Item, c.Member, c.Subject}
+			if !reported[g] && unproven(g) {
+				reported[g] = true
+				out = append(out, c)
+			}
 		}
 	}
 	return out
@@ -182,6 +220,7 @@ type cellSpec struct {
 	kind, item, member, subject string
 	requires                    []string
 	enforced                    bool
+	anyOne                      bool // requires_any: proof at any one of requires is enough
 	judge                       func(level string) (status.Status, []Evidence)
 }
 
@@ -192,13 +231,14 @@ func (b *builder) add(spec cellSpec) {
 	for _, l := range spec.requires {
 		required[l] = true
 	}
+	var cells []Cell
 	for _, level := range b.levels {
 		if !required[level] {
 			b.set.Put(spec.kind, spec.item, spec.member, spec.subject, level, status.NotRequired)
 			continue
 		}
 		c := Cell{Kind: spec.kind, Item: spec.item, Member: spec.member, Subject: spec.subject, Level: level,
-			Enforced: spec.enforced, Judged: b.run[level], Evidence: []Evidence{}}
+			Enforced: spec.enforced, Judged: b.run[level], Any: spec.anyOne, Evidence: []Evidence{}}
 		if c.Judged {
 			c.Status, c.Evidence = spec.judge(level)
 			if !spec.enforced && c.Status != status.Covered && c.Status != status.Exempt {
@@ -215,8 +255,35 @@ func (b *builder) add(spec cellSpec) {
 				c.Status = status.Unenforced
 			}
 		}
-		b.set.Put(spec.kind, spec.item, spec.member, spec.subject, level, c.Status)
+		cells = append(cells, c)
+	}
+	if spec.anyOne {
+		settleAny(cells)
+	}
+	for _, c := range cells {
+		b.set.Put(spec.kind, spec.item, spec.member, spec.subject, c.Level, c.Status)
 		b.cells = append(b.cells, c)
+	}
+}
+
+// settleAny applies requires_any to one group of cells. Once any level is
+// proven (covered, or exempt by a passing proof), the levels that are not
+// proven are not needed, so they read not_required instead of missing. A
+// failing level stays failing.
+func settleAny(cells []Cell) {
+	proven := false
+	for _, c := range cells {
+		if c.Status == status.Covered || c.Status == status.Exempt {
+			proven = true
+		}
+	}
+	if !proven {
+		return
+	}
+	for i := range cells {
+		if cells[i].Status == status.Missing || cells[i].Status == status.Unenforced {
+			cells[i].Status = status.NotRequired
+		}
 	}
 }
 
@@ -261,11 +328,12 @@ func (b *builder) coversJudge(ref, subject string) func(string) (status.Status, 
 
 func (b *builder) invariants() {
 	for _, inv := range b.p.Invariants {
-		if inv.Retired || inv.Requires == nil || len(*inv.Requires) == 0 {
+		levels, anyOne := inv.RequiredLevels()
+		if inv.Retired || len(levels) == 0 {
 			continue
 		}
 		for _, s := range b.p.ApplicableSubjects(inv) {
-			spec := cellSpec{kind: "invariant", item: inv.ID, subject: s.ID, requires: *inv.Requires,
+			spec := cellSpec{kind: "invariant", item: inv.ID, subject: s.ID, requires: levels, anyOne: anyOne,
 				enforced: inv.IsEnforced(), judge: b.coversJudge(inv.ID, s.ID)}
 			if e, ok := s.Exemption(inv.ID); ok {
 				spec.judge = b.exemptJudge(inv.ID, s.ID, e.ProvenBy)

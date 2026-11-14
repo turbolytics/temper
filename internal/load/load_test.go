@@ -120,10 +120,35 @@ func TestLoad_AnswerForms(t *testing.T) {
 	}
 	double, _ := p.Subject("sink.double")
 	if a := double.Answers["sink.types"]["int64"]; !a.Supported {
-		t.Errorf("map without unsupported, with extra keys = %+v, want supported", a)
+		t.Errorf("`supported: true` map with payload keys = %+v, want supported", a)
 	}
 	if a := double.Answers["sink.types"]["list<int64>"]; a.Supported || a.TrackedBy != "#9" {
 		t.Errorf("tracked unsupported = %+v", a)
+	}
+}
+
+// A map answer must say which way it goes. Reading a map with neither key as
+// supported would credit `outcome: unsupported` (a project's own payload) as
+// support, silently, so Temper refuses to guess.
+func TestLoad_AnswerMapMustSayWhichWay(t *testing.T) {
+	temper.Covers(t, "declarations.ambiguous_answer_rejected", temper.Subject("cli"))
+	temper.Covers(t, "declarations.load")
+	for name, tc := range map[string]struct{ body, want string }{
+		"neither key":       {"{outcome: unsupported, code: user.sink.type_unsupported}", "neither"},
+		"both keys":         {"{supported: true, unsupported: true, reason: r, tracked_by: '#1'}", "both"},
+		"supported false":   {"{supported: false}", "supported: false"},
+		"unsupported false": {"{unsupported: false, outcome: exact}", "unsupported: false"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := writeProject(t, map[string]string{
+				"temper.yml":              minimalConfig,
+				"temper/subjects/s.a.yml": "id: s.a\nkind: s\nfeature: f\nanswers:\n  l:\n    k: " + tc.body + "\n",
+			})
+			_, errs := Load(root)
+			if len(errs) != 1 || errs[0].File != "temper/subjects/s.a.yml" || !strings.Contains(errs[0].Message, tc.want) {
+				t.Fatalf("errors = %v, want one naming the subject file and %q", errs, tc.want)
+			}
+		})
 	}
 }
 
@@ -155,7 +180,7 @@ func TestLoad_PayloadFieldsAllowed(t *testing.T) {
 	temper.Covers(t, "declarations.load")
 	root := writeProject(t, map[string]string{
 		"temper.yml":              minimalConfig,
-		"temper/subjects/s.a.yml": "id: s.a\nkind: s\nfeature: f\nanswers:\n  l:\n    k: {anything: 1, goes: [x]}\n",
+		"temper/subjects/s.a.yml": "id: s.a\nkind: s\nfeature: f\nanswers:\n  l:\n    k: {supported: true, anything: 1, goes: [x]}\n",
 		"temper/scenarios/a.yml":  "- id: a\n  name: n\n  description: d\n  covers: [f]\n  events:\n    - {at: 0s, whatever: {deep: true}}\n",
 	})
 	if _, errs := Load(root); len(errs) != 0 {
@@ -229,5 +254,55 @@ func TestLoad_SecondDocumentIsError(t *testing.T) {
 	_, errs := Load(root)
 	if len(errs) != 1 || errs[0].File != "temper/features.yml" || !strings.Contains(errs[0].Message, "one YAML document") {
 		t.Fatalf("errors = %v, want one naming features.yml", errs)
+	}
+}
+
+// A project keeps its own metadata beside Temper's under an x- key. Temper
+// ignores it, and still rejects every other field it does not know.
+func TestLoad_ExtensionFieldsAreIgnored(t *testing.T) {
+	temper.Covers(t, "declarations.extension_fields")
+	root := writeProject(t, map[string]string{
+		"temper.yml":              minimalConfig + "x-owner: platform\n",
+		"temper/features.yml":     "features:\n  - id: a\n    description: d\n    requires: []\n    x-team: sinks\n",
+		"temper/invariants.yml":   "invariants:\n  - id: i\n    claim: c\n    applies_to: s\n    requires: []\n    x-verified_by: harness\n",
+		"temper/lattices/l.yml":   "id: l\ndescription: d\napplies_to: s\nmembers:\n  - key: k\n    x-duckdb: [BIGINT]\n",
+		"temper/subjects/s.a.yml": "id: s.a\nkind: s\nfeature: a\nx-constructed: false\nexempt:\n  - invariant: i\n    reason: r\n    proven_by: T\n    x-ticket: \"#9\"\n",
+		"temper/scenarios/a.yml":  "- id: sc\n  name: n\n  description: d\n  covers: [a]\n  x-flaky: no\n  events:\n    - {at: 0s}\n",
+	})
+	p, errs := Load(root)
+	if len(errs) != 0 {
+		t.Fatalf("errors = %v, want x- fields ignored everywhere", errs)
+	}
+	if f, ok := p.Feature("a"); !ok || f.Description != "d" || len(p.Lattices) != 1 || len(p.Lattices[0].Members) != 1 || len(p.Subjects[0].Exempt) != 1 {
+		t.Fatalf("an x- field disturbed the fields around it: %+v", p)
+	}
+}
+
+func TestLoad_ExtensionFieldDoesNotHideATypo(t *testing.T) {
+	temper.Covers(t, "declarations.extension_fields")
+	root := writeProject(t, map[string]string{
+		"temper.yml":          minimalConfig,
+		"temper/features.yml": "features:\n  - id: a\n    x-team: sinks\n    descripton: typo\n    requires: []\n",
+	})
+	_, errs := Load(root)
+	if len(errs) != 1 || errs[0].File != "temper/features.yml" || !strings.Contains(errs[0].Message, "descripton") || strings.Contains(errs[0].Message, "x-team") {
+		t.Fatalf("errors = %v, want one for the typo and none for x-team, with its line", errs)
+	}
+	if !strings.Contains(errs[0].Message, "line 4") {
+		t.Fatalf("message %q lost the typo's line number", errs[0].Message)
+	}
+}
+
+// Only a key that starts with x- is an extension: x or xray is not.
+func TestLoad_OnlyXDashIsAnExtension(t *testing.T) {
+	temper.Covers(t, "declarations.extension_fields")
+	for _, key := range []string{"x", "xray", "X-team", "extra"} {
+		root := writeProject(t, map[string]string{
+			"temper.yml":          minimalConfig,
+			"temper/features.yml": "features:\n  - id: a\n    description: d\n    requires: []\n    " + key + ": 1\n",
+		})
+		if _, errs := Load(root); len(errs) != 1 {
+			t.Errorf("key %q: errors = %v, want it rejected as unknown", key, errs)
+		}
 	}
 }

@@ -5,6 +5,9 @@ features:
   - id: declarations.load
     description: Reads every declaration into one model, rejecting unknown fields.
     requires: [unit]
+  - id: declarations.extension_fields
+    description: Ignores x- fields, so a project keeps its own metadata beside Temper's.
+    requires: [unit]
   - id: cli.check
     description: Validates declarations without running any test and names each problem's file, id and rule.
     requires: [unit, integration]

@@ -24,3 +24,14 @@ invariants:
     family: correctness
     requires: [integration]
     tracked_by: "#12"
+
+  - id: store.restock.adds_exactly
+    claim: >
+      Restocking n units of a SKU adds exactly n to its stock, never more
+      and never less.
+    applies_to: store
+    class: safety
+    family: correctness
+    # The memory store proves this in-process; the file store proves it
+    # against a real file, so each subject names the one level that suits it.
+    requires_any: [unit, integration]

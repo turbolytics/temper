@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -129,8 +130,10 @@ func (l *loader) decode(rel string, out any) bool {
 		if errors.Is(err, io.EOF) {
 			return true
 		}
-		l.fail(rel, err)
-		return false
+		if err = withoutExtensions(err); err != nil {
+			l.fail(rel, err)
+			return false
+		}
 	}
 	var extra yaml.Node
 	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
@@ -138,6 +141,31 @@ func (l *loader) decode(rel string, out any) bool {
 		return false
 	}
 	return true
+}
+
+// extensionField matches yaml's complaint about a field the struct lacks, for
+// a field whose name starts with x-.
+var extensionField = regexp.MustCompile(`^line \d+: field x-\S* not found in type `)
+
+// withoutExtensions drops the complaints about x- fields from a strict decode
+// error. A project keeps its own metadata beside Temper's under an x- key;
+// Temper ignores it, and still rejects every other unknown field. The decode
+// has already filled the struct, and the complaints keep their line numbers.
+func withoutExtensions(err error) error {
+	var te *yaml.TypeError
+	if !errors.As(err, &te) {
+		return err
+	}
+	var rest []string
+	for _, msg := range te.Errors {
+		if !extensionField.MatchString(msg) {
+			rest = append(rest, msg)
+		}
+	}
+	if len(rest) == 0 {
+		return nil
+	}
+	return &yaml.TypeError{Errors: rest}
 }
 
 func (l *loader) fail(rel string, err error) {

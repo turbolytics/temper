@@ -58,3 +58,14 @@ func TestMemoryStore_Units(t *testing.T) {
 		}
 	}
 }
+
+func TestMemoryStore_RestockAddsExactly(t *testing.T) {
+	temper.Covers(t, "store.restock.adds_exactly", temper.Subject("store.memory"))
+
+	s := NewMemoryStore()
+	s.Restock("apple", 3, Each)
+	s.Restock("apple", 2, Each)
+	if got := s.Stock("apple"); got != 5 {
+		t.Fatalf("stock = %v after restocking 3 then 2, want exactly 5", got)
+	}
+}
