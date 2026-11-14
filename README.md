@@ -95,6 +95,16 @@ one evidence record with the outcome. A pass counts; a skip, failure or
 panic does not. A plain `go test` with no runner records nothing and
 behaves exactly as before.
 
+Call `temper.Covers` first in the test, before anything that registers a
+cleanup (a mock controller, `t.TempDir`, `t.Setenv`). A cleanup can still
+fail the test after the adapter has read the outcome, so a test that breaks
+this rule fails with a message saying so. To lift the rule, settle evidence
+after every test has fully finished:
+
+```go
+func TestMain(m *testing.M) { temper.Main(m) }   // or os.Exit(temper.Run(m)) inside your own TestMain
+```
+
 ### 4. Run it
 
 ```sh
@@ -196,7 +206,7 @@ missing.
 exempt:
   - invariant: store.persists_across_restart
     reason: Memory is the point. A restart starts empty.
-    proven_by: TestMemoryStore_ForgetsOnRestart
+    proven_by: TestIntegration_MemoryStoreForgetsOnRestart
 ```
 
 ### Lattice
@@ -277,15 +287,20 @@ levels:
   - name: unit
     description: go test ./...
   - name: integration
-    description: go test -tags integration ./...; state survives a real restart
+    description: go test -tags integration -run '^TestIntegration' ./...; state survives a real restart
 ```
 
 ```sh
 temper clean
 temper run --level unit        -- go test ./...
-temper run --level integration -- go test -tags integration ./...
+temper run --level integration -- go test -tags integration -run '^TestIntegration' ./...
 temper matrix --all-levels
 ```
+
+A level's command must run only that level's tests. Plain `go test -tags
+integration ./...` would also run every unit test and credit it at the
+integration level. Select integration tests by name, as here, or keep them
+in their own package.
 
 A level can be built from several commands, such as Go tests and a pytest
 suite. Wrap each one in its own `temper run --level <level>`. Evidence
@@ -325,7 +340,7 @@ from the test named in `proven_by`:
 
 ```go
 // A memory store cannot persist across a restart, and says so.
-func TestMemoryStore_ForgetsOnRestart(t *testing.T) {
+func TestIntegration_MemoryStoreForgetsOnRestart(t *testing.T) {
     temper.Exempts(t, "store.persists_across_restart", temper.Subject("store.memory"))
     s := NewMemoryStore()
     s.Restock("apple", 5, Each)
@@ -426,7 +441,7 @@ fails if the committed statuses disagree with what the evidence produces.
 - run: go install github.com/turbolytics/temper/cmd/temper@latest
 - run: temper clean
 - run: temper run --level unit -- go test ./...
-- run: temper run --level integration -- go test -tags integration ./...
+- run: temper run --level integration -- go test -tags integration -run '^TestIntegration' ./...
 - run: temper matrix --check --all-levels
 ```
 
@@ -476,7 +491,7 @@ The checker is the guardrail. The agent proposes; Temper decides.
 | `temper check` | Validates declarations without running tests: ids, files, levels, applicability, exemptions, lattice answers, scenarios. |
 | `temper matrix` | Checks, reads evidence, and writes `temper/status/` and `MATRIX.md`. |
 | `temper matrix --all-levels` | Judges every level, even one with no evidence. Use it in CI. |
-| `temper matrix --check` | Writes nothing. Exits 3 if the committed output differs. |
+| `temper matrix --check` | Writes nothing, judges every level (implies `--all-levels`), and exits 3 if the committed output differs. |
 | `temper matrix --json` | Prints every cell, error and count as JSON. |
 | `temper render` | Rewrites `MATRIX.md` from the committed `temper/status/` (after a merge conflict). |
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE` and `TEMPER_RUN` set. Appends evidence, never clears it. |
@@ -510,7 +525,7 @@ When several apply, the highest wins.
     "kind": "invariant", "item": "store.persists_across_restart", "member": "",
     "subject": "store.memory", "level": "integration", "status": "exempt",
     "enforced": true, "judged": true,
-    "evidence": [{"test": "TestMemoryStore_ForgetsOnRestart", "outcome": "pass"}]
+    "evidence": [{"test": "TestIntegration_MemoryStoreForgetsOnRestart", "outcome": "pass"}]
   }],
   "summary": {"covered": 20, "exempt": 2, "failing": 0, "missing": 0, "unenforced": 2, "gaps": 0},
   "stale": []

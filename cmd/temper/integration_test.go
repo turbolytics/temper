@@ -200,12 +200,25 @@ func TestIntegration_RunAndExample(t *testing.T) {
 		{"run", "--level", "unit", "--", "go", "test", "./..."},
 		{"clean"},
 		{"run", "--level", "unit", "--", "go", "test", "./..."},
-		{"run", "--level", "integration", "--", "go", "test", "-tags", "integration", "./..."},
+		{"run", "--level", "integration", "--", "go", "test", "-tags", "integration", "-run", "^TestIntegration", "./..."},
 		{"matrix", "--check", "--all-levels"},
 	}
 	for _, step := range steps {
 		if code, out := temperBin(t, dst, step...); code != 0 {
 			t.Fatalf("temper %s = %d\n%s", strings.Join(step, " "), code, out)
+		}
+	}
+
+	// A level counts only what ran at it: no unit test may be credited at
+	// the integration level.
+	files, _ := filepath.Glob(filepath.Join(dst, ".temper", "evidence", "*.jsonl"))
+	for _, f := range files {
+		raw, _ := os.ReadFile(f)
+		for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+			var r temper.Record
+			if json.Unmarshal([]byte(line), &r) == nil && r.Level == "integration" && !strings.HasPrefix(r.Test, "TestIntegration") {
+				t.Fatalf("unit test %s was credited at the integration level", r.Test)
+			}
 		}
 	}
 }

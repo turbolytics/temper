@@ -11,7 +11,7 @@ import (
 
 // A restart is a new process opening the same file: the store is closed and
 // reopened from disk.
-func TestFileStore_PersistsAcrossRestart(t *testing.T) {
+func TestIntegration_FileStorePersistsAcrossRestart(t *testing.T) {
 	temper.Covers(t, "store.file")
 	temper.Covers(t, "store.persists_across_restart", temper.Subject("store.file"))
 

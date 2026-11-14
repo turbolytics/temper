@@ -6,7 +6,7 @@ exempt:
     reason: >
       Memory is the point: a restart starts empty. Nothing that needs
       durability uses this store.
-    proven_by: TestMemoryStore_ForgetsOnRestart
+    proven_by: TestIntegration_MemoryStoreForgetsOnRestart
 answers:
   sku.units:
     each: supported

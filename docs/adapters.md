@@ -29,13 +29,27 @@ records nothing and changes nothing about how tests run. Plain `pytest`,
 `go test` or `npm test` must behave exactly as without the adapter.
 
 `temper run --level <level> -- <command>` sets all three and runs the
-command, so no project wires them by hand.
+command, so no project wires them by hand. The command must run only that
+level's tests. A command that also runs unit tests credits them at its
+level, which is the false claim levels exist to prevent.
 
 ## When to record
 
 Record after the test's outcome is final: after teardown, fixtures and
 cleanups have run. One record per (test execution, reference). A test that
 declares three references writes three records with the same outcome.
+
+If the framework cannot tell the adapter when a test is truly final, the
+adapter must refuse rather than guess. Go's `testing` runs cleanups last in,
+first out, so a cleanup registered before the claim runs after the
+adapter's own. The Go adapter therefore settles every outcome after the
+package's tests finish when the package uses `temper.Main` (or
+`temper.Run`) in `TestMain`. Without it, a claim made after a cleanup is
+registered fails the test with a message saying how to fix it.
+
+Read `TEMPER_LEVEL` and `TEMPER_EVIDENCE` once, when the test process
+starts. A test that changes its own environment must not change where or at
+what level its evidence counts.
 
 ## Outcomes
 

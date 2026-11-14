@@ -455,7 +455,7 @@ committed statuses.
 | Command | What it does |
 |---|---|
 | `temper check` | Validates declarations (§14). |
-| `temper matrix [--json] [--check] [--all-levels]` | Checks, reads evidence, writes `status/` and `MATRIX.md`. `--check` writes nothing and reports committed output that differs. `--json` prints the full result. |
+| `temper matrix [--json] [--check] [--all-levels]` | Checks, reads evidence, writes `status/` and `MATRIX.md`. `--check` writes nothing, judges every level, and reports committed output that differs. `--json` prints the full result. |
 | `temper render` | Rewrites `MATRIX.md` from the committed `status/` (after a merge). |
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE` and `TEMPER_RUN` set. Appends; never clears. |
 | `temper clean` | Deletes all evidence: the start of a full run. |
