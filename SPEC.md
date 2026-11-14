@@ -2,12 +2,13 @@
 
 **Version 0.1 — draft**
 
-Temper is a guidance system for software written with AI. You declare the
-structure a system must have — what it does, what must never happen, which
-closed sets it must answer for — and let the implementation be a black box.
-Tests state what they prove. Temper joins those statements against the
-declarations and shows, cell by cell, what is proven, what is excused with
-proof, and what is missing.
+Temper is a framework for LLM-based software development. People declare
+what a system means: its features, its invariants, the scenarios it must
+handle, the closed sets it must answer for. The code is an implementation
+detail, written by an LLM and treated as a black box. Tests state what they
+prove. Temper joins those statements against the declarations and shows,
+cell by cell, what is proven, what is excused with proof, and what is
+missing.
 
 Trust the implementation. Verify the structure.
 
@@ -15,18 +16,30 @@ Trust the implementation. Verify the structure.
 
 ## 1. Why
 
-A test suite reports on the tests that exist. It cannot report on the tests
-that don't. A feature with no test, an integration that never runs its real
-checks, a test that skips and prints `ok` — all of these read as green.
+As LLMs get better at writing code, human understanding of a system moves up
+a level. Nobody reads the machine code a compiler emits; we trust the
+compiler to produce valid code and reason about the source instead. LLMs are
+now good enough to be trusted the same way, and the source becomes what
+machine code became: an implementation detail.
 
-This gets worse when an AI writes the code. An agent will write a test that
-skips, asserts nothing, or covers the easy path, and report success. Line
-coverage does not catch it: a line can execute without anything being proven
-about it.
+People still have to know what the system does and that it does it. They
+work best at the level of functional definitions: features, invariants and
+scenarios. Temper makes that level the one that is written down, committed
+and checked.
 
-Temper catches it by turning the question around. Instead of asking "what do
-the tests cover?", it asks "what did we say must be covered, and where is the
-evidence?" Anything declared without evidence is a visible gap.
+A test suite cannot provide that view on its own. It reports on the tests
+that exist, never on the ones that don't. A feature with no test, an
+integration that never runs its real checks, a test that skips and prints
+`ok`: all of these read as green. An LLM writing tests makes this worse. It
+will write a test that skips, asserts nothing, or covers the easy path, and
+report success. Line coverage does not catch it, because a line can execute
+without anything being proven about it.
+
+Temper turns the question around. Instead of asking "what do the tests
+cover?", it asks "what did we say must hold, and where is the evidence?" It
+guides the LLM to tie every test to the feature or invariant it proves,
+validates each claim, and reports anything declared without evidence as a
+visible gap.
 
 ## 2. Rules
 
