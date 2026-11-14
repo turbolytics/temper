@@ -91,13 +91,17 @@ temper/
   lattices/<id>.yml         # one file per lattice
   subjects/<id>.yml         # one file per subject
   scenarios/<group>.yml     # scenarios, grouped however suits the project
-  status/<id>.yml           # GENERATED, committed: per-item cell status
+  status/                   # GENERATED, committed: one status per cell
+    features.yml            #   one row per feature
+    subjects/<id>.yml       #   one row per invariant or lattice member, per subject
+    lattices/<id>.yml       #   one row per member of a scenario-covered lattice
 MATRIX.md                   # GENERATED, committed: the rendered matrix
 .temper/evidence/*.jsonl    # GENERATED, not committed: evidence records from test runs
 ```
 
-Paths are configurable in `temper.yml`. Generated files carry a header saying
-so and are never edited by hand.
+Paths are configurable in `temper.yml` (§6). Generated files carry a header
+saying so and are never edited by hand. Status files are split by kind
+because ids are unique only within a kind.
 
 Only statuses are committed. Test names and counts change whenever a test is
 added; the committed status changes only when a cell does.
@@ -127,9 +131,13 @@ Evidence records, scenarios and exemptions refer to declared items:
 | `sink.clickhouse` | a feature (or a subject, where a subject is expected) |
 | `sink.flush.keeps_batch` | an invariant |
 | `sink.types/int64` | member `int64` of lattice `sink.types` |
+| `failed.state.healthy_worker` | a scenario (§11) |
 
-Feature and invariant ids share one namespace for references, so they must not
-collide.
+Feature, invariant and scenario ids share one namespace for references, so
+they must not collide. A reference is split on its first `/`.
+
+Lattice member keys are not ids: a key is any string without whitespace or
+`/` (`list<int64>`, `up.working`).
 
 ## 6. Configuration — `temper.yml`
 
@@ -147,12 +155,15 @@ levels:                      # in the order they run
   - name: release
     description: the shipped image does it
 
-evidence: .temper/evidence
+evidence: .temper/evidence    # optional; this is the default
+dir: temper                   # optional; where declarations and status/ live
+matrix: MATRIX.md             # optional; where the matrix is rendered
 ```
 
-The order of `levels` is the order of matrix columns. How a runner tells an
-adapter which level it is running at is the adapter's concern (an environment
-variable such as `TEMPER_LEVEL` is the convention); a test never sets it.
+The order of `levels` is the order of matrix columns. A runner tells an
+adapter which level it is running at through `TEMPER_LEVEL`, and where to
+write through `TEMPER_EVIDENCE` (`temper run` sets both, §13); a test never
+sets either.
 
 ## 7. Feature
 
@@ -266,8 +277,13 @@ description should say how.
 **Checks:** a subject answer whose key is not a member is an error (R6, typo).
 A member an applicable subject does not answer is a gap.
 
-**Cells:** for `applies_to`, one per (subject, member answered `supported`,
-level). For `covered_by: scenarios`, one per (member, level).
+**Cells:** for `applies_to`, one per (subject, answered member, level) for
+each level in `requires`. A `supported` answer needs `covers` evidence; an
+`unsupported` answer with `proven_by` is exempt when its proof passes; an
+`unsupported` answer with only `tracked_by` is unenforced. For
+`covered_by: scenarios`, one per (member, level), credited only by evidence
+that carries a declared `scenario` listing the member (§11). A member no
+declared scenario lists is a gap `temper check` reports before any test runs.
 
 ## 10. Subject
 
@@ -300,8 +316,8 @@ answers:
 | `kind` | yes | Decides which invariants and lattices apply. |
 | `feature` | yes, unless `test_only` | The feature this subject delivers. |
 | `implements` | no | Optional capabilities beyond the kind's base contract; invariants may apply only to subjects implementing one (`applies_to: sink+Prober`). |
-| `exempt` | no | Invariants that cannot apply, each with `reason` and `proven_by` (a test id that must pass). |
-| `answers` | per lattice | For each applicable lattice, every member: `supported`, or `unsupported` with `reason` and optionally `proven_by` / `tracked_by`. |
+| `exempt` | no | Invariants that cannot apply, each with `reason` and `proven_by`: the test that emits a passing `exempts` evidence record for it (§12). |
+| `answers` | per lattice | For each applicable lattice, every member: `supported`, or a map with `unsupported: true`, a `reason`, and `proven_by` or `tracked_by`. Other keys in a map are the project's own payload and are ignored. |
 | `test_only` | no | A test double. Gets no cells and needs no feature; its evidence credits no real subject. |
 
 Answers are written by reading the subject, never generated from it: a table
@@ -339,6 +355,7 @@ payloads belong to the project.
 | `id` | yes | The scenario. |
 | `name` | yes | A sentence a reader understands without the code. |
 | `covers` | yes | References (§5) this scenario proves. Must resolve. |
+| `subject` | when `covers` names a per-subject item | The subject the scenario proves invariants or subject-lattice members for. |
 | `description` | yes | The claim, including what the system cannot know and therefore must not say. |
 | `events` | yes | Ordered entries. Each has `at` (a duration from start) and is either an input (project-defined fields) or an `expect`. `every` and `until` repeat an input. |
 
@@ -348,8 +365,11 @@ payloads belong to the project.
 - Descriptions say what the system cannot tell apart, and scenarios prove it
   says so (`unknown`, `idle` rather than a guessed fault).
 
-The project's scenario runner executes each scenario and emits one evidence record per
-`covers` reference, plus one for the scenario id itself.
+The project's scenario runner executes each scenario and emits one evidence
+record per `covers` reference, plus one for the scenario id itself, each
+carrying `scenario: <id>` (and the scenario's `subject`, if it has one).
+Temper holds that evidence to the declaration: a record naming a scenario
+that does not list its reference is an error (R7).
 
 ## 12. Evidence
 
@@ -360,14 +380,32 @@ written as JSON Lines to the evidence directory.
 {"covers":"sink.flush.keeps_batch","subject":"sink.kafka","test":"TestSinkKafka_FlushRetries","level":"integration","outcome":"pass","run":"ci-4812","at":"2026-11-14T15:02:11Z"}
 ```
 
+An exemption is proven by its own form of record, because a `covers` record
+from the proving test would claim the opposite:
+
+```json
+{"exempts":"sink.flush.idempotent_on_key","subject":"sink.kafka","test":"TestSinkKafka_IsNotKeyed","level":"unit","outcome":"pass"}
+```
+
+A scenario runner adds the scenario:
+
+```json
+{"covers":"heuristics/failed.state","scenario":"failed.state.healthy_worker","test":"TestScenarios/failed.state.healthy_worker","level":"unit","outcome":"pass"}
+```
+
 | Field | Required | Meaning |
 |---|---|---|
-| `covers` | yes | A reference (§5). |
+| `covers` | one of | A reference (§5) this test proves. |
+| `exempts` | one of | An invariant the subject is exempt from, or a lattice member it answers `unsupported`, that this test proves the exemption for. The test must be the declaration's `proven_by` (R5). |
 | `subject` | when the item applies per subject | Which subject this proves it for. |
+| `scenario` | no | The declared scenario that produced this record (§11). |
 | `test` | yes | The test's identifier in its own framework. |
 | `level` | yes | Set by the adapter from the runner (R4), never by the test. |
 | `outcome` | yes | `pass`, `fail`, `skip` or `error`. Only `pass` counts (R3). |
 | `run`, `at` | no | Run identifier and timestamp, for reports. |
+
+Exactly one of `covers` and `exempts` is set. Adapters append; they never
+delete or truncate evidence. Clearing it is `temper clean`.
 
 ### Adapters
 
@@ -388,39 +426,62 @@ def test_sigterm_flushes_buffer(image):
     ...
 ```
 
-A test may cover several references. An evidence record for a reference that does not
-resolve is an error (R7).
+A test may cover several references. An evidence record for a reference that
+does not resolve is an error (R7). The full contract an adapter implements is
+`docs/adapters.md`.
 
 ## 13. The matrix
 
 `temper matrix` joins every required cell with the evidence for it.
 
-| Status | Meaning |
-|---|---|
-| **covered** | At least one `pass` evidence record at this level. |
-| **exempt** | The subject is exempt from this invariant (or answered `unsupported`) and the `proven_by` test passed. |
-| **failing** | Evidence exists at this level and none passed; at least one failed or errored. |
-| **missing** | No passing evidence, including when every record was a skip. |
-| **unenforced** | The item has `tracked_by` or `enforced: false`. Reported, never fails the build. |
-| **—** | Not required at this level. Shown, never counted. |
+| Status | Committed as | Meaning |
+|---|---|---|
+| **covered** | `covered` | At least one `pass` evidence record at this level. |
+| **exempt** | `exempt` | The subject is exempt from this invariant (or answered `unsupported`) and a passing `exempts` record from the `proven_by` test exists at this level. |
+| **failing** | `failing` | Evidence exists at this level and none passed; at least one failed or errored. |
+| **missing** | `missing` | No passing evidence, including when every record was a skip. |
+| **unenforced** | `unenforced` | The item has `tracked_by` or `enforced: false` and is not yet proven. Once passing evidence exists the cell reads `covered`, so it shows as ready to enforce. Never fails the build. |
+| **—** | `not_required` | Not required at this level. Shown, never counted. |
 
-`temper matrix` exits non-zero when any enforced required cell is `missing` or
-`failing`. It writes `status/` and `MATRIX.md`, and with `--json` prints the
-full result for CI and agents.
+**Levels that did not run.** A level with no evidence records is *not run*:
+its cells keep their committed status (a new cell reads `missing`) and are
+not judged, so a local run of one level fails only on that level.
+`--all-levels` judges every level on the evidence present; CI always passes
+it, starting from empty evidence, which makes CI the authority on the
+committed statuses.
+
+**Commands.**
+
+| Command | What it does |
+|---|---|
+| `temper check` | Validates declarations (§14). |
+| `temper matrix [--json] [--check] [--all-levels]` | Checks, reads evidence, writes `status/` and `MATRIX.md`. `--check` writes nothing and reports committed output that differs. `--json` prints the full result. |
+| `temper render` | Rewrites `MATRIX.md` from the committed `status/` (after a merge). |
+| `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE` and `TEMPER_RUN` set. Appends; never clears. |
+| `temper clean` | Deletes all evidence: the start of a full run. |
+
+**Exit codes.** `0` every enforced, judged cell is covered or exempt. `1` one
+is missing or failing. `2` a declaration, evidence or usage error (nothing is
+written). `3` (`--check`) committed output is stale. The highest that applies
+wins.
 
 ## 14. Checks
 
 `temper check` validates declarations without running tests. It must report:
 
 1. Malformed ids, and duplicate ids within a kind.
-2. Feature and invariant ids that collide.
+2. Feature, invariant and scenario ids that collide.
 3. A subject file whose name and id disagree.
 4. A subject with no `feature` (unless `test_only`), or one naming an unknown feature.
 5. An invariant whose `applies_to` names no known kind or subject.
 6. An exemption naming an invariant that does not apply to the subject, or missing `reason` or `proven_by`.
 7. A lattice answer key that is not a member (typo), and a member an applicable subject does not answer (gap).
-8. A scenario `covers` reference that does not resolve.
+8. A scenario `covers` reference that does not resolve, and a member of a
+   scenario-covered lattice that no scenario lists (gap).
 9. A level named anywhere that is not in `temper.yml`.
+
+An unknown field in a declaration is an error (a typo), except inside lattice
+answers and scenario events, which carry the project's own payload.
 
 Every error names the file, the id and the rule it breaks, in a form an agent
 can act on:
@@ -444,9 +505,12 @@ This project declares its structure in temper/. Before finishing any change:
 - Never make a test skip, or catch and ignore a failure, to get green.
   A skip is not coverage.
 - A subject that cannot hold an invariant gets an exemption with a reason and
-  a test that proves it. Never delete an invariant to make the matrix pass.
+  a test that proves it (temper.Exempts). Never delete an invariant to make
+  the matrix pass.
 - Lattices are closed: answer every member for every applicable subject.
-- Run `temper check` and `temper matrix` and fix what they report.
+- Run `temper clean`, each level through `temper run --level <level> -- …`,
+  then `temper check` and `temper matrix --all-levels`, and fix what they
+  report.
 ```
 
 The checker is the guardrail. The agent proposes; Temper decides.
