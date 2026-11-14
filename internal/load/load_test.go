@@ -217,3 +217,17 @@ func TestFindRoot(t *testing.T) {
 		t.Fatal("FindRoot found a temper.yml where there is none")
 	}
 }
+
+// A second YAML document in one file would be dropped, and its declarations
+// with it, so its gaps would never show. It is an error naming the file.
+func TestLoad_SecondDocumentIsError(t *testing.T) {
+	temper.Covers(t, "declarations.load")
+	root := writeProject(t, map[string]string{
+		"temper.yml":          minimalConfig,
+		"temper/features.yml": "features:\n  - {id: a, description: d, requires: []}\n---\nfeatures:\n  - {id: b, description: d, requires: []}\n",
+	})
+	_, errs := Load(root)
+	if len(errs) != 1 || errs[0].File != "temper/features.yml" || !strings.Contains(errs[0].Message, "one YAML document") {
+		t.Fatalf("errors = %v, want one naming features.yml", errs)
+	}
+}

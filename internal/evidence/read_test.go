@@ -137,3 +137,27 @@ func TestClean(t *testing.T) {
 		t.Fatalf("left = %v, want only notes.txt", left)
 	}
 }
+
+// A line holds exactly one record with each key spelled once, exactly. Two
+// records on one line (an interleaved write), trailing text, a duplicate key
+// or a key in another case would otherwise be read silently, and wrongly.
+func TestRead_OneExactRecordPerLine(t *testing.T) {
+	temper.Covers(t, "cli.matrix")
+	temper.Covers(t, "matrix.unknown_reference_fails", temper.Subject("cli"))
+	for name, line := range map[string]string{
+		"two records":   line1 + " " + line2,
+		"trailing text": line1 + " trailing",
+		"duplicate key": `{"covers":"sink.kafka","test":"T","level":"unit","outcome":"fail","outcome":"pass"}`,
+		"key in caps":   `{"covers":"sink.kafka","test":"T","level":"unit","outcome":"fail","Outcome":"pass"}`,
+		"not an object": `["covers","sink.kafka"]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := project(t)
+			writeEvidence(t, p, "a.jsonl", line+"\n")
+			recs, errs := Read(p)
+			if len(recs) != 0 || len(errs) != 1 || errs[0].File != ".temper/evidence/a.jsonl:1" {
+				t.Fatalf("Read(%q) = %+v, %v; want one error at a.jsonl:1 and no record", line, recs, errs)
+			}
+		})
+	}
+}

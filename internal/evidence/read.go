@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -73,10 +74,8 @@ func Read(p *model.Project) ([]Located, diag.List) {
 			if len(bytes.TrimSpace(line)) == 0 {
 				continue
 			}
-			var r temper.Record
-			dec := json.NewDecoder(bytes.NewReader(line))
-			dec.DisallowUnknownFields()
-			if err := dec.Decode(&r); err != nil {
+			r, err := parseRecord(line)
+			if err != nil {
 				errs = append(errs, diag.Error{File: fmt.Sprintf("%s:%d", file, n), Message: "is not an evidence record: " + err.Error(), Rule: "R7"})
 				continue
 			}
@@ -88,6 +87,53 @@ func Read(p *model.Project) ([]Located, diag.List) {
 		f.Close()
 	}
 	return recs, errs
+}
+
+// recordKeys are the keys a record may carry, spelled exactly.
+var recordKeys = map[string]bool{
+	"covers": true, "exempts": true, "subject": true, "scenario": true,
+	"test": true, "level": true, "outcome": true, "run": true, "at": true,
+}
+
+// parseRecord reads a line holding exactly one JSON object whose keys are
+// record keys, each spelled exactly and given once. encoding/json alone
+// would accept a second object or trailing text, match keys in any case,
+// and let a repeated key win silently.
+func parseRecord(line []byte) (temper.Record, error) {
+	var r temper.Record
+	dec := json.NewDecoder(bytes.NewReader(line))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return r, errors.New("not a JSON object")
+	}
+	seen := map[string]bool{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return r, err
+		}
+		key, _ := tok.(string)
+		switch {
+		case !recordKeys[key]:
+			return r, fmt.Errorf("unknown key %q", key)
+		case seen[key]:
+			return r, fmt.Errorf("key %q given twice", key)
+		}
+		seen[key] = true
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return r, err
+		}
+	}
+	if _, err := dec.Token(); err != nil { // the closing brace
+		return r, err
+	}
+	if _, err := dec.Token(); err != io.EOF {
+		return r, errors.New("more than one JSON value on the line")
+	}
+	if err := json.Unmarshal(line, &r); err != nil {
+		return r, err
+	}
+	return r, nil
 }
 
 // Clean removes every *.jsonl file in the evidence directory and returns how

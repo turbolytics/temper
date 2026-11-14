@@ -125,8 +125,16 @@ func (l *loader) decode(rel string, out any) bool {
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(raw))
 	dec.KnownFields(true)
-	if err := dec.Decode(out); err != nil && !errors.Is(err, io.EOF) {
+	if err := dec.Decode(out); err != nil {
+		if errors.Is(err, io.EOF) {
+			return true
+		}
 		l.fail(rel, err)
+		return false
+	}
+	var extra yaml.Node
+	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
+		l.fail(rel, errors.New("holds more than one YAML document; a file holds exactly one"))
 		return false
 	}
 	return true
