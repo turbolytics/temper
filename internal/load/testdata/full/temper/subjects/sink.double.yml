@@ -1,0 +1,12 @@
+id: sink.double
+kind: sink
+test_only: true
+answers:
+  sink.types:
+    int64:
+      outcome: exact
+      columns: [{type: bigint, expect: "1"}]
+    list<int64>:
+      unsupported: true
+      reason: not needed
+      tracked_by: "#9"

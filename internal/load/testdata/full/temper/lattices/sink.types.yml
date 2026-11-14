@@ -1,0 +1,9 @@
+id: sink.types
+description: Every Arrow type the engine can hand a sink.
+applies_to: sink
+requires: [integration]
+members:
+  - key: int64
+  - key: list<int64>
+    depth: 2
+    note: nested

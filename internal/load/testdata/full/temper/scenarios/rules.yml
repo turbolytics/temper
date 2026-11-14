@@ -1,0 +1,8 @@
+- id: up.working.basic
+  name: a pipeline doing its work
+  covers: [heuristics/up.working, sink.kafka]
+  subject: sink.kafka
+  description: It reports, and it moved messages.
+  events:
+    - {at: 0s, replica: a, report: {work: true}}
+    - {at: 0s, expect: {replica: a, status: up, rule: up.working}}

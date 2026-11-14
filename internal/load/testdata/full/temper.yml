@@ -1,0 +1,7 @@
+temper: "0.1"
+project: demo
+levels:
+  - name: unit
+    description: fast
+  - name: integration
+    description: against the real thing
