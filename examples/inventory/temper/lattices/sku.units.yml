@@ -1,0 +1,13 @@
+id: sku.units
+description: >
+  Every unit a SKU can be stocked in. Taken from the catalog's unit column,
+  which has exactly these four values.
+applies_to: store
+requires: [unit]
+members:
+  - key: each
+  - key: dozen
+  - key: case
+    note: 24 to a case
+  - key: weight_kg
+    note: the only unit with fractional quantities

@@ -1,0 +1,15 @@
+id: store.memory
+kind: store
+feature: store.memory
+exempt:
+  - invariant: store.persists_across_restart
+    reason: >
+      Memory is the point: a restart starts empty. Nothing that needs
+      durability uses this store.
+    proven_by: TestMemoryStore_ForgetsOnRestart
+answers:
+  sku.units:
+    each: supported
+    dozen: supported
+    case: supported
+    weight_kg: supported

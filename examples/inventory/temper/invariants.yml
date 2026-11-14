@@ -1,0 +1,26 @@
+invariants:
+  - id: store.reserve.never_negative
+    claim: >
+      A reservation larger than the stock is refused and leaves the stock
+      unchanged; stock never goes below zero.
+    applies_to: store
+    class: safety
+    family: correctness
+    requires: [unit]
+
+  - id: store.persists_across_restart
+    claim: >
+      Stock written before a restart is the stock read after it.
+    applies_to: store
+    class: safety
+    family: durability
+    requires: [integration]
+
+  - id: store.reserve.no_oversell_under_concurrency
+    claim: >
+      Two processes reserving the last units at once never both succeed.
+    applies_to: store
+    class: safety
+    family: correctness
+    requires: [integration]
+    tracked_by: "#12"

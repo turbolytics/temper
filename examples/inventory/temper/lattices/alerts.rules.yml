@@ -1,0 +1,11 @@
+id: alerts.rules
+description: >
+  Every rule Classify can return. Read from alerts.go; a new rule is added
+  here before it is added there.
+covered_by: scenarios
+requires: [unit]
+members:
+  - key: ok.stocked
+  - key: low.below_threshold
+  - key: out.zero
+  - key: over.capacity
