@@ -1,0 +1,7 @@
+id: sink.kafka
+kind: sink
+feature: sink.kafka
+answers:
+  sink.types:
+    int64: supported
+    timestamp_us_utc: supported

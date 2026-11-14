@@ -1,0 +1,9 @@
+id: adapter.go
+kind: adapter
+feature: adapter.go
+answers:
+  outcomes:
+    pass: supported
+    fail: supported
+    skip: supported
+    error: supported

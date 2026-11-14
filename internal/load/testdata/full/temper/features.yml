@@ -1,0 +1,9 @@
+features:
+  - id: sink.kafka
+    description: Publishes rows to Kafka.
+    requires: [unit, integration]
+  - id: sink.old
+    description: The old sink.
+    requires: []
+    retired: true
+    replaced_by: sink.kafka

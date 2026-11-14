@@ -1,0 +1,14 @@
+invariants:
+  - id: sink.flush.keeps_batch
+    claim: A failed Flush leaves every undelivered row buffered.
+    applies_to: sink
+    class: safety
+    family: resilience
+    requires: [integration]
+    enforced: true
+    violated_once: ["#221"]
+  - id: sink.error.classifies
+    claim: Every error carries a code.
+    applies_to: sink+Prober
+    requires: []
+    tracked_by: "#240"

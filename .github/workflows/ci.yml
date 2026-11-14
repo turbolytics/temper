@@ -1,0 +1,22 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: vet
+        run: go vet ./... && go vet -tags integration ./...
+      # CI is the authority: fresh evidence for every level, then the
+      # committed statuses and MATRIX.md must match what it produces.
+      - name: temper's own matrix
+        run: make check-matrix
+      - name: the example's matrix
+        run: make example

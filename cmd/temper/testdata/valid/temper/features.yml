@@ -1,0 +1,7 @@
+features:
+  - id: sink.kafka
+    description: Publishes rows to Kafka.
+    requires: [unit, integration]
+  - id: sink.postgres
+    description: Upserts rows into Postgres.
+    requires: [unit]

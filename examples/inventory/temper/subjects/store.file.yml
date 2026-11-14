@@ -1,0 +1,12 @@
+id: store.file
+kind: store
+feature: store.file
+answers:
+  sku.units:
+    each: supported
+    dozen: supported
+    case: supported
+    weight_kg:
+      unsupported: true
+      reason: the file format stores whole numbers, so fractional kilograms cannot be kept
+      proven_by: TestFileStore_RejectsFractionalUnits

@@ -1,0 +1,37 @@
+# Stock levels over time. Input events set stock, threshold and capacity;
+# an expect event asks Classify and names the rule that must decide.
+
+- id: alerts.ok_then_low
+  name: a well-stocked SKU sells down below its threshold
+  covers: [alerts.rules/ok.stocked, alerts.rules/low.below_threshold, alerts.low_stock]
+  description: >
+    Forty units against a threshold of ten is fine. After a morning of
+    sales six are left, which is low, not out: there is still stock to sell.
+  events:
+    - {at: 0s, stock: 40, threshold: 10, capacity: 100}
+    - {at: 0s, expect: {level: ok, rule: ok.stocked}}
+    - {at: 4h, stock: 6}
+    - {at: 4h, expect: {level: low, rule: low.below_threshold}}
+
+- id: alerts.sold_out
+  name: the last units sell
+  covers: [alerts.rules/out.zero, alerts.low_stock]
+  description: >
+    Zero is out, whatever the threshold says. Out outranks low.
+  events:
+    - {at: 0s, stock: 2, threshold: 10, capacity: 100}
+    - {at: 0s, expect: {level: low, rule: low.below_threshold}}
+    - {at: 1h, stock: 0}
+    - {at: 1h, expect: {level: out, rule: out.zero}}
+
+- id: alerts.overstocked
+  name: a delivery overfills the shelf
+  covers: [alerts.rules/over.capacity, alerts.low_stock]
+  description: >
+    More stock than capacity is over, not ok: the shelf cannot hold it, so
+    the classifier must not call it fine.
+  events:
+    - {at: 0s, stock: 90, threshold: 10, capacity: 100}
+    - {at: 0s, expect: {level: ok, rule: ok.stocked}}
+    - {at: 2h, stock: 130}
+    - {at: 2h, expect: {level: over, rule: over.capacity}}

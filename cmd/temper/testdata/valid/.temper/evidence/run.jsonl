@@ -1,0 +1,9 @@
+{"covers":"sink.kafka","test":"TestKafka","level":"unit","outcome":"pass"}
+{"covers":"sink.kafka","test":"TestKafkaIT","level":"integration","outcome":"pass"}
+{"covers":"sink.postgres","test":"TestPostgres","level":"unit","outcome":"pass"}
+{"covers":"sink.flush.keeps_batch","subject":"sink.kafka","test":"TestFlush_kafka","level":"integration","outcome":"pass"}
+{"covers":"sink.types/int64","subject":"sink.kafka","test":"TestTypes_kafka","level":"integration","outcome":"pass"}
+{"covers":"sink.types/timestamp_us_utc","subject":"sink.kafka","test":"TestTypes_kafka","level":"integration","outcome":"pass"}
+{"covers":"sink.flush.keeps_batch","subject":"sink.postgres","test":"TestFlush_postgres","level":"integration","outcome":"pass"}
+{"covers":"sink.types/int64","subject":"sink.postgres","test":"TestTypes_postgres","level":"integration","outcome":"pass"}
+{"covers":"sink.types/timestamp_us_utc","subject":"sink.postgres","test":"TestTypes_postgres","level":"integration","outcome":"pass"}

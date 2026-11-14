@@ -1,0 +1,16 @@
+features:
+  - id: inventory.restock
+    description: Adds stock for a SKU, in any unit the store accepts.
+    requires: [unit]
+  - id: inventory.reserve
+    description: Takes stock for an order, or refuses when there is not enough.
+    requires: [unit]
+  - id: store.memory
+    description: Keeps stock in memory, for tests and single-process demos.
+    requires: [unit]
+  - id: store.file
+    description: Keeps stock in a JSON file that survives a restart.
+    requires: [unit, integration]
+  - id: alerts.low_stock
+    description: Classifies a SKU's stock as ok, low, out or over capacity, and says which rule decided.
+    requires: [unit]

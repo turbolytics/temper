@@ -1,0 +1,8 @@
+temper: "0.1"
+project: inventory
+
+levels:
+  - name: unit
+    description: go test ./...; the logic is right
+  - name: integration
+    description: go test -tags integration -run '^TestIntegration' ./...; state survives a real restart

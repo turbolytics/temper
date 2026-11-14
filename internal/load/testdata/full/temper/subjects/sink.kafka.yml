@@ -1,0 +1,15 @@
+id: sink.kafka
+kind: sink
+feature: sink.kafka
+implements: [Prober]
+exempt:
+  - invariant: sink.flush.keeps_batch
+    reason: a topic is a log
+    proven_by: TestSinkKafka_IsNotKeyed
+answers:
+  sink.types:
+    int64: supported
+    list<int64>:
+      unsupported: true
+      reason: serialized as JSON
+      proven_by: TestSinkKafka_NestedAsJSON
