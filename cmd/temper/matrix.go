@@ -18,10 +18,16 @@ import (
 func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
 	fs, rootFlag := flags("matrix", root, stderr)
 	asJSON := fs.Bool("json", false, "print the full result as JSON")
-	checkOnly := fs.Bool("check", false, "write nothing; exit 3 if committed output differs")
+	checkOnly := fs.Bool("check", false, "write nothing; exit 3 if committed output differs (implies --all-levels)")
 	allLevels := fs.Bool("all-levels", false, "judge every level, even one with no evidence (CI)")
 	if err := fs.Parse(args); err != nil {
 		return exitError
+	}
+	// --check is CI's command, and CI is the authority: every level is judged
+	// on the evidence present, so a level that produced none reads missing
+	// rather than keeping a committed covered.
+	if *checkOnly {
+		*allLevels = true
 	}
 
 	fail := func(p *model.Project, errs diag.List) int {
@@ -42,9 +48,16 @@ func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
 	if errs := append(readErrs, validErrs...); len(errs) != 0 {
 		return fail(p, errs.Sorted())
 	}
-	committed, err := status.Read(p.StatusDir())
-	if err != nil {
-		return fail(p, diag.List{{File: path.Join(p.Config.Dir, "status"), Message: err.Error(), Rule: "parse"}})
+	// The committed statuses are read only for levels that did not run.
+	// Judging every level never needs them, so a conflicted status file
+	// cannot block the run that regenerates it.
+	committed := status.NewSet()
+	if !*allLevels {
+		var err error
+		if committed, err = status.Read(p.StatusDir()); err != nil {
+			return fail(p, diag.List{{File: path.Join(p.Config.Dir, "status"),
+				Message: err.Error() + "; run every level and `temper matrix --all-levels` to regenerate it", Rule: "parse"}})
+		}
 	}
 
 	res := matrix.Build(p, kept, committed, matrix.Options{AllLevels: *allLevels})
@@ -133,7 +146,7 @@ func cmdRender(root string, args []string, stdout, stderr io.Writer) int {
 	}
 	s, err := status.Read(p.StatusDir())
 	if err != nil {
-		fmt.Fprintf(stderr, "%s: %v\n", path.Join(p.Config.Dir, "status"), err)
+		fmt.Fprintf(stderr, "%s: %v; to regenerate it, run every level and `temper matrix --all-levels`\n", path.Join(p.Config.Dir, "status"), err)
 		return exitError
 	}
 	if err := os.WriteFile(p.MatrixPath(), render.Markdown(p, s), 0o644); err != nil {

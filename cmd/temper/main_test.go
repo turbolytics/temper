@@ -253,3 +253,50 @@ func TestCLI_UsageErrors(t *testing.T) {
 		t.Errorf("no project = %d, %q", code, errOut)
 	}
 }
+
+// Status files are designed for merging; when they conflict anyway, a fresh
+// full run must still recover, and render must say how.
+func TestCLI_ConflictedStatusRecovers(t *testing.T) {
+	temper.Covers(t, "cli.matrix")
+	temper.Covers(t, "cli.render")
+	root := fixture(t, "valid")
+	if code, _, _ := cli(t, "matrix", "--root", root); code != 0 {
+		t.Fatal("matrix failed")
+	}
+	conflicted := "<<<<<<< ours\nsink.kafka: {unit: covered, integration: covered}\n=======\nsink.kafka: {unit: missing, integration: covered}\n>>>>>>> theirs\n"
+	os.WriteFile(filepath.Join(root, "temper/status/features.yml"), []byte(conflicted), 0o644)
+
+	code, _, errOut := cli(t, "render", "--root", root)
+	if code != 2 || !strings.Contains(errOut, "temper matrix --all-levels") {
+		t.Fatalf("render on a conflicted status = %d, %q; want 2 and a pointer to matrix --all-levels", code, errOut)
+	}
+	if code, out, errOut := cli(t, "matrix", "--all-levels", "--root", root); code != 0 {
+		t.Fatalf("matrix --all-levels on a conflicted status = %d\n%s%s", code, out, errOut)
+	}
+	if raw, _ := os.ReadFile(filepath.Join(root, "temper/status/features.yml")); strings.Contains(string(raw), "<<<<<<<") {
+		t.Fatal("the conflicted file was not regenerated")
+	}
+}
+
+// --check is CI's command, and CI is the authority: a level whose command
+// produced no evidence must read missing, not keep its committed covered.
+func TestCLI_CheckJudgesEveryLevel(t *testing.T) {
+	temper.Covers(t, "cli.matrix_check")
+	temper.Covers(t, "matrix.stale_output_detected", temper.Subject("cli"))
+	root := fixture(t, "valid")
+	if code, _, _ := cli(t, "matrix", "--root", root); code != 0 {
+		t.Fatal("matrix failed")
+	}
+	edit(t, root, ".temper/evidence/run.jsonl", func(s string) string {
+		var keep []string
+		for _, l := range strings.Split(s, "\n") {
+			if !strings.Contains(l, `"level":"integration"`) {
+				keep = append(keep, l)
+			}
+		}
+		return strings.Join(keep, "\n")
+	})
+	if code, out, _ := cli(t, "matrix", "--check", "--root", root); code != 3 {
+		t.Fatalf("--check with no integration evidence = %d, want 3 (integration judged, statuses stale)\n%s", code, out)
+	}
+}
