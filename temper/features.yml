@@ -30,5 +30,5 @@ features:
     description: Deletes all evidence, the start of a full run.
     requires: [unit]
   - id: cli.version
-    description: Prints the version the binary was built as.
-    requires: [integration]
+    description: Prints the version the binary was built as, whether stamped at release or installed with go install.
+    requires: [unit, integration]

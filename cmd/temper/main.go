@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/turbolytics/temper/internal/check"
@@ -26,8 +27,26 @@ import (
 	"github.com/turbolytics/temper/internal/model"
 )
 
-// version is set at release with -ldflags "-X main.version=...".
+// version is set at release with -ldflags "-X main.version=...". A build made
+// by `go install …@v0.1.0` is not stamped, so main falls back to the module
+// version Go records in the binary (see resolveVersion).
 var version = "dev"
+
+// resolveVersion returns the version to report. A version stamped at build
+// time wins. Otherwise it is the module version Go recorded in the binary,
+// without its leading v so it reads the same as a stamped release: 0.1.0, not
+// v0.1.0. A binary with no real module version (a plain `go build` reports
+// "(devel)") stays "dev".
+func resolveVersion(set string, info *debug.BuildInfo) string {
+	if set != "dev" || info == nil {
+		return set
+	}
+	v := info.Main.Version
+	if v == "" || v == "(devel)" {
+		return set
+	}
+	return strings.TrimPrefix(v, "v")
+}
 
 const (
 	exitOK    = 0
@@ -52,6 +71,8 @@ exit codes: 0 ok, 1 gap, 2 error, 3 stale output (matrix --check)
 `
 
 func main() {
+	info, _ := debug.ReadBuildInfo()
+	version = resolveVersion(version, info)
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 

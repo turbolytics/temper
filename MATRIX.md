@@ -11,7 +11,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 
 | covered | exempt | failing | missing | unenforced |
 | ---: | ---: | ---: | ---: | ---: |
-| 39 | 0 | 0 | 0 | 0 |
+| 40 | 0 | 0 | 0 | 0 |
 
 ## Features
 
@@ -27,7 +27,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 | `cli.render` | Rewrites MATRIX.md from the committed statuses alone. | ✅ | — |
 | `cli.run` | Runs a command with the level and evidence directory set, so no test chooses its own level. | ✅ | ✅ |
 | `cli.clean` | Deletes all evidence, the start of a full run. | ✅ | — |
-| `cli.version` | Prints the version the binary was built as. | — | ✅ |
+| `cli.version` | Prints the version the binary was built as, whether stamped at release or installed with go install. | ✅ | ✅ |
 
 ## Invariants
 
