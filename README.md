@@ -2,18 +2,26 @@
 
 **Trust the implementation. Verify the structure.**
 
-A test suite reports on the tests that exist. It cannot report on the ones
-that don't. A feature with no test, an integration that never runs its real
-checks, a test that skips and prints `ok`: all of them read as green. When an
-AI writes the code, that gets worse. An agent will write a test that skips,
-asserts nothing, or covers the easy path, and report success.
+Temper is a framework for LLM-based software development.
 
-Temper turns the question around. You declare the structure your system must
-have: what it does, what must never happen, which closed sets it must answer
-for. Tests state, in code, what they prove. Temper joins the two and shows,
-cell by cell, what is proven, what is excused with proof, and what is
-missing. Anything declared without evidence is a visible gap that fails the
-build.
+As LLMs get better at writing code, human understanding of a system moves up
+a level. We stopped reading the machine code a compiler emits because we
+trust the compiler to produce valid code. LLMs are now good enough to be
+trusted the same way, and Temper treats the code they write as an
+implementation detail.
+
+What people still own is what the system means. Temper keeps that at the
+level people work best, written down and committed beside the code:
+
+- **Features**: what the system does.
+- **Invariants**: what must never happen.
+- **Scenarios**: how it behaves over time, and which rule decides each outcome.
+
+The implementation stays a black box. Temper guides the LLM to tie every test
+to the feature or invariant it proves, validates each of those claims, and
+reports cell by cell what is proven, what is excused with proof, and what is
+missing. A feature nobody tested, a test that skips, an integration that never
+ran its real checks: each one is a visible gap that fails the build.
 
 ```
 $ go test ./...
