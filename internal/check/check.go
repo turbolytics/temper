@@ -20,6 +20,12 @@ var rules = []rule{
 	checkSubjects,
 	checkRetired,
 	checkLatticeLevels,
+	checkAppliesTo,
+	checkExemptions,
+	checkLatticeShape,
+	checkAnswers,
+	checkScenarios,
+	checkScenarioLattices,
 }
 
 // Check runs every rule and returns the findings, sorted.
