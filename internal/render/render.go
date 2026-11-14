@@ -189,10 +189,11 @@ func (w *writer) invariants() {
 		w.line("")
 		var rows []string
 		for _, inv := range invs {
-			if inv.Requires == nil || len(*inv.Requires) == 0 {
+			levels, _ := inv.RequiredLevels()
+			if len(levels) == 0 {
 				continue
 			}
-			required := set(*inv.Requires)
+			required := set(levels)
 			for _, subj := range w.p.ApplicableSubjects(inv) {
 				cells := []string{code(inv.ID), code(subj.ID)}
 				for _, l := range w.levels {
@@ -210,8 +211,11 @@ func (w *writer) invariants() {
 		}
 		for _, inv := range invs {
 			text := fmt.Sprintf("- %s — %s", code(inv.ID), cell(inv.Claim))
-			if inv.Requires == nil || len(*inv.Requires) == 0 {
+			switch levels, anyOne := inv.RequiredLevels(); {
+			case len(levels) == 0:
 				text += " (declared, no levels required)"
+			case anyOne:
+				text += " Proven at any one of: " + strings.Join(levels, ", ") + "."
 			}
 			if inv.TrackedBy != "" {
 				text += " Tracked by " + inv.TrackedBy + "."

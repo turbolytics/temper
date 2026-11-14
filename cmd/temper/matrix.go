@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/turbolytics/temper/internal/diag"
 	"github.com/turbolytics/temper/internal/evidence"
@@ -130,6 +131,12 @@ func gapLine(p *model.Project, c matrix.Cell) string {
 	line := fmt.Sprintf("%s: %s", file, item)
 	if c.Subject != "" {
 		line += " for " + c.Subject
+	}
+	if c.Any && c.Status == status.Missing {
+		// One line for the whole group, naming every level it could be proven at.
+		inv, _ := p.Invariant(c.Item)
+		levels, _ := inv.RequiredLevels()
+		return fmt.Sprintf("%s is missing at every level it may be proven at (%s)", line, strings.Join(levels, ", "))
 	}
 	return fmt.Sprintf("%s is %s at %s", line, c.Status, c.Level)
 }
