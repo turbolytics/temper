@@ -4,6 +4,7 @@ test_only: true
 answers:
   sink.types:
     int64:
+      supported: true
       outcome: exact
       columns: [{type: bigint, expect: "1"}]
     list<int64>:

@@ -120,10 +120,35 @@ func TestLoad_AnswerForms(t *testing.T) {
 	}
 	double, _ := p.Subject("sink.double")
 	if a := double.Answers["sink.types"]["int64"]; !a.Supported {
-		t.Errorf("map without unsupported, with extra keys = %+v, want supported", a)
+		t.Errorf("`supported: true` map with payload keys = %+v, want supported", a)
 	}
 	if a := double.Answers["sink.types"]["list<int64>"]; a.Supported || a.TrackedBy != "#9" {
 		t.Errorf("tracked unsupported = %+v", a)
+	}
+}
+
+// A map answer must say which way it goes. Reading a map with neither key as
+// supported would credit `outcome: unsupported` (a project's own payload) as
+// support, silently, so Temper refuses to guess.
+func TestLoad_AnswerMapMustSayWhichWay(t *testing.T) {
+	temper.Covers(t, "declarations.ambiguous_answer_rejected", temper.Subject("cli"))
+	temper.Covers(t, "declarations.load")
+	for name, tc := range map[string]struct{ body, want string }{
+		"neither key":       {"{outcome: unsupported, code: user.sink.type_unsupported}", "neither"},
+		"both keys":         {"{supported: true, unsupported: true, reason: r, tracked_by: '#1'}", "both"},
+		"supported false":   {"{supported: false}", "supported: false"},
+		"unsupported false": {"{unsupported: false, outcome: exact}", "unsupported: false"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := writeProject(t, map[string]string{
+				"temper.yml":              minimalConfig,
+				"temper/subjects/s.a.yml": "id: s.a\nkind: s\nfeature: f\nanswers:\n  l:\n    k: " + tc.body + "\n",
+			})
+			_, errs := Load(root)
+			if len(errs) != 1 || errs[0].File != "temper/subjects/s.a.yml" || !strings.Contains(errs[0].Message, tc.want) {
+				t.Fatalf("errors = %v, want one naming the subject file and %q", errs, tc.want)
+			}
+		})
 	}
 }
 
@@ -155,7 +180,7 @@ func TestLoad_PayloadFieldsAllowed(t *testing.T) {
 	temper.Covers(t, "declarations.load")
 	root := writeProject(t, map[string]string{
 		"temper.yml":              minimalConfig,
-		"temper/subjects/s.a.yml": "id: s.a\nkind: s\nfeature: f\nanswers:\n  l:\n    k: {anything: 1, goes: [x]}\n",
+		"temper/subjects/s.a.yml": "id: s.a\nkind: s\nfeature: f\nanswers:\n  l:\n    k: {supported: true, anything: 1, goes: [x]}\n",
 		"temper/scenarios/a.yml":  "- id: a\n  name: n\n  description: d\n  covers: [f]\n  events:\n    - {at: 0s, whatever: {deep: true}}\n",
 	})
 	if _, errs := Load(root); len(errs) != 0 {

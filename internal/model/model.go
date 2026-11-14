@@ -99,9 +99,13 @@ type Answer struct {
 	TrackedBy string
 }
 
-// UnmarshalYAML reads `supported`, or a map. A map with `unsupported: true`
-// is unsupported; any other map is supported. Keys beyond the four Temper
-// reads are the project's own payload and are ignored.
+// UnmarshalYAML reads `supported`, or a map that says which way it goes: it
+// sets exactly one of `supported: true` and `unsupported: true`. Any other
+// keys in the map are the project's own payload and are ignored.
+//
+// A map that says neither is an error, never read as supported: a payload
+// like `outcome: unsupported` would otherwise be credited as support without
+// anyone having said so.
 func (a *Answer) UnmarshalYAML(n *yaml.Node) error {
 	switch n.Kind {
 	case yaml.ScalarNode:
@@ -112,7 +116,8 @@ func (a *Answer) UnmarshalYAML(n *yaml.Node) error {
 		return nil
 	case yaml.MappingNode:
 		var raw struct {
-			Unsupported bool   `yaml:"unsupported"`
+			Supported   *bool  `yaml:"supported"`
+			Unsupported *bool  `yaml:"unsupported"`
 			Reason      string `yaml:"reason"`
 			ProvenBy    string `yaml:"proven_by"`
 			TrackedBy   string `yaml:"tracked_by"`
@@ -120,7 +125,19 @@ func (a *Answer) UnmarshalYAML(n *yaml.Node) error {
 		if err := n.Decode(&raw); err != nil {
 			return err
 		}
-		*a = Answer{Supported: !raw.Unsupported, Reason: raw.Reason, ProvenBy: raw.ProvenBy, TrackedBy: raw.TrackedBy}
+		supported := raw.Supported != nil && *raw.Supported
+		unsupported := raw.Unsupported != nil && *raw.Unsupported
+		switch {
+		case raw.Supported != nil && !*raw.Supported:
+			return fmt.Errorf("line %d: answer says `supported: false`; write `unsupported: true` with a reason and proven_by or tracked_by", n.Line)
+		case raw.Unsupported != nil && !*raw.Unsupported:
+			return fmt.Errorf("line %d: answer says `unsupported: false`; write `supported: true`", n.Line)
+		case supported && unsupported:
+			return fmt.Errorf("line %d: answer says both `supported: true` and `unsupported: true`", n.Line)
+		case !supported && !unsupported:
+			return fmt.Errorf("line %d: answer says neither `supported: true` nor `unsupported: true`; Temper will not guess which", n.Line)
+		}
+		*a = Answer{Supported: supported, Reason: raw.Reason, ProvenBy: raw.ProvenBy, TrackedBy: raw.TrackedBy}
 		return nil
 	default:
 		return fmt.Errorf("line %d: answer: want `supported` or a map", n.Line)
