@@ -20,6 +20,14 @@ This project declares its structure in temper/. Before finishing any change:
   `temper matrix --all-levels`) and commit `temper/status/` and `MATRIX.md`.
   `make check-matrix` must exit 0 before you finish.
 
+## The guide
+
+`docs/agents.md` is the guide to working in any Temper project, and
+`temper guide` prints it from the binary. Keep it true: tests in
+`cmd/temper/guide_test.go` fail when it names a command that does not exist, or
+when its declaration snippets stop passing `temper check`. A change to a command
+or to the format updates the guide in the same commit.
+
 ## This repository
 
 - `SPEC.md` is the format and the rules. A change to behavior that the spec

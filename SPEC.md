@@ -501,6 +501,7 @@ committed statuses.
 | `temper render` | Rewrites `MATRIX.md` from the committed `status/` (after a merge). |
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE` and `TEMPER_RUN` set. Appends; never clears. |
 | `temper clean` | Deletes all evidence: the start of a full run. |
+| `temper guide` | Prints the guide to working in a Temper project, embedded in the binary so it matches the installed version. |
 
 **Exit codes.** `0` every enforced, judged cell is covered or exempt. `1` one
 is missing or failing. `2` a declaration, evidence or usage error (nothing is
@@ -559,6 +560,9 @@ This project declares its structure in temper/. Before finishing any change:
   then `temper check` and `temper matrix --all-levels`, and fix what they
   report.
 ```
+
+`temper guide` prints a fuller guide, matching the installed version: the
+loop, how to read each result, what never to do, and the declarations.
 
 The checker is the guardrail. The agent proposes; Temper decides.
 
