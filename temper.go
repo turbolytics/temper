@@ -16,6 +16,7 @@ package temper
 
 import (
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -62,4 +63,51 @@ func Exempts(t testing.TB, ref string, opts ...Option) {
 	std.add(t, true, ref, opts)
 }
 
-var std = newRecorder(os.Getenv, time.Now)
+// Run runs the package's tests and records each test's evidence once every
+// test has fully finished, cleanups included, so a failure in any cleanup,
+// however early it was registered, is recorded as one. Use it from TestMain:
+//
+//	func TestMain(m *testing.M) { os.Exit(temper.Run(m)) }
+//
+// Without Run, evidence is recorded as each test's cleanups run, and a test
+// that registers a cleanup before its first Covers fails with a message
+// saying so.
+func Run(m *testing.M) int {
+	std.mu.Lock()
+	std.deferred = true
+	std.mu.Unlock()
+	code := m.Run()
+	std.settle()
+	return code
+}
+
+// Main is Run followed by os.Exit, for a TestMain that does nothing else:
+//
+//	func TestMain(m *testing.M) { temper.Main(m) }
+func Main(m *testing.M) { os.Exit(Run(m)) }
+
+var std = newRecorder(runnerEnv(), time.Now)
+
+// runnerEnv snapshots the runner's environment when the test binary starts,
+// so a test that changes TEMPER_LEVEL or TEMPER_EVIDENCE cannot change where
+// or at what level its evidence counts (R4). On first use it reads the
+// variables again, without using the values: go test's cache keys on the
+// environment a test reads, and reads during package initialisation are not
+// seen, so this read is what keeps a cached result from replaying without
+// its evidence.
+func runnerEnv() func(string) string {
+	keys := []string{"TEMPER_LEVEL", "TEMPER_EVIDENCE", "TEMPER_RUN"}
+	snapshot := map[string]string{}
+	for _, k := range keys {
+		snapshot[k] = os.Getenv(k)
+	}
+	var once sync.Once
+	return func(k string) string {
+		once.Do(func() {
+			for _, k := range keys {
+				os.Getenv(k)
+			}
+		})
+		return snapshot[k]
+	}
+}

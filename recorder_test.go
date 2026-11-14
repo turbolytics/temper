@@ -301,3 +301,26 @@ func TestRecorder_ConcurrentWritesStayWhole(t *testing.T) {
 		t.Fatalf("got %d whole records, want 1000", len(got))
 	}
 }
+
+// Under Run the outcome is read once the test has fully finished, so a
+// failure that arrives after the adapter's cleanup still counts.
+func TestRecorder_DeferredSettlesFinalOutcome(t *testing.T) {
+	Covers(t, "adapter.failure_never_passes", Subject("adapter.go"))
+	dir := t.TempDir()
+	r := newTestRecorder(runner(dir, "unit"))
+	r.deferred = true
+	f := &fakeTB{name: "TestFake"}
+
+	r.add(f, false, "a.b", nil)
+	f.end()
+	if got := readRecords(t, dir); len(got) != 0 {
+		t.Fatalf("records written before settle: %+v", got)
+	}
+	f.failed = true // a cleanup registered earlier failed after ours ran
+	r.settle()
+
+	got := readRecords(t, dir)
+	if len(got) != 1 || got[0].Outcome != OutcomeFail {
+		t.Fatalf("records = %+v, want one fail", got)
+	}
+}
