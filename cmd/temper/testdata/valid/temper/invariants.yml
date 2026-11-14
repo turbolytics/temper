@@ -1,0 +1,6 @@
+invariants:
+  - id: sink.flush.keeps_batch
+    claim: A failed Flush leaves every undelivered row buffered.
+    applies_to: sink
+    family: resilience
+    requires: [integration]

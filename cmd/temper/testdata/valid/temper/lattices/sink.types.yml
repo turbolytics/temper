@@ -1,0 +1,7 @@
+id: sink.types
+description: Every type a sink is handed.
+applies_to: sink
+requires: [integration]
+members:
+  - key: int64
+  - key: timestamp_us_utc

@@ -1,0 +1,7 @@
+id: sink.postgres
+kind: sink
+feature: sink.postgres
+answers:
+  sink.types:
+    int64: supported
+    timestamp_us_utc: supported
