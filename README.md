@@ -48,14 +48,25 @@ This walks through a Go project. For other languages, see
 
 ### 1. Install
 
+Install the CLI with Homebrew (macOS and Linux):
+
 ```sh
-go install github.com/turbolytics/temper/cmd/temper@latest
-go get github.com/turbolytics/temper
+brew install turbolytics/tap/temper
 ```
 
-The first command installs the CLI. The second adds the Go adapter, a
-dependency-free package your tests import. Prebuilt binaries are on the
-[releases page](https://github.com/turbolytics/temper/releases).
+Or with Go, or from a prebuilt binary on the
+[releases page](https://github.com/turbolytics/temper/releases):
+
+```sh
+go install github.com/turbolytics/temper/cmd/temper@latest
+```
+
+Then add the Go adapter to your module. It is a dependency-free package your
+tests import:
+
+```sh
+go get github.com/turbolytics/temper
+```
 
 ### 2. Declare what the system does
 

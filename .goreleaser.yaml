@@ -27,3 +27,22 @@ checksum:
 
 changelog:
   use: github
+
+# Publishes the formula to the turbolytics/homebrew-tap repository on every
+# release, so `brew install turbolytics/tap/temper` works. The workflow's
+# built-in token cannot push to another repository, so a token scoped to the
+# tap is passed in as HOMEBREW_TAP_GITHUB_TOKEN. A pre-release tag (v0.2.0-rc.1)
+# does not update the tap.
+brews:
+  - name: temper
+    repository:
+      owner: turbolytics
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/turbolytics/temper
+    description: Declare what software must do, and verify the tests prove it
+    license: MIT
+    skip_upload: auto
+    test: |
+      assert_match "temper", shell_output("#{bin}/temper version")
