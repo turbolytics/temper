@@ -52,11 +52,24 @@ type Invariant struct {
 	Class        string    `yaml:"class"`
 	Family       string    `yaml:"family"`
 	Requires     *[]string `yaml:"requires"`
+	RequiresAny  *[]string `yaml:"requires_any"` // proof at any one of these levels is enough
 	Enforced     *bool     `yaml:"enforced"`
 	ViolatedOnce []string  `yaml:"violated_once"`
 	TrackedBy    string    `yaml:"tracked_by"`
 	Retired      bool      `yaml:"retired"`
 	ReplacedBy   string    `yaml:"replaced_by"`
+}
+
+// RequiredLevels returns the levels evidence is required at, and whether one
+// of them is enough (requires_any) or all of them are (requires).
+func (i Invariant) RequiredLevels() (levels []string, anyOne bool) {
+	if i.RequiresAny != nil && len(*i.RequiresAny) > 0 {
+		return *i.RequiresAny, true
+	}
+	if i.Requires != nil {
+		return *i.Requires, false
+	}
+	return nil, false
 }
 
 // IsEnforced reports whether a gap in this invariant fails the build.

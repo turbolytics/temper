@@ -137,10 +137,21 @@ func checkInvariants(p *model.Project) diag.List {
 		if i.AppliesTo == "" {
 			add("has no applies_to")
 		}
-		if i.Requires == nil {
-			add("has no requires (use [] to require no level)")
-		} else {
+		hasRequires := i.Requires != nil
+		hasAny := i.RequiresAny != nil
+		switch {
+		case !hasRequires && !hasAny:
+			add("has neither requires nor requires_any (use `requires: []` to require no level)")
+		case hasAny && len(*i.RequiresAny) == 0:
+			add("requires_any is empty; list the levels, or use `requires: []` to require no level")
+		case hasRequires && len(*i.Requires) > 0 && hasAny:
+			add("declares both requires and requires_any; choose one (requires needs every level, requires_any needs one)")
+		}
+		if hasRequires {
 			out = append(out, checkLevels(p, p.InvariantsFile(), i.ID, *i.Requires)...)
+		}
+		if hasAny {
+			out = append(out, checkLevels(p, p.InvariantsFile(), i.ID, *i.RequiresAny)...)
 		}
 	}
 	return out
