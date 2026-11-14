@@ -20,8 +20,8 @@ level people work best, written down and committed beside the code:
 The implementation stays a black box. Temper guides the LLM to tie every test
 to the feature or invariant it proves, validates each of those claims, and
 reports cell by cell what is proven, what is excused with proof, and what is
-missing. A feature nobody tested, a test that skips, an integration that never
-ran its real checks: each one is a visible gap that fails the build.
+missing. Temper audits for untested features and invariants, and fails the
+build when it finds one.
 
 ```
 $ go test ./...
