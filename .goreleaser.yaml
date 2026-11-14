@@ -25,6 +25,18 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# A pre-release tag and its final tag can sit on one commit (v0.1.0-rc.1, then
+# v0.1.0). Git sorts "-rc.1" after the bare version, so without this GoReleaser
+# released the rc again and failed on assets that already existed. The suffix
+# makes pre-releases sort below their final version.
+git:
+  prerelease_suffix: "-"
+
+release:
+  # Mark a tag with a pre-release suffix (v0.2.0-rc.1) as a GitHub pre-release,
+  # so it is never shown as the latest release.
+  prerelease: auto
+
 changelog:
   use: github
 
