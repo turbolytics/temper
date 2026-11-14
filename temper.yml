@@ -1,0 +1,8 @@
+temper: "0.1"
+project: temper
+
+levels:
+  - name: unit
+    description: go test ./...; the logic is right
+  - name: integration
+    description: the built binary against fixture projects and examples/inventory

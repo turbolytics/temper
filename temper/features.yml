@@ -1,0 +1,31 @@
+features:
+  - id: adapter.go
+    description: Lets a Go test state what it proves and records how it ended.
+    requires: [unit]
+  - id: declarations.load
+    description: Reads every declaration into one model, rejecting unknown fields.
+    requires: [unit]
+  - id: cli.check
+    description: Validates declarations without running any test and names each problem's file, id and rule.
+    requires: [unit, integration]
+  - id: cli.matrix
+    description: Joins declarations with evidence and writes the committed statuses and MATRIX.md.
+    requires: [unit, integration]
+  - id: cli.matrix_json
+    description: Prints the full matrix, errors and summary as JSON for CI and agents.
+    requires: [integration]
+  - id: cli.matrix_check
+    description: Writes nothing and exits 3 when committed statuses or MATRIX.md are out of date.
+    requires: [unit, integration]
+  - id: cli.render
+    description: Rewrites MATRIX.md from the committed statuses alone.
+    requires: [unit]
+  - id: cli.run
+    description: Runs a command with the level and evidence directory set, so no test chooses its own level.
+    requires: [unit, integration]
+  - id: cli.clean
+    description: Deletes all evidence, the start of a full run.
+    requires: [unit]
+  - id: cli.version
+    description: Prints the version the binary was built as.
+    requires: [integration]

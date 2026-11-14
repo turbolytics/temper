@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -49,7 +51,12 @@ func cmdRun(root string, args []string, stdout, stderr io.Writer) int {
 		id = os.Getenv("TEMPER_RUN")
 	}
 	if id == "" {
-		id = time.Now().UTC().Format("20060102T150405Z")
+		// Fresh every run. Go's test cache keys on the environment a test
+		// reads, and the adapter reads TEMPER_RUN, so a new id means a cached
+		// result is never replayed without writing its evidence.
+		suffix := make([]byte, 3)
+		_, _ = rand.Read(suffix)
+		id = time.Now().UTC().Format("20060102T150405Z") + "-" + hex.EncodeToString(suffix)
 	}
 
 	cmd := exec.Command(command[0], command[1:]...)

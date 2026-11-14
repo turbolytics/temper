@@ -1,0 +1,116 @@
+invariants:
+  # What the matrix must never do. Each is an anti-goal of the design.
+
+  - id: matrix.skip_never_covers
+    claim: A skipped test never makes a cell covered, at any level.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit, integration]
+
+  - id: matrix.unknown_reference_fails
+    claim: >
+      Evidence or a declaration that names an id Temper does not know is an
+      error that exits 2; it is never ignored and never creates a row.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit, integration]
+
+  - id: matrix.exemption_needs_passing_proof
+    claim: >
+      A cell is exempt only while a passing exempts record from the declared
+      proven_by test exists; a covers record, another test, a skip or a
+      failure leaves it missing or failing.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit, integration]
+
+  - id: matrix.exact_reference_only
+    claim: >
+      Evidence credits only the item its reference names exactly; never by
+      test name, id prefix, file path or level.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
+
+  - id: matrix.test_only_credits_nothing
+    claim: Evidence for a test-only subject credits no cell.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
+
+  - id: matrix.scenario_needs_declaration
+    claim: >
+      A member of a scenario-covered lattice is credited only by evidence from
+      a declared scenario that lists it, and a member no scenario lists is a
+      gap before any test runs.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
+
+  - id: matrix.stale_output_detected
+    claim: >
+      matrix --check exits 3 whenever the committed statuses or MATRIX.md
+      differ from what the evidence produces.
+    applies_to: cli
+    class: safety
+    family: output
+    requires: [unit, integration]
+
+  - id: matrix.output_deterministic
+    claim: The same declarations and evidence always produce the same bytes.
+    applies_to: cli
+    class: safety
+    family: output
+    requires: [unit]
+
+  - id: matrix.not_run_never_judged
+    claim: >
+      A level with no evidence keeps its committed statuses and never affects
+      the exit code, unless --all-levels judges it.
+    applies_to: cli
+    class: safety
+    family: output
+    requires: [unit]
+
+  # What every adapter must never do.
+
+  - id: adapter.failure_never_passes
+    claim: A test that fails, errors or panics never records pass.
+    applies_to: adapter
+    class: safety
+    family: adapter
+    requires: [unit]
+
+  - id: adapter.skip_records_skip
+    claim: A skipped test records skip.
+    applies_to: adapter
+    class: safety
+    family: adapter
+    requires: [unit]
+
+  - id: adapter.level_from_runner
+    claim: The level a record carries comes only from TEMPER_LEVEL; no test can set it.
+    applies_to: adapter
+    class: safety
+    family: adapter
+    requires: [unit]
+
+  - id: adapter.silent_without_runner
+    claim: Without TEMPER_LEVEL and TEMPER_EVIDENCE the adapter records nothing and changes nothing.
+    applies_to: adapter
+    class: safety
+    family: adapter
+    requires: [unit]
+
+  - id: adapter.never_truncates
+    claim: The adapter only appends, to a file unique to its process; it never truncates or removes evidence.
+    applies_to: adapter
+    class: safety
+    family: adapter
+    requires: [unit]

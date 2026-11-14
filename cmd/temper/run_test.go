@@ -84,8 +84,8 @@ func TestCLI_RunDefaultsRunID(t *testing.T) {
 
 	t.Setenv("TEMPER_RUN", "")
 	cli(t, helper(root, "--level", "unit")...)
-	if got := readEnv(t, h["out"]); !regexp.MustCompile(`^\d{8}T\d{6}Z$`).MatchString(got["RUN"]) {
-		t.Fatalf("default run id = %q, want a UTC timestamp", got["RUN"])
+	if got := readEnv(t, h["out"]); !regexp.MustCompile(`^\d{8}T\d{6}Z-[0-9a-f]{6}$`).MatchString(got["RUN"]) {
+		t.Fatalf("default run id = %q, want a UTC timestamp with a random suffix, fresh every run so go test never replays a cached result without evidence", got["RUN"])
 	}
 }
 
