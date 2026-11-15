@@ -512,7 +512,11 @@ their committed status and never fail your run.
 
 ### Guide an agent
 
-Add this to `AGENTS.md` or `CLAUDE.md`:
+Start with `temper guide`. It prints a complete guide to working in a Temper
+project: the loop, how to read each result, what never to do, and a copyable
+set of declarations. Point your agent at it, or save it with
+`temper guide > docs/temper.md`. For a shorter version that is always in
+context, add this to `AGENTS.md` or `CLAUDE.md`:
 
 ```markdown
 ## Temper
@@ -558,6 +562,7 @@ The checker is the guardrail. The agent proposes; Temper decides.
 | `temper render` | Rewrites `MATRIX.md` from the committed `temper/status/` (after a merge conflict). |
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE` and `TEMPER_RUN` set. Appends evidence, never clears it. |
 | `temper clean` | Deletes all evidence. |
+| `temper guide` | Prints the guide to working in a Temper project, for an LLM or a person. It matches the installed version. |
 | `temper version` | Prints the version. |
 
 Every command takes `--root DIR`. The default is the nearest directory above

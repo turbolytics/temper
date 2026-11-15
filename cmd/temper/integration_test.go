@@ -229,3 +229,12 @@ func TestIntegration_Version(t *testing.T) {
 		t.Fatalf("version = %d, %q", code, out)
 	}
 }
+
+func TestIntegration_Guide(t *testing.T) {
+	temper.Covers(t, "cli.guide")
+	// From a directory with no temper.yml: the guide is not about a project.
+	code, out := temperBin(t, t.TempDir(), "guide")
+	if code != 0 || !strings.HasPrefix(out, "# Working in a Temper project") || !strings.Contains(out, "## The loop") {
+		t.Fatalf("guide = %d, starts %.80q", code, out)
+	}
+}

@@ -29,6 +29,9 @@ features:
   - id: cli.clean
     description: Deletes all evidence, the start of a full run.
     requires: [unit]
+  - id: cli.guide
+    description: Prints the guide an LLM or a person needs to work in a Temper project, matching the installed version.
+    requires: [unit, integration]
   - id: cli.version
     description: Prints the version the binary was built as, whether stamped at release or installed with go install.
     requires: [unit, integration]

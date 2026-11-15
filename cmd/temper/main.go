@@ -6,6 +6,7 @@
 //	temper render                    rewrite MATRIX.md from the committed statuses
 //	temper run --level L -- CMD...   run CMD with the level and evidence directory set
 //	temper clean                     delete all evidence
+//	temper guide                     print the guide for working in a Temper project
 //	temper version
 //
 // Exit codes: 0 ok; 1 an enforced cell is missing or failing; 2 a
@@ -21,6 +22,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/turbolytics/temper/docs"
 	"github.com/turbolytics/temper/internal/check"
 	"github.com/turbolytics/temper/internal/diag"
 	"github.com/turbolytics/temper/internal/load"
@@ -65,6 +67,7 @@ commands:
   run --level LEVEL [--run ID] -- COMMAND [ARGS...]
                                      run COMMAND with TEMPER_LEVEL and TEMPER_EVIDENCE set
   clean                              delete all evidence
+  guide                              print the guide for working in a Temper project
   version                            print the version
 
 exit codes: 0 ok, 1 gap, 2 error, 3 stale output (matrix --check)
@@ -102,6 +105,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdRun(*root, cmdArgs, stdout, stderr)
 	case "clean":
 		return cmdClean(*root, cmdArgs, stdout, stderr)
+	case "guide":
+		if len(cmdArgs) != 0 {
+			fmt.Fprintf(stderr, "temper: guide takes no arguments\n\n%s", usage)
+			return exitError
+		}
+		fmt.Fprint(stdout, docs.Agents)
+		return exitOK
 	case "version":
 		fmt.Fprintf(stdout, "temper %s\n", version)
 		return exitOK
