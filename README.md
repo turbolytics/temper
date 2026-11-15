@@ -38,10 +38,9 @@ $ echo $?
 
 In metallurgy, tempering is applied to increase toughness. Non-tempered steel
 is scratch resistant but brittle: it breaks before it bends. LLM-written code
-is hard in the same way. It arrives fast and holds where it is tested, then
-breaks where a change reaches something nobody wrote down. Temper adds the
-toughness: declared invariants and proven claims, so a change bends the system
-without breaking what it must keep.
+is hard in the same way. It arrives fast and works where it is tested, then
+breaks, and degrades, as it evolves. Temper adds the toughness: declared
+invariants and proven claims, so a change bends the system without breaking.
 
 - [Getting started](#getting-started-5-minutes): integrate in 5 minutes
 - [Primitives](#primitives): the eight ideas Temper is built on
