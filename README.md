@@ -34,6 +34,15 @@ $ echo $?
 1
 ```
 
+## Why "Temper"
+
+In metallurgy, tempering trades a little hardness for toughness. Hardened steel
+resists scratching but is brittle: it breaks before it bends. LLM-written code
+is hard in the same way. It arrives fast and holds where it is tested, then
+breaks where a change reaches something nobody wrote down. Temper adds the
+toughness: declared invariants and proven claims, so a change bends the system
+without breaking what it must keep.
+
 - [Getting started](#getting-started-5-minutes): integrate in 5 minutes
 - [Primitives](#primitives): the eight ideas Temper is built on
 - [Usage examples](#usage-examples): invariants across subjects, proven exemptions, closed sets, scenarios, CI, agents
