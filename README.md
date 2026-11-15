@@ -36,8 +36,8 @@ $ echo $?
 
 ## Why "Temper"
 
-In metallurgy, tempering trades a little hardness for toughness. Hardened steel
-resists scratching but is brittle: it breaks before it bends. LLM-written code
+In metallurgy, tempering is applied to increase toughness. Non-tempered steel
+is scratch resistant but brittle: it breaks before it bends. LLM-written code
 is hard in the same way. It arrives fast and holds where it is tested, then
 breaks where a change reaches something nobody wrote down. Temper adds the
 toughness: declared invariants and proven claims, so a change bends the system
