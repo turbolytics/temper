@@ -652,7 +652,7 @@ rows merge cleanly. If `MATRIX.md` conflicts, run `temper render`.
 | Language | Adapter | Status |
 |---|---|---|
 | Go | `github.com/turbolytics/temper` (this repository) | available |
-| Python (pytest) | `temper-python` | planned |
+| Python (pytest) | [`temper-python`](https://github.com/turbolytics/temper-python) (`pip install temper-python`) | available |
 | Node.js | `temper-nodejs` | planned |
 | Java | `temper-java` | planned |
 

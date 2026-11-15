@@ -233,8 +233,31 @@ func TestIntegration_MemoryStoreForgetsOnRestart(t *testing.T) {
 
 Without `temper run`, nothing is recorded, so a plain `go test` is unaffected.
 
+## Writing tests in Python
+
+Install `temper-python` (`pip install temper-python`). It is a pytest plugin, so
+there is nothing to import or enable.
+
+```python
+@pytest.mark.covers("store.reserve.never_negative", subject="store.file")
+def test_file_store_never_negative(): ...
+
+@pytest.mark.exempts("store.persists_across_restart", subject="store.memory")
+def test_memory_store_forgets_on_restart(): ...
+```
+
+- The same rules as Go: `subject=` for invariants and subject lattice members,
+  `lattice/key` for members, and `exempts` only in the test named in `proven_by`.
+- Marks on a class or module apply to every test inside it.
+- A parametrized scenario runner claims from inside the test:
+  `temper.covers(request, ref, scenario=sid)`.
+- Run it as `temper run --level unit -- pytest`. Select each level's tests with
+  a directory or `-m`, so a level's command runs only that level's tests.
+- The record is written after fixtures tear down, so a failing teardown is an
+  error, never a pass. Any `xfail` records `fail`.
+
 ## Other languages
 
 Every adapter writes the same evidence records; the contract is
-https://github.com/turbolytics/temper/blob/main/docs/adapters.md. Adapters for
-Python and Node.js are planned.
+https://github.com/turbolytics/temper/blob/main/docs/adapters.md. An adapter for
+Node.js is planned.

@@ -130,7 +130,7 @@ func TestSinkKafka_IsNotKeyed(t *testing.T) {
 }
 ```
 
-Python (pytest), as `temper-python` is expected to offer it:
+Python (pytest), as [`temper-python`](https://github.com/turbolytics/temper-python) offers it:
 
 ```python
 @pytest.mark.covers("sink.flush.keeps_batch", subject="sink.kafka")
