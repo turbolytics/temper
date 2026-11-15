@@ -2,16 +2,26 @@
 
 **Trust the implementation. Verify the structure.**
 
-Temper is a framework for LLM-based software development.
+Works with Go and Python (pytest) today.
 
-As LLMs get better at writing code, human understanding of a system moves up
-a level. We stopped reading the machine code a compiler emits because we
-trust the compiler to produce valid code. LLMs are now good enough to be
-trusted the same way, and Temper treats the code they write as an
-implementation detail.
+[![CI](https://github.com/turbolytics/temper/actions/workflows/ci.yml/badge.svg)](https://github.com/turbolytics/temper/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/turbolytics/temper.svg)](https://pkg.go.dev/github.com/turbolytics/temper)
+[![PyPI](https://img.shields.io/pypi/v/temper-python)](https://pypi.org/project/temper-python/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-What people still own is what the system means. Temper keeps that at the
-level people work best, written down and committed beside the code:
+Temper is a CLI plus small test adapters. Tests state what they prove, and
+Temper reports what's proven, excused with proof, or missing, and fails CI on
+gaps.
+
+You don't read every line a teammate writes. You check that it does what it
+must and never does what it mustn't. As LLMs write more of the code, that check
+is what people still own. Temper makes it mechanical: what the system means is
+written down beside the code, and every claim needs a test that proves it.
+
+Not line coverage: a line can run without anything being proven about it, and
+a claim can be missing while every line is covered.
+
+The declarations are committed beside the code, at the level people work best:
 
 - **Features**: what the system does.
 - **Invariants**: what must never happen.
@@ -34,13 +44,7 @@ $ echo $?
 1
 ```
 
-## Why "Temper"
-
-In metallurgy, tempering is applied to increase toughness. Non-tempered steel
-is scratch resistant but brittle: it breaks before it bends. LLM-written code
-is hard in the same way. It arrives fast and works where it is tested, then
-breaks, and degrades, as it evolves. Temper adds the toughness: declared
-invariants and proven claims, so a change bends the system without breaking.
+Temper proves itself with Temper: see [MATRIX.md](MATRIX.md).
 
 - [Getting started](#getting-started-5-minutes): integrate in 5 minutes
 - [Primitives](#primitives): the eight ideas Temper is built on
@@ -51,8 +55,9 @@ invariants and proven claims, so a change bends the system without breaking.
 
 ## Getting started (5 minutes)
 
-This walks through a Go project. For other languages, see
-[Adapters](#adapters).
+This walks through a Go project. Python (pytest) takes the same steps, with
+[temper-python](https://github.com/turbolytics/temper-python) in place of the
+Go adapter. Other languages: see [Adapters](#adapters).
 
 ### 1. Install
 
@@ -75,6 +80,14 @@ tests import:
 ```sh
 go get github.com/turbolytics/temper
 ```
+
+For Python, install the pytest adapter instead:
+
+```sh
+pip install temper-python
+```
+
+The name is `temper-python` (not `temper`, which is an unrelated package).
 
 ### 2. Declare what the system does
 
@@ -115,6 +128,14 @@ func TestTotal(t *testing.T) {
         t.Fatalf("Total = %d, want 350", got)
     }
 }
+```
+
+In Python, the same test is a pytest mark:
+
+```python
+@pytest.mark.covers("cart.total")
+def test_total():
+    assert total([250, 100]) == 350
 ```
 
 `temper.Covers` records the claim. When the test ends, the adapter writes
@@ -172,6 +193,14 @@ temper matrix --check --all-levels    # exit 3 if committed output is stale, 1 o
 You're integrated. The rest of this page covers what else you can declare.
 
 ---
+
+## Why "Temper"
+
+In metallurgy, tempering is applied to increase toughness. Non-tempered steel
+is scratch resistant but brittle: it breaks before it bends. LLM-written code
+is hard in the same way. It arrives fast and works where it is tested, then
+breaks, and degrades, as it evolves. Temper adds the toughness: declared
+invariants and proven claims, so a change bends the system without breaking.
 
 ## Primitives
 
@@ -697,6 +726,9 @@ evidence actually runs.
 `temper matrix` exits `2` and names the file and line. Evidence for an
 unknown id is never ignored and never creates a row.
 
+**Is this related to nerdsane/temper?** No. That's a verified runtime where
+agents write specs. This Temper audits what an existing codebase's tests prove.
+
 **Where did this come from?** Temper codifies an approach that grew inside
 [sql-flow](https://github.com/turbolytics/sql-flow) and sql-flow-control.
 It was built after a sink shipped for months without ever being written to,
@@ -708,6 +740,13 @@ behind a test that skipped and read as green.
 - [docs/adapters.md](docs/adapters.md): writing an adapter
 - [examples/inventory](examples/inventory): every concept, runnable
 - [MATRIX.md](MATRIX.md): Temper's own matrix. Temper proves itself with Temper.
+
+## What's next
+
+Runtime evidence. The same claims, proven by production traffic: see features
+that are declared but never used, and invariants broken live.
+
+Want help adopting Temper on your team? Turbolytics sets it up in a week.
 
 ## License
 
