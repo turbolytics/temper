@@ -72,9 +72,9 @@ temper/subjects/store.memory.yml: store.memory does not answer sku.units/weight_
 
 | Status | Meaning |
 |---|---|
-| covered | A passing test claimed it at this level. |
+| covered | A passing test claimed it at this level, and no test that claimed it failed. |
 | exempt | The subject is excused, and the test that proves the exemption passed. |
-| failing | Evidence exists and none of it passed. |
+| failing | A test that claimed it failed or errored. A pass never hides a failure. |
 | missing | No passing evidence. Every skip lands here. |
 | unenforced | A known gap with `tracked_by`. Reported, never failing the build. |
 | not_required | Not required at this level (or, for `requires_any`, proven or failing at another). |

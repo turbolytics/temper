@@ -55,7 +55,9 @@ Temper never attributes coverage by matching test names, file paths or
 anything else implicit.
 
 **R3. A skip is not coverage.** Only a passing outcome counts. A skipped,
-failed or errored test proves nothing at any level.
+failed or errored test proves nothing at any level. A pass never hides a
+failure: when several records claim one cell, one failed or errored record
+makes it failing.
 
 **R4. Levels are observed, not declared.** The level an evidence record counts at
 (unit, integration, release, …) comes from where the test ran, set by the
@@ -482,12 +484,16 @@ does not resolve is an error (R7). The full contract an adapter implements is
 
 | Status | Committed as | Meaning |
 |---|---|---|
-| **covered** | `covered` | At least one `pass` evidence record at this level. |
+| **covered** | `covered` | At least one `pass` evidence record at this level, and none failed or errored. |
 | **exempt** | `exempt` | The subject is exempt from this invariant (or answered `unsupported`) and a passing `exempts` record from the `proven_by` test exists at this level. |
-| **failing** | `failing` | Evidence exists at this level and none passed; at least one failed or errored. |
+| **failing** | `failing` | At least one evidence record at this level failed or errored, whatever else passed. |
 | **missing** | `missing` | No passing evidence, including when every record was a skip. |
 | **unenforced** | `unenforced` | The item has `tracked_by` or `enforced: false` and is not yet proven. Once passing evidence exists the cell reads `covered`, so it shows as ready to enforce. Never fails the build. |
 | **—** | `not_required` | Not required at this level. Shown, never counted. |
+
+**Evidence accumulates.** Adapters append, so records from earlier runs stay
+until `temper clean`. A failure from an earlier run keeps its cell failing
+after the test is fixed. Clean before a full run, as CI does.
 
 **Levels that did not run.** A level with no evidence records is *not run*:
 its cells keep their committed status (a new cell reads `missing`) and are

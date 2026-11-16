@@ -95,8 +95,9 @@ func TestBuild_SkipNeverCovers(t *testing.T) {
 	}
 }
 
-func TestBuild_FailWithoutPassIsFailing(t *testing.T) {
+func TestBuild_FailOrErrorIsFailing(t *testing.T) {
 	temper.Covers(t, "cli.matrix")
+	temper.Covers(t, "matrix.failure_beats_pass", temper.Subject("cli"))
 	r := Build(project(), []evidence.Located{
 		rec("f.a", "", "TestA", "unit", "fail"),
 		rec("f.a", "", "TestB", "unit", "skip"),
@@ -107,8 +108,8 @@ func TestBuild_FailWithoutPassIsFailing(t *testing.T) {
 	if c := cell(t, r, "feature", "f.a", "", "", "unit"); c.Status != status.Failing {
 		t.Fatalf("fail+skip = %q, want failing", c.Status)
 	}
-	if c := cell(t, r, "feature", "f.both", "", "", "unit"); c.Status != status.Covered {
-		t.Fatalf("fail+pass = %q, want covered", c.Status)
+	if c := cell(t, r, "feature", "f.both", "", "", "unit"); c.Status != status.Failing {
+		t.Fatalf("fail+pass = %q, want failing: a pass never hides a failure", c.Status)
 	}
 	if c := cell(t, r, "feature", "f.both", "", "", "integration"); c.Status != status.Failing {
 		t.Fatalf("error = %q, want failing", c.Status)

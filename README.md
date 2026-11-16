@@ -355,9 +355,9 @@ required claim, subject, and level. Each cell has one status:
 
 | | Status | Meaning |
 |---|---|---|
-| ✅ | covered | A test passed at this level. |
+| ✅ | covered | A test passed at this level, and none failed. |
 | ☑️ | exempt | The subject is exempt, and the proving test passed at this level. |
-| ❌ | failing | Tests ran at this level, and none passed. |
+| ❌ | failing | A test failed at this level. A pass beside it does not hide it. |
 | ⬜ | missing | No test passed at this level. Skipped tests land here. |
 | ⏳ | unenforced | A known gap with `tracked_by`. Temper reports it but does not fail the build. |
 | — | not required | The claim does not require this level. |
