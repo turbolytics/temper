@@ -172,3 +172,39 @@ func TestBuild_RequiresAnyNotRunIsNeverJudged(t *testing.T) {
 		t.Fatalf("unrun level of a satisfied group = %+v, want not_required, not judged", c)
 	}
 }
+
+// A group that failed at one level is decided there: the failure is the gap,
+// and the other levels read not_required rather than missing, so one broken
+// claim reads as one problem, not one per level.
+func TestBuild_RequiresAnyFailureDecidesTheGroup(t *testing.T) {
+	temper.Covers(t, "cli.matrix")
+	temper.Covers(t, "matrix.requires_any_one_level_proves_it", temper.Subject("cli"))
+	r := Build(anyProject(), []evidence.Located{
+		rec("inv.any", "sink.kafka", "TestKIT", "integration", "fail"),
+		rec("inv.any", "sink.pg", "TestP", "unit", "pass"),
+	}, status.NewSet(), both)
+	if c := cell(t, r, "invariant", "inv.any", "", "sink.kafka", "integration"); c.Status != status.Failing {
+		t.Fatalf("the failing level stays failing, got %q", c.Status)
+	}
+	if c := cell(t, r, "invariant", "inv.any", "", "sink.kafka", "unit"); c.Status != status.NotRequired {
+		t.Fatalf("the other level of a failed group = %q, want not_required", c.Status)
+	}
+	if g := gapsFor(r, "inv.any"); len(g) != 1 || g[0].Status != status.Failing {
+		t.Fatalf("gaps = %+v, want exactly the failing cell", g)
+	}
+}
+
+// Only a failure judged in this run decides the group. A failure carried in
+// the committed status from an earlier run cannot excuse a level that ran
+// now and proved nothing.
+func TestBuild_RequiresAnyCommittedFailureDecidesNothing(t *testing.T) {
+	temper.Covers(t, "cli.matrix")
+	temper.Covers(t, "matrix.not_run_never_judged", temper.Subject("cli"))
+	committed := status.NewSet()
+	committed.Put("invariant", "inv.any", "", "sink.kafka", "integration", status.Failing)
+	only := []evidence.Located{rec("f.a", "", "TestA", "unit", "pass")} // unit ran; integration did not
+	r := Build(anyProject(), only, committed, Options{})
+	if c := cell(t, r, "invariant", "inv.any", "", "sink.kafka", "unit"); c.Status != status.Missing {
+		t.Fatalf("a level that ran and proved nothing = %q, want missing", c.Status)
+	}
+}

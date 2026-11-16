@@ -264,6 +264,10 @@ one claim:
   subject, not once per level.
 - A failure at any listed level is still a gap, whatever else passed: a pass
   at one level never hides a failure at another.
+- A failure judged in this run decides the claim: its levels with no proof
+  read `not_required` rather than `missing`, so one broken claim is one gap,
+  not one per level. A failure carried in the committed status from an
+  earlier run decides nothing.
 - A level that did not run is not judged (§13), so a group with an unrun level
   is never called unproven.
 

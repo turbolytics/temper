@@ -266,22 +266,32 @@ func (b *builder) add(spec cellSpec) {
 	}
 }
 
-// settleAny applies requires_any to one group of cells. Once any level is
-// proven (covered, or exempt by a passing proof), the levels that are not
-// proven are not needed, so they read not_required instead of missing. A
-// failing level stays failing.
+// settleAny applies requires_any to one group of cells. A group is decided at
+// one level, and its other levels read not_required instead of missing:
+//
+//   - Once any level is proven (covered, or exempt by a passing proof), the
+//     levels that are not proven are not needed.
+//   - Once a level fails in this run, that failure is the group's gap, so one
+//     broken claim reads as one problem rather than one per level. A failure
+//     carried in the committed status from an earlier run decides nothing: it
+//     must not excuse a level that ran now and proved nothing.
+//
+// A failing level stays failing either way.
 func settleAny(cells []Cell) {
-	proven := false
+	proven, failed := false, false
 	for _, c := range cells {
-		if c.Status == status.Covered || c.Status == status.Exempt {
+		switch {
+		case c.Status == status.Covered || c.Status == status.Exempt:
 			proven = true
+		case c.Status == status.Failing && c.Judged:
+			failed = true
 		}
 	}
-	if !proven {
-		return
-	}
 	for i := range cells {
-		if cells[i].Status == status.Missing || cells[i].Status == status.Unenforced {
+		switch {
+		case proven && (cells[i].Status == status.Missing || cells[i].Status == status.Unenforced):
+			cells[i].Status = status.NotRequired
+		case failed && cells[i].Status == status.Missing:
 			cells[i].Status = status.NotRequired
 		}
 	}
