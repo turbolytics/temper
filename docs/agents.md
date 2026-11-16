@@ -77,7 +77,7 @@ temper/subjects/store.memory.yml: store.memory does not answer sku.units/weight_
 | failing | Evidence exists and none of it passed. |
 | missing | No passing evidence. Every skip lands here. |
 | unenforced | A known gap with `tracked_by`. Reported, never failing the build. |
-| not_required | Not required at this level (or, for `requires_any`, proven at another). |
+| not_required | Not required at this level (or, for `requires_any`, proven or failing at another). |
 
 For machine reading, use `temper matrix --all-levels --json`.
 

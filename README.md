@@ -514,7 +514,8 @@ no proof anywhere, it's a single gap per subject:
 temper/invariants.yml: store.restock.adds_exactly for store.file is missing at every level it may be proven at (unit, integration)
 ```
 
-A failure at any level is still a gap, whatever else passed.
+A failure at any level is still a gap, whatever else passed. The failure is
+the claim's one gap: its other levels read — rather than missing.
 
 ### Track a known gap
 
