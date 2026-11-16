@@ -187,7 +187,8 @@ func (b *builder) records(exempts bool, ref, level string, keep func(evidence.Lo
 	return out
 }
 
-// judge applies R3: any pass covers; otherwise any fail or error is failing;
+// judge applies R3 to every record that claims one cell at one level: any fail
+// or error is failing, whatever passed beside it; otherwise any pass covers;
 // otherwise (nothing, or only skips) it is missing.
 func judge(rs []evidence.Located) (status.Status, []Evidence) {
 	st := status.Missing
@@ -202,7 +203,7 @@ func judge(rs []evidence.Located) (status.Status, []Evidence) {
 			failed = true
 		}
 	}
-	if st != status.Covered && failed {
+	if failed {
 		st = status.Failing
 	}
 	sort.Slice(ev, func(i, j int) bool {

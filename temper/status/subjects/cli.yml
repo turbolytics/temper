@@ -3,6 +3,7 @@
 declarations.ambiguous_answer_rejected: {unit: covered, integration: not_required}
 matrix.exact_reference_only: {unit: covered, integration: not_required}
 matrix.exemption_needs_passing_proof: {unit: covered, integration: covered}
+matrix.failure_beats_pass: {unit: covered, integration: not_required}
 matrix.not_run_never_judged: {unit: covered, integration: not_required}
 matrix.output_deterministic: {unit: covered, integration: not_required}
 matrix.requires_any_one_level_proves_it: {unit: covered, integration: not_required}

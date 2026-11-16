@@ -88,6 +88,16 @@ invariants:
     family: honesty
     requires: [unit]
 
+  - id: matrix.failure_beats_pass
+    claim: >
+      When several records claim one cell at one level, a failed or errored
+      record makes the cell failing, whatever passed beside it. A pass never
+      hides a failure.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
+
   - id: declarations.ambiguous_answer_rejected
     claim: >
       A lattice answer map that does not say exactly one of supported: true

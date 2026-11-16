@@ -94,8 +94,9 @@ func (w *writer) intro() {
 	}
 	w.line("# %s matrix", title)
 	w.line("")
-	w.line("Every row is a claim this project declares in `%s/`. A cell is covered only by a", w.p.Config.Dir)
-	w.line("passing evidence record from a test that ran at that level; a skip proves nothing.")
+	w.line("Every row is a claim this project declares in `%s/`. A cell is covered when a test", w.p.Config.Dir)
+	w.line("that ran at that level passed and none failed. A skip proves nothing, and a pass")
+	w.line("never hides a failure.")
 	w.line("Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.")
 	w.line("")
 	w.line("✅ covered · ☑️ exempt · ❌ failing · ⬜ missing · ⏳ unenforced · — not required")
