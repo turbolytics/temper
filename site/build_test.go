@@ -234,3 +234,23 @@ func TestEveryPageHasTheIBeam(t *testing.T) {
 		}
 	}
 }
+
+// Every page offers a way to reach Turbolytics. The home and findings pages
+// also ask for it.
+func TestContactOnEveryPage(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	out := build(t, false)
+	for _, p := range pages {
+		page := read(t, filepath.Join(out, p))
+		if !strings.Contains(page, `<a data-ph="nav-contact" href="https://turbolytics.io/contact">Contact</a>`) {
+			t.Errorf("%s has no Contact link in the header", p)
+		}
+	}
+	for _, p := range []string{"index.html", "findings/index.html"} {
+		page := read(t, filepath.Join(out, p))
+		if !strings.Contains(page, "Contact us to get onboarded to Temper") || !strings.Contains(page, `class="button"`) {
+			t.Errorf("%s has no call to action", p)
+		}
+	}
+}
+

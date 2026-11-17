@@ -88,6 +88,24 @@ pre code { padding: 0; background: none; }
 .status-fixed, .status-merged, .status-confirmed { color: var(--ok); border-color: var(--ok); }
 .status-not-a-bug, .status-duplicate, .status-closed { color: var(--warn); border-color: var(--warn); }
 .note { color: var(--muted); }
+.cta {
+  margin-top: 40px;
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--code-bg);
+}
+.cta h2 { margin-top: 0; }
+.button {
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+.button:hover { opacity: .9; }
 .matrix { overflow-x: auto; }
 .matrix table { border-collapse: collapse; margin: 8px 0 16px; font-size: 14px; }
 .matrix th, .matrix td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
