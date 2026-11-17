@@ -14,8 +14,8 @@ Website: <https://turbolytics.github.io/temper/>
 Temper checks that your tests prove what your system must do. It fails the
 build when something is not proven.
 
-**Findings:** Temper has helped find bugs in open-source projects. Each one
-was reported to the maintainers. [See the findings](https://turbolytics.github.io/temper/findings/).
+**Findings:** Temper has helped find bugs in open-source projects. We
+reported each one to the maintainers. [See the findings](https://turbolytics.github.io/temper/findings/).
 
 ## Why
 

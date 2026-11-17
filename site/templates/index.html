@@ -6,7 +6,7 @@
 
 <section>
 <h2>Install</h2>
-<pre data-ph="install-copy"><code>brew install turbolytics/tap/temper</code></pre>
+<pre><code>brew install turbolytics/tap/temper</code></pre>
 <p>Or <code>go install github.com/turbolytics/temper/cmd/temper@latest</code>. For Python, <code>pip install temper-python</code>.</p>
 </section>
 
@@ -38,7 +38,7 @@ summary: 1 covered, 0 exempt, 0 failing, 1 missing, 0 unenforced</code></pre>
 
 <section>
 <h2>Findings so far</h2>
-<p>Temper helped find bugs in {{.Home.Projects}} open-source projects. Each one was reported to the maintainers.</p>
+<p>Temper helped find bugs in {{.Home.Projects}} open-source {{if eq .Home.Projects 1}}project{{else}}projects{{end}}. We reported each one to the maintainers.</p>
 <ul class="counts">
 <li>{{.Home.Issues}} issues:{{range $i, $c := .Home.IssueStatus}}{{if $i}},{{end}} {{$c.N}} {{$c.Status}}{{end}}</li>
 <li>{{.Home.PRs}} pull requests:{{range $i, $c := .Home.PRStatus}}{{if $i}},{{end}} {{$c.N}} {{$c.Status}}{{end}}</li>

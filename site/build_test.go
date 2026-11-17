@@ -177,13 +177,14 @@ func TestAnalyticsOnlyWithKeyAndFlag(t *testing.T) {
 func TestMarkdownRendersMatrixShape(t *testing.T) {
 	temper.Covers(t, "site.findings")
 	in := "<!-- hidden -->\n# Title\n\nA `code` and **bold** [link](https://x.test/a?b=1&c=2).\nSame paragraph.\n\n" +
-		"| a | b |\n| --- | ---: |\n| `x` | ✅ |\n\n<b>raw</b> stays text\n"
+		"| a | b |\n| --- | ---: |\n| `x` | ✅ |\n\n<b>raw</b> stays text\n\n- `a.b` — first\n- second\n"
 	got := string(Markdown([]byte(in)))
 	for _, want := range []string{
 		"<h1>Title</h1>",
 		"<p>A <code>code</code> and <strong>bold</strong> <a href=\"https://x.test/a?b=1&amp;c=2\">link</a>. Same paragraph.</p>",
 		"<table>", "<th>a</th>", "<td><code>x</code></td>", "<td>✅</td>",
 		"<p>&lt;b&gt;raw&lt;/b&gt; stays text</p>",
+		"<ul>\n<li><code>a.b</code> — first</li>\n<li>second</li>\n</ul>",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("markdown output lacks %q\n%s", want, got)
@@ -194,5 +195,22 @@ func TestMarkdownRendersMatrixShape(t *testing.T) {
 	}
 	if bytes.Contains(Markdown([]byte(in)), []byte("<b>")) {
 		t.Error("raw HTML passed through")
+	}
+}
+
+// The project count names projects with a real bug, so a project whose only
+// issue is not-a-bug or a duplicate does not count.
+func TestHomeCountsOnlyRealBugs(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	rows := csvHeader +
+		"acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,\n" +
+		"beta/kv,issue,3,https://github.com/beta/kv/issues/3,Documented.,not-a-bug,,2026-11-17,\n"
+	root := fakeRoot(t, rows, `{"posthog_key": "", "posthog_host": ""}`)
+	out := t.TempDir()
+	if err := Build(Options{Root: root, Out: out}); err != nil {
+		t.Fatal(err)
+	}
+	if page := read(t, filepath.Join(out, "index.html")); !strings.Contains(page, "bugs in 1 open-source project") {
+		t.Fatalf("home page should count 1 project:\n%s", page)
 	}
 }

@@ -14,8 +14,12 @@ on:
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
+# The same permissions as GitHub's starter workflow for Pages. The build job's
+# configure-pages step reads the Pages settings, and the deploy job writes.
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 # Two pushes never deploy at once. A newer push waits for the running deploy.
 concurrency:
@@ -42,9 +46,6 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -1,11 +1,12 @@
 # Findings
 
 `findings.csv` is the public record of the issues and pull requests Temper
-helped find in other projects. The Temper site's findings page is built from
+helped find in other projects. The Temper site builds its findings page from
 it.
 
 **Public facts only.** Strategy, next steps and private notes stay in the
-private tracker. The header is fixed, so a test fails if a column is added.
+private tracker. The header is fixed, so a test fails if someone adds a
+column.
 
 ## Columns
 
@@ -31,8 +32,11 @@ One row per issue or pull request.
 - No two rows share a `url`.
 - Rows sort by `repo` (ignoring case), then by kind in the order above, then
   by `number`.
-- A `summary` never says `TODO`.
-- `matrix_url` points at a commit, never a branch, so it cannot change.
+- A `summary` never says `TODO`, in any case.
+- `opened` is never after `updated`.
+- A repo has one spelling. `Acme/db` and `acme/db` cannot both appear.
+- `matrix_url` is a GitHub commit permalink, never a branch link, so it
+  cannot change.
 - When a maintainer says a finding is documented behavior, set `not-a-bug`.
   Never delete the row.
 

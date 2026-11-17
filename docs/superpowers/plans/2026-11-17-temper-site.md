@@ -110,7 +110,7 @@ Check: `go run ./site -out /tmp/site` writes three pages. `go test ./site/...` p
 - [ ] Read the project key and host from `site/config.json`. The `phc_` project key is public by design. Never commit a personal API key.
 - [ ] With an empty key, write no snippet. The site ships this way until the key is set.
 - [ ] Set `persistence: 'memory'`, so PostHog sets no cookies.
-- [ ] Mark links with `data-ph`, so they show clearly in PostHog's autocapture: `finding-issue`, `finding-pr`, `finding-matrix`, `cta-contact`, `install-copy`.
+- [ ] Mark links with `data-ph`, so they show clearly in PostHog's autocapture: `finding-issue`, `finding-pr`, `finding-matrix`, `cta-contact`. (`install-copy` was dropped: autocapture records clicks on links and buttons, and the install command is a code block with no copy button.)
 - [ ] A `-no-analytics` flag skips the snippet for local preview.
 
 Check: with a key set, the built `index.html` contains the snippet once. With `-no-analytics` or an empty key, it contains none.

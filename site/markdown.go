@@ -8,8 +8,8 @@ import (
 )
 
 // Markdown renders the subset of Markdown that MATRIX.md uses: headings,
-// paragraphs, tables, inline code, bold and links. HTML comments are
-// dropped. Every other line renders as an escaped paragraph, so nothing is
+// paragraphs, bullet lists, tables, inline code, bold and links. It drops HTML
+// comments. Every other line renders as an escaped paragraph, so nothing is
 // lost and no raw HTML passes through.
 func Markdown(src []byte) []byte {
 	var out bytes.Buffer
@@ -33,6 +33,14 @@ func Markdown(src []byte) []byte {
 			m := heading.FindStringSubmatch(line)
 			n := string(rune('0' + len(m[1])))
 			out.WriteString("<h" + n + ">" + inline(m[2]) + "</h" + n + ">\n")
+		case strings.HasPrefix(line, "- "):
+			flush()
+			out.WriteString("<ul>\n")
+			for ; i < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[i]), "- "); i++ {
+				out.WriteString("<li>" + inline(strings.TrimPrefix(strings.TrimSpace(lines[i]), "- ")) + "</li>\n")
+			}
+			i--
+			out.WriteString("</ul>\n")
 		case strings.HasPrefix(line, "|") && i+1 < len(lines) && separator.MatchString(strings.TrimSpace(lines[i+1])):
 			flush()
 			var rows [][]string

@@ -164,11 +164,13 @@ func posthogSnippet(cfg config, on bool) (template.HTML, error) {
 
 func summarize(rows []findings.Finding) home {
 	var h home
-	repos := map[string]bool{} // projects with at least one issue
+	repos := map[string]bool{} // projects with a real bug: reported, confirmed or fixed
 	issues, prs := map[string]int{}, map[string]int{}
 	for _, f := range rows {
 		if f.IsIssue() {
-			repos[f.Repo] = true
+			if f.Status == "reported" || f.Status == "confirmed" || f.Status == "fixed" {
+				repos[f.Repo] = true
+			}
 			h.Issues++
 			issues[f.Status]++
 		} else {

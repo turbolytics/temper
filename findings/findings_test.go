@@ -21,7 +21,7 @@ func TestCommittedFindingsAreValid(t *testing.T) {
 
 const header = "repo,kind,number,url,summary,status,opened,updated,matrix_url\n"
 
-const goodIssue = "acme/db,issue,7,https://github.com/acme/db/issues/7,Reads lose a row.,reported,2026-11-16,2026-11-17,https://github.com/turbolytics/db/blob/abc/MATRIX.md\n"
+const goodIssue = "acme/db,issue,7,https://github.com/acme/db/issues/7,Reads lose a row.,reported,2026-11-16,2026-11-17,https://github.com/turbolytics/db/blob/0123456789abcdef0123456789abcdef01234567/MATRIX.md\n"
 const goodPR = "acme/db,fix-pr,8,https://github.com/acme/db/pull/8,Fixes the lost row.,open,,2026-11-17,\n"
 
 func TestParseAcceptsGoodRows(t *testing.T) {
@@ -32,7 +32,7 @@ func TestParseAcceptsGoodRows(t *testing.T) {
 	}
 	want := Finding{Repo: "acme/db", Kind: "issue", Number: 7, URL: "https://github.com/acme/db/issues/7",
 		Summary: "Reads lose a row.", Status: "reported", Opened: "2026-11-16", Updated: "2026-11-17",
-		MatrixURL: "https://github.com/turbolytics/db/blob/abc/MATRIX.md"}
+		MatrixURL: "https://github.com/turbolytics/db/blob/0123456789abcdef0123456789abcdef01234567/MATRIX.md"}
 	if len(rows) != 2 || rows[0] != want || rows[1].Opened != "" || rows[1].MatrixURL != "" {
 		t.Fatalf("rows = %+v", rows)
 	}
@@ -80,6 +80,14 @@ func TestParseRejectsEachBrokenRule(t *testing.T) {
 		{"TODO summary", header + issue(func(c []string) { c[4] = "TODO: write this" }), "line 2: summary"},
 		{"rows out of order", header + goodPR + goodIssue, "line 3: order"},
 		{"matrix_url not a link", header + issue(func(c []string) { c[8] = "MATRIX.md" }), "line 2: matrix_url"},
+		{"matrix_url on a branch", header + issue(func(c []string) { c[8] = "https://github.com/t/db/blob/main/MATRIX.md" }), "line 2: matrix_url"},
+		{"matrix_url off GitHub", header + issue(func(c []string) { c[8] = "https://evil.example/x" }), "line 2: matrix_url"},
+		{"number with a plus sign", header + issue(func(c []string) { c[2] = "+7" }), "line 2: number"},
+		{"number with a leading zero", header + issue(func(c []string) { c[2] = "007" }), "line 2: number"},
+		{"opened after updated", header + issue(func(c []string) { c[6] = "2026-11-18" }), "line 2: opened"},
+		{"lowercase todo", header + issue(func(c []string) { c[4] = "todo: write this" }), "line 2: summary"},
+		{"same repo in two cases", header + goodIssue + strings.Replace(goodPR, "acme/db", "Acme/db", 2), "line 3: repo"},
+		{"header only", header, "no rows"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := Parse(strings.NewReader(tc.input))

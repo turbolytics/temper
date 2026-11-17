@@ -44,6 +44,8 @@ var (
 	issueStatuses = []string{"reported", "confirmed", "fixed", "not-a-bug", "duplicate"}
 	prStatuses    = []string{"draft", "open", "merged", "closed"}
 	repoPattern   = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
+	// A matrix link points at a commit, so it cannot change under the reader.
+	matrixPattern = regexp.MustCompile(`^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/blob/[0-9a-f]{40}/\S+$`)
 )
 
 // MaxSummary is the longest summary allowed, in characters.
@@ -91,6 +93,10 @@ func Parse(r io.Reader) ([]Finding, error) {
 		rows    []Finding
 		errs    []string
 		seen    = map[string]int{}
+		spelled = map[string]struct {
+			repo string
+			line int
+		}{}
 		prevKey sortKey
 		prevAt  int
 	)
@@ -116,12 +122,19 @@ func Parse(r io.Reader) ([]Finding, error) {
 
 		if !repoPattern.MatchString(f.Repo) {
 			bad("repo", "%q is not owner/name", f.Repo)
+		} else if first, ok := spelled[strings.ToLower(f.Repo)]; ok && first.repo != f.Repo {
+			bad("repo", "%q differs only in case from %q on line %d", f.Repo, first.repo, first.line)
+		} else if !ok {
+			spelled[strings.ToLower(f.Repo)] = struct {
+				repo string
+				line int
+			}{f.Repo, line}
 		}
 		if !contains(Kinds, f.Kind) {
 			bad("kind", "%q is not one of %s", f.Kind, strings.Join(Kinds, ", "))
 		}
 		n, err := strconv.Atoi(rec[2])
-		if err != nil || n <= 0 {
+		if err != nil || n <= 0 || strconv.Itoa(n) != rec[2] {
 			bad("number", "%q is not a positive number", rec[2])
 		}
 		f.Number = n
@@ -146,20 +159,23 @@ func Parse(r io.Reader) ([]Finding, error) {
 			bad("summary", "is required")
 		case utf8.RuneCountInString(f.Summary) > MaxSummary:
 			bad("summary", "is %d characters; keep it to %d", utf8.RuneCountInString(f.Summary), MaxSummary)
-		case strings.Contains(f.Summary, "TODO"):
+		case strings.Contains(strings.ToUpper(f.Summary), "TODO"):
 			bad("summary", "still says TODO")
 		case strings.ContainsAny(f.Summary, "\n"):
 			bad("summary", "must be one line")
 		}
 
-		if f.Opened != "" && !isDate(f.Opened) {
+		switch {
+		case f.Opened != "" && !isDate(f.Opened):
 			bad("opened", "%q is not YYYY-MM-DD", f.Opened)
+		case f.Opened != "" && isDate(f.Updated) && f.Opened > f.Updated:
+			bad("opened", "%s is after updated %s", f.Opened, f.Updated)
 		}
 		if !isDate(f.Updated) {
 			bad("updated", "%q is not YYYY-MM-DD", f.Updated)
 		}
-		if f.MatrixURL != "" && !strings.HasPrefix(f.MatrixURL, "https://") {
-			bad("matrix_url", "%q is not an https link", f.MatrixURL)
+		if f.MatrixURL != "" && !matrixPattern.MatchString(f.MatrixURL) {
+			bad("matrix_url", "%q is not a GitHub commit permalink (https://github.com/<owner>/<repo>/blob/<40-hex commit>/<path>)", f.MatrixURL)
 		}
 
 		key := keyOf(f)
@@ -171,6 +187,9 @@ func Parse(r io.Reader) ([]Finding, error) {
 	}
 	if len(errs) > 0 {
 		return nil, errors.New(strings.Join(errs, "\n"))
+	}
+	if len(rows) == 0 {
+		return nil, errors.New("line 2: the file has no rows")
 	}
 	return rows, nil
 }
