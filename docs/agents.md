@@ -52,7 +52,8 @@ their commands are declared in `temper.yml`.
 | `temper version` | Prints the installed version. |
 
 Locally, evidence from a level you did not run keeps its committed status and
-is not judged, so running one level fails only on that level. CI runs every
+is not judged, so running one level fails only on that level. If no level has
+evidence, `temper matrix` exits 2 and writes nothing. CI runs every
 level from empty evidence and is the authority.
 
 ## Reading the result
@@ -90,6 +91,7 @@ For machine reading, use `temper matrix --all-levels --json`.
 | `R6 gap`: a subject does not answer a lattice member | Read the subject, then answer the member honestly: `supported`, or `unsupported` with a reason and a proof. |
 | `R6 typo` or `R7`: an unknown id | Fix the spelling, or declare the missing item. Nothing is ever ignored or created silently. |
 | A subject cannot hold an invariant | Add an exemption with a reason and a test that proves it. |
+| `no evidence at any level` | Run the tests through `temper run --level L -- CMD`, then run `temper matrix` again. |
 | Exit 3 | Regenerate: run every level, then `temper matrix --all-levels`, and commit the result. |
 | `temper/status/` or `MATRIX.md` conflicts in git | `temper render` rebuilds `MATRIX.md` from the statuses; `temper matrix --all-levels` rebuilds both. |
 

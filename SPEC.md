@@ -500,7 +500,9 @@ its cells keep their committed status (a new cell reads `missing`) and are
 not judged, so a local run of one level fails only on that level.
 `--all-levels` judges every level on the evidence present; CI always passes
 it, starting from empty evidence, which makes CI the authority on the
-committed statuses.
+committed statuses. When no level ran at all, nothing would be judged, so
+`temper matrix` without `--all-levels` reports an evidence error and writes
+nothing. It never replays the committed statuses as the result of a run.
 
 **Commands.**
 
@@ -514,9 +516,9 @@ committed statuses.
 | `temper guide` | Prints the guide to working in a Temper project, embedded in the binary so it matches the installed version. |
 
 **Exit codes.** `0` every enforced, judged cell is covered or exempt. `1` one
-is missing or failing. `2` a declaration, evidence or usage error (nothing is
-written). `3` (`--check`) committed output is stale. The highest that applies
-wins.
+is missing or failing. `2` a declaration, evidence or usage error, including
+no evidence at any level without `--all-levels` (nothing is written). `3`
+(`--check`) committed output is stale. The highest that applies wins.
 
 ## 14. Checks
 

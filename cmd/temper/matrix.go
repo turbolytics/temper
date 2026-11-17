@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/turbolytics/temper/internal/diag"
@@ -48,6 +49,14 @@ func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
 	kept, validErrs := evidence.Validate(p, recs)
 	if errs := append(readErrs, validErrs...); len(errs) != 0 {
 		return fail(p, errs.Sorted())
+	}
+	// With no evidence at any level, nothing would be judged: every cell
+	// would replay its committed status, and the exit code would read as a
+	// passing run. That is an evidence error, not a result.
+	if !*allLevels && len(kept) == 0 {
+		return fail(p, diag.List{{File: filepath.ToSlash(p.Config.Evidence),
+			Message: "no evidence at any level, so nothing was judged; run the tests through `temper run --level L -- CMD` first, " +
+				"pass --all-levels to judge every level on no evidence, or use `temper render` to rebuild MATRIX.md from the committed status"}})
 	}
 	// The committed statuses are read only for levels that did not run.
 	// Judging every level never needs them, so a conflicted status file

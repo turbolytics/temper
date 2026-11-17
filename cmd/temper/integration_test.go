@@ -238,3 +238,19 @@ func TestIntegration_Guide(t *testing.T) {
 		t.Fatalf("guide = %d, starts %.80q", code, out)
 	}
 }
+
+func TestIntegration_MatrixNoEvidence(t *testing.T) {
+	temper.Covers(t, "cli.matrix")
+	temper.Covers(t, "matrix.no_evidence_is_an_error", temper.Subject("cli"))
+	root := fixture(t, "valid")
+	if code, out := temperBin(t, root, "matrix"); code != 0 {
+		t.Fatalf("first matrix = %d, %s", code, out)
+	}
+	if code, out := temperBin(t, root, "clean"); code != 0 {
+		t.Fatalf("clean = %d, %s", code, out)
+	}
+	code, out := temperBin(t, root, "matrix")
+	if code != 2 || !strings.Contains(out, "no evidence at any level") || strings.Contains(out, "summary:") {
+		t.Fatalf("matrix after clean = %d, %s; want 2, the no-evidence error, and no summary", code, out)
+	}
+}
