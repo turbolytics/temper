@@ -44,8 +44,9 @@ header.top {
   padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }
-.brand { color: var(--fg); font-weight: 700; font-size: 20px; text-decoration: none; }
-.brand span { color: var(--muted); font-weight: 400; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 700; font-size: 20px; text-decoration: none; }
+.brand .mark { display: block; }
+.brand span { color: var(--muted); font-weight: 400; margin-left: -4px; }
 nav { display: flex; gap: 20px; }
 nav a { color: var(--fg); text-decoration: none; }
 nav a:hover { color: var(--accent); }

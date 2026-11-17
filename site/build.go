@@ -14,7 +14,7 @@ import (
 	"github.com/turbolytics/temper/findings"
 )
 
-//go:embed templates/*.html style.css posthog.js
+//go:embed templates/*.html style.css posthog.js favicon.svg
 var assets embed.FS
 
 // Options says where to read the repository and where to write the site.
@@ -63,8 +63,8 @@ type item struct {
 	PH    string // the data-ph tag for the link
 }
 
-// Build writes index.html, findings/index.html, matrix/index.html and
-// style.css into opts.Out.
+// Build writes index.html, findings/index.html, matrix/index.html,
+// style.css and favicon.svg into opts.Out.
 func Build(opts Options) error {
 	rows, err := findings.Load(filepath.Join(opts.Root, "findings", "findings.csv"))
 	if err != nil {
@@ -112,11 +112,16 @@ func Build(opts Options) error {
 			return err
 		}
 	}
-	css, err := assets.ReadFile("style.css")
-	if err != nil {
-		return err
+	for _, name := range []string{"style.css", "favicon.svg"} {
+		data, err := assets.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		if err := write(filepath.Join(opts.Out, name), data); err != nil {
+			return err
+		}
 	}
-	return write(filepath.Join(opts.Out, "style.css"), css)
+	return nil
 }
 
 func readConfig(path string) (config, error) {

@@ -63,7 +63,7 @@ const csvHeader = "repo,kind,number,url,summary,status,opened,updated,matrix_url
 func TestBuildWritesEveryPageWithFooter(t *testing.T) {
 	temper.Covers(t, "site.findings")
 	out := build(t, false)
-	for _, p := range append(pages, "style.css") {
+	for _, p := range append(pages, "style.css", "favicon.svg") {
 		if _, err := os.Stat(filepath.Join(out, p)); err != nil {
 			t.Errorf("missing %s", p)
 		}
@@ -98,7 +98,7 @@ func TestFindingsPageListsEveryURL(t *testing.T) {
 func TestBuildIsDeterministic(t *testing.T) {
 	temper.Covers(t, "site.findings")
 	a, b := build(t, false), build(t, false)
-	for _, p := range append(pages, "style.css") {
+	for _, p := range append(pages, "style.css", "favicon.svg") {
 		if read(t, filepath.Join(a, p)) != read(t, filepath.Join(b, p)) {
 			t.Errorf("%s differs between two builds", p)
 		}
@@ -212,5 +212,25 @@ func TestHomeCountsOnlyRealBugs(t *testing.T) {
 	}
 	if page := read(t, filepath.Join(out, "index.html")); !strings.Contains(page, "bugs in 1 open-source project") {
 		t.Fatalf("home page should count 1 project:\n%s", page)
+	}
+}
+
+// The I-beam in temper colors is the site's mark: in the header of every page,
+// and as the browser-tab icon.
+func TestEveryPageHasTheIBeam(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	out := build(t, false)
+	icon := read(t, filepath.Join(out, "favicon.svg"))
+	if !strings.Contains(icon, "<svg") || !strings.Contains(icon, "#2F5A9E") {
+		t.Fatalf("favicon.svg is not the I-beam in temper colors:\n%s", icon)
+	}
+	for _, p := range pages {
+		page := read(t, filepath.Join(out, p))
+		if !strings.Contains(page, `rel="icon"`) || !strings.Contains(page, `favicon.svg"`) {
+			t.Errorf("%s does not link the favicon", p)
+		}
+		if !strings.Contains(page, `class="mark"`) {
+			t.Errorf("%s has no I-beam in the header", p)
+		}
 	}
 }
