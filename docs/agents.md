@@ -11,8 +11,8 @@ https://github.com/turbolytics/temper/blob/main/docs/adapters.md.
 
 - The code is an implementation detail. Trust it, and verify the structure.
 - People own what the system means, written down in `temper/`: **features**
-  (what it does), **invariants** (what must never happen), **lattices** (closed
-  sets it must answer for) and **scenarios** (behavior over time).
+  (what it does), **invariants** (what must never happen), **lattices** (complete
+  lists of values it must handle) and **scenarios** (behavior over time).
 - A test must state, in code, what it proves. Temper joins those statements to
   the declarations and reports every claim that has no passing evidence.
 - Only a passing test counts. A skip, a failure and an error prove nothing.
@@ -88,7 +88,7 @@ For machine reading, use `temper matrix --all-levels --json`.
 |---|---|
 | A cell is missing | Write the test that proves the claim and make it claim it. Do not weaken the declaration. |
 | A cell is failing | Fix the code or the test. Never skip it. |
-| `R6 gap`: a subject does not answer a lattice member | Read the subject, then answer the member honestly: `supported`, or `unsupported` with a reason and a proof. |
+| `R6 gap`: a subject leaves out a lattice member | Read the subject, then state the member honestly: `supported`, or `unsupported` with a reason and a proof. |
 | `R6 typo` or `R7`: an unknown id | Fix the spelling, or declare the missing item. Nothing is ever ignored or created silently. |
 | A subject cannot hold an invariant | Add an exemption with a reason and a test that proves it. |
 | `no evidence at any level` | Run the tests through `temper run --level L -- CMD`, then run `temper matrix` again. |
@@ -110,7 +110,7 @@ For machine reading, use `temper matrix --all-levels --json`.
 temper.yml            levels, in the order they run
 temper/features.yml   what the system does
 temper/invariants.yml what must never happen
-temper/lattices/<id>.yml    one closed set per file
+temper/lattices/<id>.yml    one list of members per file
 temper/subjects/<id>.yml    one concrete thing per file (the file name is its id)
 temper/scenarios/<group>.yml
 ```
@@ -171,7 +171,7 @@ exempt:
     reason: Memory is the point; a restart starts empty.
     proven_by: TestIntegration_MemoryStoreForgetsOnRestart   # must call Exempts
 answers:
-  sku.units:                          # one answer per member of the lattice
+  sku.units:                          # one entry per member of the lattice
     each: supported
     weight_kg: {unsupported: true, reason: whole numbers only, proven_by: TestRejectsKg}
 ```
@@ -198,7 +198,7 @@ members: [{key: each}, {key: weight_kg}]
 
 Things that are easy to get wrong:
 
-- A map answer must say `supported: true` or `unsupported: true`. It is never
+- A map entry must say `supported: true` or `unsupported: true`. It is never
   guessed.
 - `requires` needs every level listed. `requires_any` needs one. Declare one of
   them, not both.
