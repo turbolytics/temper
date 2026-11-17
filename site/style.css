@@ -112,15 +112,24 @@ pre .hl {
 .sidebar .stars { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sidebar .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar .lang { color: var(--muted); font-size: 12px; }
-.findings-main .project:first-child { margin-top: 0; border-top: 0; }
-.findings-main .project:first-child h2 { margin-top: 0; }
-.project { border-top: 1px solid var(--line); margin-top: 24px; scroll-margin-top: 16px; }
+.findings-main { display: flex; flex-direction: column; gap: 20px; }
+.findings-main .project {
+  margin: 0;
+  padding: 18px 22px 8px;
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  scroll-margin-top: 16px;
+}
+.findings-main .project h2 { margin: 0 0 2px; }
+.findings-main .findings li { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
 .project-meta { color: var(--muted); font-size: 14px; margin: 0 0 4px; }
 @media (max-width: 760px) {
   .findings-layout { grid-template-columns: 1fr; gap: 16px; }
   .sidebar { position: static; max-height: none; }
 }
 .project h2 a { color: var(--fg); text-decoration: none; }
+.project h2 a:hover { color: var(--accent); }
 .findings { list-style: none; padding: 0; margin: 0; }
 .findings li { padding: 12px 0; border-bottom: 1px solid var(--line); }
 .findings li:last-child { border-bottom: 0; }
