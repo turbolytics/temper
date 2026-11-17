@@ -334,3 +334,17 @@ func TestContactOnEveryPage(t *testing.T) {
 		}
 	}
 }
+
+// The matrix page says the rows are Temper's own specification, in place of
+// the sentence every project's MATRIX.md opens with.
+func TestMatrixPageNamesTemperSpecification(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	page := read(t, filepath.Join(build(t, false), "matrix/index.html"))
+	if strings.Contains(page, "Every row is a claim this project declares") {
+		t.Error("the generic MATRIX.md sentence is still on the page")
+	}
+	want := `Every row in the tables below is part of Temper's specification. Temper declares each one in its own <a href="https://github.com/turbolytics/temper/tree/main/temper"><code>temper/</code></a> directory.`
+	if !strings.Contains(page, want) {
+		t.Error("the matrix page lacks the specification sentence")
+	}
+}

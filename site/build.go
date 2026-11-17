@@ -117,7 +117,11 @@ func Build(opts Options) error {
 		case "findings.html":
 			p.Projects = grouped
 		case "matrix.html":
-			p.MatrixDoc = template.HTML(Markdown(matrix))
+			doc, err := matrixDoc(matrix)
+			if err != nil {
+				return err
+			}
+			p.MatrixDoc = doc
 		}
 		t, err := template.New("base.html").Funcs(funcs).ParseFS(assets, "templates/base.html", "templates/"+o.tmpl)
 		if err != nil {
@@ -265,6 +269,24 @@ func group(rows []findings.Finding, projects []findings.Project) []project {
 		out = append(out, *byRepo[r])
 	}
 	return out
+}
+
+// The sentence every MATRIX.md opens with, as Markdown renders it, and what
+// the site says in its place.
+const (
+	matrixOpening = "Every row is a claim this project declares in <code>temper/</code>."
+	matrixOnSite  = `Every row in the tables below is part of Temper's specification. Temper declares each one in its own <a href="https://github.com/turbolytics/temper/tree/main/temper"><code>temper/</code></a> directory.`
+)
+
+// matrixDoc renders MATRIX.md for the site. It replaces the generic opening
+// sentence, and fails if that sentence is gone, so a change in Temper's
+// wording cannot slip past.
+func matrixDoc(src []byte) (template.HTML, error) {
+	html := string(Markdown(src))
+	if strings.Count(html, matrixOpening) != 1 {
+		return "", fmt.Errorf("MATRIX.md: the opening sentence %q changed; update matrixOpening in site/build.go", matrixOpening)
+	}
+	return template.HTML(strings.Replace(html, matrixOpening, matrixOnSite, 1)), nil
 }
 
 var funcs = template.FuncMap{
