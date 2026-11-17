@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"go/ast"
+	"html"
+	"html/template"
 	"go/parser"
 	"go/token"
 	"os"
@@ -71,6 +73,22 @@ func goFunc(root, path, name string) (string, error) {
 		return string(src[start:end]), nil
 	}
 	return "", fmt.Errorf("%s: no function %s", path, name)
+}
+
+// highlightTemper escapes Go source and marks each line that calls the
+// temper package, so a reader sees where a test states what it proves.
+func highlightTemper(src string) template.HTML {
+	lines := strings.Split(src, "\n")
+	for i, line := range lines {
+		code := strings.TrimLeft(line, " \t")
+		indent := line[:len(line)-len(code)]
+		if strings.HasPrefix(code, "temper.") {
+			lines[i] = html.EscapeString(indent) + `<span class="hl">` + html.EscapeString(code) + `</span>`
+		} else {
+			lines[i] = html.EscapeString(line)
+		}
+	}
+	return template.HTML(strings.Join(lines, "\n"))
 }
 
 // tutorialSnippets reads every snippet the tutorial shows.

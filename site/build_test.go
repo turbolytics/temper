@@ -379,6 +379,14 @@ func TestTutorialQuotesLiveFiles(t *testing.T) {
 			t.Errorf("tutorial lacks %q", want)
 		}
 	}
+	for _, hl := range []string{
+		`<span class="hl">temper.Covers(t, &#34;cli.matrix&#34;)</span>`,
+		`<span class="hl">temper.Covers(t, &#34;matrix.skip_never_covers&#34;, temper.Subject(&#34;cli&#34;))</span>`,
+	} {
+		if !strings.Contains(page, hl) {
+			t.Errorf("tutorial does not highlight %s", hl)
+		}
+	}
 	for _, step := range []string{"Decide what counts as proof", "List what the system does", "Write what must never happen", "List every case", "Make each test state what it proves", "Run it, and read the result", "Hand it to an LLM"} {
 		if !strings.Contains(page, step) {
 			t.Errorf("tutorial lacks the step %q", step)

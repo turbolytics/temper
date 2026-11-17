@@ -40,6 +40,7 @@ type page struct {
 	Projects  []project
 	MatrixDoc template.HTML
 	Snippets  map[string]string // the tutorial's quotes from Temper's own files
+	TestHTML  template.HTML     // the tutorial's test, with its temper calls highlighted
 }
 
 // home is the breadth of the findings. It counts other people's projects
@@ -126,6 +127,7 @@ func Build(opts Options) error {
 			if p.Snippets, err = tutorialSnippets(opts.Root); err != nil {
 				return err
 			}
+			p.TestHTML = highlightTemper(p.Snippets["test"])
 		}
 		t, err := template.New("base.html").Funcs(funcs).ParseFS(assets, "templates/base.html", "templates/"+o.tmpl)
 		if err != nil {
