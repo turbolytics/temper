@@ -50,6 +50,19 @@ func TestParseAcceptsQuotedSummary(t *testing.T) {
 	}
 }
 
+// A maintainer can close an issue without judging the findings. The record says
+// so instead of claiming the bug was not real.
+func TestParseAcceptsDeclinedIssue(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	rows, err := Parse(strings.NewReader(header + strings.Replace(goodIssue, ",reported,", ",declined,", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows[0].Status != "declined" {
+		t.Fatalf("status = %q", rows[0].Status)
+	}
+}
+
 // Each bad input breaks one rule. The error names the line and the rule.
 func TestParseRejectsEachBrokenRule(t *testing.T) {
 	temper.Covers(t, "site.findings")

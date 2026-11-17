@@ -145,7 +145,7 @@ pre .hl {
   color: var(--muted);
 }
 .status-fixed, .status-merged, .status-confirmed { color: var(--ok); border-color: var(--ok); }
-.status-not-a-bug, .status-duplicate, .status-closed { color: var(--warn); border-color: var(--warn); }
+.status-not-a-bug, .status-duplicate, .status-declined, .status-closed { color: var(--warn); border-color: var(--warn); }
 .note { color: var(--muted); }
 .step { margin-top: 36px; }
 .step h2 { display: flex; align-items: center; gap: 12px; }

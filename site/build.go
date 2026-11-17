@@ -258,7 +258,7 @@ func summarize(projects []project) home {
 		}
 	}
 	h.Stars = stars(total)
-	for _, s := range []string{"fixed", "confirmed", "reported", "not-a-bug", "duplicate"} {
+	for _, s := range []string{"fixed", "confirmed", "reported", "not-a-bug", "duplicate", "declined"} {
 		if issues[s] > 0 {
 			h.IssueStatus = append(h.IssueStatus, count{s, issues[s]})
 		}

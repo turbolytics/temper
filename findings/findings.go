@@ -41,7 +41,7 @@ func (f Finding) IsIssue() bool { return f.Kind == "issue" }
 var Kinds = []string{"issue", "fix-pr", "test-pr", "temper-pr"}
 
 var (
-	issueStatuses = []string{"reported", "confirmed", "fixed", "not-a-bug", "duplicate"}
+	issueStatuses = []string{"reported", "confirmed", "fixed", "not-a-bug", "duplicate", "declined"}
 	prStatuses    = []string{"draft", "open", "merged", "closed"}
 	repoPattern   = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 	// A matrix link points at a commit, so it cannot change under the reader.
