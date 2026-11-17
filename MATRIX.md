@@ -29,7 +29,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 | `cli.run` | Runs a command with the level and evidence directory set, so no test chooses its own level. | ✅ | ✅ |
 | `cli.clean` | Deletes all evidence, the start of a full run. | ✅ | — |
 | `cli.guide` | Prints the guide an LLM or a person needs to work in a Temper project, matching the installed version. | ✅ | ✅ |
-| `cli.version` | Prints the version the binary was built as, whether stamped at release or installed with go install. | ✅ | ✅ |
+| `cli.version` | Prints the name, Temper by Turbolytics, and the version the binary was built as, whether stamped at release or installed with go install. | ✅ | ✅ |
 
 ## Invariants
 

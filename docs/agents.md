@@ -1,8 +1,8 @@
 # Working in a Temper project
 
 This guide is for an LLM or a person making changes in a project that uses
-Temper. Print it any time with `temper guide`; it always matches the installed
-version. The full format is the specification,
+Temper by Turbolytics. Print it any time with `temper guide`; it always
+matches the installed version. The full format is the specification,
 https://github.com/turbolytics/temper/blob/main/SPEC.md, and the rules every
 adapter follows are in
 https://github.com/turbolytics/temper/blob/main/docs/adapters.md.

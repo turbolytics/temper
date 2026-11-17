@@ -57,7 +57,12 @@ const (
 	exitStale = 3
 )
 
-const usage = `usage: temper [--root DIR] <command> [flags]
+// product is the name the CLI prints. The command stays `temper`.
+const product = "Temper by Turbolytics"
+
+const usage = product + `
+
+usage: temper [--root DIR] <command> [flags]
 
 commands:
   check                              validate declarations
@@ -113,7 +118,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprint(stdout, docs.Agents)
 		return exitOK
 	case "version":
-		fmt.Fprintf(stdout, "temper %s\n", version)
+		fmt.Fprintf(stdout, "%s %s\n", product, version)
 		return exitOK
 	default:
 		fmt.Fprintf(stderr, "temper: unknown command %q\n\n%s", cmd, usage)

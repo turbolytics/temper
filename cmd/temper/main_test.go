@@ -237,7 +237,7 @@ func TestCLI_Render(t *testing.T) {
 
 func TestCLI_Version(t *testing.T) {
 	temper.Covers(t, "cli.version")
-	if code, out, _ := cli(t, "version"); code != 0 || out != "temper dev\n" {
+	if code, out, _ := cli(t, "version"); code != 0 || out != "Temper by Turbolytics dev\n" {
 		t.Fatalf("version = %d, %q", code, out)
 	}
 }
@@ -248,6 +248,9 @@ func TestCLI_UsageErrors(t *testing.T) {
 		if code, _, errOut := cli(t, args...); code != 2 || errOut == "" {
 			t.Errorf("%v = %d, stderr %q; want 2 with usage", args, code, errOut)
 		}
+	}
+	if _, _, errOut := cli(t); !strings.HasPrefix(errOut, "Temper by Turbolytics\n") {
+		t.Errorf("usage does not open with the product name: %q", errOut)
 	}
 	if code, _, errOut := cli(t, "check", "--root", t.TempDir()); code != 2 || !strings.Contains(errOut, "temper.yml") {
 		t.Errorf("no project = %d, %q", code, errOut)
