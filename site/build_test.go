@@ -207,6 +207,12 @@ func TestAnalyticsOnlyWithKeyAndFlag(t *testing.T) {
 				if tc.want == 1 && !strings.Contains(page, "persistence") {
 					t.Errorf("%s: snippet does not set persistence", p)
 				}
+				if tc.want == 1 && !strings.Contains(page, `"cookieless_mode":"always"`) {
+					t.Errorf("%s: snippet does not turn on cookieless mode", p)
+				}
+				if tc.want == 1 && !strings.Contains(page, `"disable_session_recording":true`) {
+					t.Errorf("%s: snippet does not turn off session recording", p)
+				}
 			}
 		})
 	}

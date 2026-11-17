@@ -207,7 +207,9 @@ func readConfig(path string) (config, error) {
 }
 
 // posthogSnippet is PostHog's loader and an init call, or nothing when
-// analytics is off or no key is set. persistence: "memory" sets no cookies.
+// analytics is off or no key is set. It stores nothing in the browser:
+// persistence is "memory", and cookieless mode counts visitors on PostHog's
+// side. Session recording is always off.
 func posthogSnippet(cfg config, on bool) (template.HTML, error) {
 	if !on || cfg.PostHogKey == "" {
 		return "", nil
@@ -220,10 +222,12 @@ func posthogSnippet(cfg config, on bool) (template.HTML, error) {
 	if err != nil {
 		return "", err
 	}
-	opts, err := json.Marshal(map[string]string{
-		"api_host":        cfg.PostHogHost,
-		"persistence":     "memory",
-		"person_profiles": "identified_only",
+	opts, err := json.Marshal(map[string]any{
+		"api_host":                  cfg.PostHogHost,
+		"persistence":               "memory",
+		"cookieless_mode":           "always", // count visitors with PostHog's server-side hash; turn on Cookieless tracking in the project too
+		"person_profiles":           "identified_only",
+		"disable_session_recording": true, // never record replays, whatever the project settings say
 	})
 	if err != nil {
 		return "", err
