@@ -3,7 +3,7 @@
 TEMPER  := go run ./cmd/temper
 EXAMPLE := examples/inventory
 
-.PHONY: test evidence matrix check-matrix example example-matrix site serve-site
+.PHONY: test evidence matrix check-matrix example example-matrix site serve-site refresh-projects
 
 test:
 	go vet ./...
@@ -44,3 +44,8 @@ site:
 # Build the website, then serve it at http://localhost:8000.
 serve-site: site
 	python3 -m http.server 8000 --directory site/_build
+
+# Update the GitHub stars in findings/projects.csv. Set GITHUB_TOKEN to raise
+# the API's rate limit. Commit the result.
+refresh-projects:
+	go run ./site -refresh-projects

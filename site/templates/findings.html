@@ -1,9 +1,25 @@
 {{define "content"}}
 <h1>Findings</h1>
+<p class="breadth">{{.Home.Projects}} {{plural .Home.Projects "project" "projects"}} · {{.Home.Stars}} GitHub stars · {{.Home.Issues}} {{plural .Home.Issues "issue" "issues"}} · {{.Home.PRs}} {{plural .Home.PRs "pull request" "pull requests"}}</p>
 <p>Temper helped find these bugs. We reported each one to the project's maintainers, with a reproduction and a Temper matrix. The list also shows the pull requests that fix or test them. The status shows where each one stands.</p>
+
+<div class="findings-layout">
+<nav class="sidebar" aria-label="Projects">
+<h2>Projects</h2>
+<ul>
+{{range .Projects}}{{if not .Ours}}<li><a href="#{{.Anchor}}" title="{{.Repo}}"><span class="stars">★ {{.Stars}}</span><span class="name">{{.Name}}</span><span class="lang">{{.Language}}</span></a></li>
+{{end}}{{end}}</ul>
+{{if .Home.HasOurs}}<h2>Our project</h2>
+<ul>
+{{range .Projects}}{{if .Ours}}<li><a href="#{{.Anchor}}" title="{{.Repo}}"><span class="stars">★ {{.Stars}}</span><span class="name">{{.Name}}</span><span class="lang">{{.Language}}</span></a></li>
+{{end}}{{end}}</ul>
+{{end}}</nav>
+
+<div class="findings-main">
 {{range .Projects}}
-<section class="project">
+<section class="project" id="{{.Anchor}}">
 <h2><a href="{{.URL}}">{{.Repo}}</a></h2>
+<p class="project-meta">★ {{.Stars}} · {{.Language}}{{if .Ours}} · Our project{{end}}</p>
 <ul class="findings">
 {{range .Items}}<li>
 <p class="meta"><span class="kind">{{.Label}}</span> <a data-ph="{{.PH}}" href="{{.URL}}">{{.Ref}}</a> <span class="status status-{{.Status}}">{{.Status}}</span></p>
@@ -13,5 +29,7 @@
 {{end}}</ul>
 </section>
 {{end}}
+</div>
+</div>
 {{template "cta" .}}
 {{end}}

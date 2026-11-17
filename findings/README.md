@@ -47,3 +47,22 @@ One row per issue or pull request.
 When a status changes, edit one row and commit, for example
 `findings: zarr-python#4645 confirmed`. The site rebuilds on the next push to
 `main`.
+
+## projects.csv
+
+`projects.csv` holds one row per project that `findings.csv` names: its
+GitHub stars, its main language, the date the stars were checked, and
+whether it is a Turbolytics project. The findings page uses it to show the
+breadth of the work. Our own projects are listed but left out of the totals.
+
+| Column | Values |
+|---|---|
+| `repo` | `owner/name`, spelled as in `findings.csv` |
+| `stars` | a whole number |
+| `language` | GitHub's main language for the repo |
+| `checked` | `YYYY-MM-DD` |
+| `ours` | `yes` or `no` |
+
+A test fails if a project in `findings.csv` has no row, or if a row names a
+project with no finding. To update the stars, run `make refresh-projects`
+(set `GITHUB_TOKEN` to raise the API's rate limit), then commit the file.

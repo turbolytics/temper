@@ -111,3 +111,65 @@ func TestParseSortsReposWithoutCase(t *testing.T) {
 		t.Fatal("ThreeDotsLabs before pydata should be out of order")
 	}
 }
+
+const projectsHeader = "repo,stars,language,checked,ours\n"
+
+func TestParseProjectsAcceptsGoodRows(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	in := projectsHeader + "acme/db,9966,Go,2026-11-17,no\nturbolytics/sql-flow,808,Go,2026-11-17,yes\n"
+	rows, err := ParseProjects(strings.NewReader(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Project{Repo: "acme/db", Stars: 9966, Language: "Go", Checked: "2026-11-17"}
+	if len(rows) != 2 || rows[0] != want || !rows[1].Ours {
+		t.Fatalf("rows = %+v", rows)
+	}
+}
+
+func TestParseProjectsRejectsEachBrokenRule(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	for _, tc := range []struct{ name, input, want string }{
+		{"wrong header", "repo,stars,language,checked\nacme/db,1,Go,2026-11-17\n", "header"},
+		{"repo not owner/name", projectsHeader + "acme,1,Go,2026-11-17,no\n", "line 2: repo"},
+		{"stars not a number", projectsHeader + "acme/db,lots,Go,2026-11-17,no\n", "line 2: stars"},
+		{"stars with a leading zero", projectsHeader + "acme/db,07,Go,2026-11-17,no\n", "line 2: stars"},
+		{"missing language", projectsHeader + "acme/db,1,,2026-11-17,no\n", "line 2: language"},
+		{"bad checked date", projectsHeader + "acme/db,1,Go,17/11/2026,no\n", "line 2: checked"},
+		{"ours not yes or no", projectsHeader + "acme/db,1,Go,2026-11-17,maybe\n", "line 2: ours"},
+		{"duplicate repo", projectsHeader + "acme/db,1,Go,2026-11-17,no\nAcme/db,1,Go,2026-11-17,no\n", "line 3: repo"},
+		{"out of order", projectsHeader + "zeta/db,1,Go,2026-11-17,no\nacme/db,1,Go,2026-11-17,no\n", "line 3: order"},
+		{"header only", projectsHeader, "no rows"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseProjects(strings.NewReader(tc.input))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err = %v, want it to mention %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// Every project in findings.csv has a row in projects.csv, with the same
+// spelling, and projects.csv lists no project without a finding.
+func TestCommittedProjectsMatchFindings(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	rows, err := Load("findings.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects, err := LoadProjects("projects.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckProjects(rows, projects); err != nil {
+		t.Fatal(err)
+	}
+	extra := append(projects, Project{Repo: "ghost/repo", Stars: 1, Language: "Go", Checked: "2026-11-17"})
+	if err := CheckProjects(rows, extra); err == nil || !strings.Contains(err.Error(), "ghost/repo") {
+		t.Fatalf("an extra project should fail, got %v", err)
+	}
+	if err := CheckProjects(rows, projects[1:]); err == nil || !strings.Contains(err.Error(), projects[0].Repo) {
+		t.Fatalf("a missing project should fail, got %v", err)
+	}
+}

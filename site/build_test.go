@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -34,7 +35,8 @@ func read(t *testing.T, path string) string {
 }
 
 // fakeRoot is a repository with its own findings and config, and the real
-// MATRIX.md.
+// MATRIX.md. Its projects.csv gives every project 100 stars, and marks
+// turbolytics projects as ours.
 func fakeRoot(t *testing.T, csv, config string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -42,9 +44,31 @@ func fakeRoot(t *testing.T, csv, config string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	rows, err := findings.Parse(strings.NewReader(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := "repo,stars,language,checked,ours\n"
+	seen := map[string]bool{}
+	var repos []string
+	for _, f := range rows {
+		if !seen[f.Repo] {
+			seen[f.Repo] = true
+			repos = append(repos, f.Repo)
+		}
+	}
+	sort.Slice(repos, func(i, j int) bool { return strings.ToLower(repos[i]) < strings.ToLower(repos[j]) })
+	for _, r := range repos {
+		ours := "no"
+		if strings.HasPrefix(r, "turbolytics/") {
+			ours = "yes"
+		}
+		projects += r + ",100,Go,2026-11-17," + ours + "\n"
+	}
 	for path, data := range map[string]string{
 		"MATRIX.md":             string(matrix),
 		"findings/findings.csv": csv,
+		"findings/projects.csv": projects,
 		"site/config.json":      config,
 	} {
 		full := filepath.Join(root, path)
@@ -198,20 +222,77 @@ func TestMarkdownRendersMatrixShape(t *testing.T) {
 	}
 }
 
-// The project count names projects with a real bug, so a project whose only
-// issue is not-a-bug or a duplicate does not count.
-func TestHomeCountsOnlyRealBugs(t *testing.T) {
+// The breadth line counts other people's projects only. Our own project is
+// listed, labeled, and left out of the totals.
+func TestBreadthLeavesOutOurProjects(t *testing.T) {
 	temper.Covers(t, "site.findings")
 	rows := csvHeader +
 		"acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,\n" +
-		"beta/kv,issue,3,https://github.com/beta/kv/issues/3,Documented.,not-a-bug,,2026-11-17,\n"
+		"beta/kv,fix-pr,3,https://github.com/beta/kv/pull/3,A fix.,open,,2026-11-17,\n" +
+		"turbolytics/sql-flow,temper-pr,4,https://github.com/turbolytics/sql-flow/pull/4,Adds Temper.,merged,,2026-11-17,\n"
 	root := fakeRoot(t, rows, `{"posthog_key": "", "posthog_host": ""}`)
 	out := t.TempDir()
 	if err := Build(Options{Root: root, Out: out}); err != nil {
 		t.Fatal(err)
 	}
-	if page := read(t, filepath.Join(out, "index.html")); !strings.Contains(page, "bugs in 1 open-source project") {
-		t.Fatalf("home page should count 1 project:\n%s", page)
+	home := read(t, filepath.Join(out, "index.html"))
+	if !strings.Contains(home, "span 2 open-source projects with 200 GitHub stars") {
+		t.Errorf("home breadth line is wrong:\n%s", home)
+	}
+	page := read(t, filepath.Join(out, "findings/index.html"))
+	if !strings.Contains(page, "2 projects · 200 GitHub stars · 1 issue · 1 pull request") {
+		t.Errorf("findings summary is wrong")
+	}
+	if !strings.Contains(page, "Our project") {
+		t.Errorf("our project is not labeled")
+	}
+}
+
+// The sidebar lists every project with its stars, sorted by stars, and each
+// entry jumps to that project's section.
+func TestFindingsSidebar(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	page := read(t, filepath.Join(build(t, false), "findings/index.html"))
+	projects, err := findings.LoadProjects("../findings/projects.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.SliceStable(projects, func(i, j int) bool {
+		if projects[i].Ours != projects[j].Ours {
+			return !projects[i].Ours
+		}
+		return projects[i].Stars > projects[j].Stars
+	})
+	last := -1
+	for _, p := range projects {
+		anchor := strings.ToLower(strings.ReplaceAll(p.Repo, "/", "-"))
+		at := strings.Index(page, `href="#`+anchor+`"`)
+		if at < 0 {
+			t.Errorf("sidebar lacks %s", p.Repo)
+			continue
+		}
+		if !strings.Contains(page, `id="`+anchor+`"`) {
+			t.Errorf("no section with id %s", anchor)
+		}
+		if at < last {
+			t.Errorf("%s is out of order in the sidebar (most stars first, ours last)", p.Repo)
+		}
+		last = at
+	}
+	if !strings.Contains(page, `class="sidebar"`) {
+		t.Error("no sidebar")
+	}
+	if !strings.Contains(page, "10.0k") {
+		t.Error("watermill's stars are not shown as 10.0k")
+	}
+}
+
+func TestStarsFormat(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	for n, want := range map[int]string{0: "0", 79: "79", 808: "808", 999: "999", 1000: "1.0k", 1171: "1.2k", 9966: "10.0k", 24781: "24.8k"} {
+		if got := stars(n); got != want {
+			t.Errorf("stars(%d) = %q, want %q", n, got, want)
+		}
 	}
 }
 
@@ -253,4 +334,3 @@ func TestContactOnEveryPage(t *testing.T) {
 		}
 	}
 }
-

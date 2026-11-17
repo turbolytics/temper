@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/turbolytics/temper/findings"
@@ -40,8 +41,12 @@ type page struct {
 	MatrixDoc template.HTML
 }
 
+// home is the breadth of the findings. It counts other people's projects
+// only, never ours.
 type home struct {
 	Issues, Projects, PRs int
+	Stars                 string // combined GitHub stars, formatted
+	HasOurs               bool   // the findings include a Turbolytics project
 	IssueStatus, PRStatus []count
 }
 
@@ -51,9 +56,15 @@ type count struct {
 }
 
 type project struct {
-	Repo  string
-	URL   string
-	Items []item
+	Repo     string
+	Name     string // the part after the slash
+	URL      string
+	Anchor   string // the section id, such as threedotslabs-watermill
+	Stars    string // formatted, such as 10.0k
+	stars    int
+	Language string
+	Ours     bool
+	Items    []item
 }
 
 type item struct {
@@ -70,6 +81,14 @@ func Build(opts Options) error {
 	if err != nil {
 		return err
 	}
+	projects, err := findings.LoadProjects(filepath.Join(opts.Root, "findings", "projects.csv"))
+	if err != nil {
+		return err
+	}
+	if err := findings.CheckProjects(rows, projects); err != nil {
+		return err
+	}
+	grouped := group(rows, projects)
 	matrix, err := os.ReadFile(filepath.Join(opts.Root, "MATRIX.md"))
 	if err != nil {
 		return err
@@ -83,7 +102,7 @@ func Build(opts Options) error {
 		return err
 	}
 
-	base := page{Snippet: snippet, Home: summarize(rows)}
+	base := page{Snippet: snippet, Home: summarize(grouped)}
 	out := []struct {
 		path, tmpl, title, rel string
 	}{
@@ -96,11 +115,11 @@ func Build(opts Options) error {
 		p.Title, p.Base = o.title, o.rel
 		switch o.tmpl {
 		case "findings.html":
-			p.Projects = group(rows)
+			p.Projects = grouped
 		case "matrix.html":
 			p.MatrixDoc = template.HTML(Markdown(matrix))
 		}
-		t, err := template.ParseFS(assets, "templates/base.html", "templates/"+o.tmpl)
+		t, err := template.New("base.html").Funcs(funcs).ParseFS(assets, "templates/base.html", "templates/"+o.tmpl)
 		if err != nil {
 			return err
 		}
@@ -167,23 +186,28 @@ func posthogSnippet(cfg config, on bool) (template.HTML, error) {
 	return template.HTML("<script>\n" + js + "\n</script>"), nil
 }
 
-func summarize(rows []findings.Finding) home {
+func summarize(projects []project) home {
 	var h home
-	repos := map[string]bool{} // projects with a real bug: reported, confirmed or fixed
+	total := 0
 	issues, prs := map[string]int{}, map[string]int{}
-	for _, f := range rows {
-		if f.IsIssue() {
-			if f.Status == "reported" || f.Status == "confirmed" || f.Status == "fixed" {
-				repos[f.Repo] = true
+	for _, p := range projects {
+		if p.Ours {
+			h.HasOurs = true
+			continue
+		}
+		h.Projects++
+		total += p.stars
+		for _, it := range p.Items {
+			if it.IsIssue() {
+				h.Issues++
+				issues[it.Status]++
+			} else {
+				h.PRs++
+				prs[it.Status]++
 			}
-			h.Issues++
-			issues[f.Status]++
-		} else {
-			h.PRs++
-			prs[f.Status]++
 		}
 	}
-	h.Projects = len(repos)
+	h.Stars = stars(total)
 	for _, s := range []string{"fixed", "confirmed", "reported", "not-a-bug", "duplicate"} {
 		if issues[s] > 0 {
 			h.IssueStatus = append(h.IssueStatus, count{s, issues[s]})
@@ -199,16 +223,24 @@ func summarize(rows []findings.Finding) home {
 
 var labels = map[string]string{"issue": "Issue", "fix-pr": "Fix PR", "test-pr": "Test PR", "temper-pr": "Temper PR"}
 
-// group puts rows under their project. Projects with a fixed or confirmed
-// issue come first, then the rest by name. Rows keep the CSV's order, which
-// puts issues before PRs.
-func group(rows []findings.Finding) []project {
+// group puts rows under their project. Projects sort by stars, most first,
+// with ours last. Rows keep the CSV's order, which puts issues before PRs.
+func group(rows []findings.Finding, projects []findings.Project) []project {
+	meta := map[string]findings.Project{}
+	for _, p := range projects {
+		meta[p.Repo] = p
+	}
 	byRepo := map[string]*project{}
 	var order []string
 	for _, f := range rows {
 		p, ok := byRepo[f.Repo]
 		if !ok {
-			p = &project{Repo: f.Repo, URL: "https://github.com/" + f.Repo}
+			m := meta[f.Repo]
+			p = &project{
+				Repo: f.Repo, Name: f.Repo[strings.Index(f.Repo, "/")+1:], URL: "https://github.com/" + f.Repo,
+				Anchor: strings.ToLower(strings.ReplaceAll(f.Repo, "/", "-")),
+				Stars:  stars(m.Stars), stars: m.Stars, Language: m.Language, Ours: m.Ours,
+			}
 			byRepo[f.Repo] = p
 			order = append(order, f.Repo)
 		}
@@ -218,18 +250,13 @@ func group(rows []findings.Finding) []project {
 		}
 		p.Items = append(p.Items, item{Finding: f, Label: labels[f.Kind], Ref: fmt.Sprintf("%s#%d", f.Repo, f.Number), PH: ph})
 	}
-	ahead := func(p *project) bool {
-		for _, it := range p.Items {
-			if it.IsIssue() && (it.Status == "fixed" || it.Status == "confirmed") {
-				return true
-			}
-		}
-		return false
-	}
 	sort.SliceStable(order, func(i, j int) bool {
 		a, b := byRepo[order[i]], byRepo[order[j]]
-		if ahead(a) != ahead(b) {
-			return ahead(a)
+		if a.Ours != b.Ours {
+			return !a.Ours
+		}
+		if a.stars != b.stars {
+			return a.stars > b.stars
 		}
 		return strings.ToLower(a.Repo) < strings.ToLower(b.Repo)
 	})
@@ -238,6 +265,24 @@ func group(rows []findings.Finding) []project {
 		out = append(out, *byRepo[r])
 	}
 	return out
+}
+
+var funcs = template.FuncMap{
+	// plural picks the word that fits n: 1 issue, 2 issues.
+	"plural": func(n int, one, many string) string {
+		if n == 1 {
+			return one
+		}
+		return many
+	},
+}
+
+// stars formats a star count the way GitHub does: 808, 1.2k, 10.0k.
+func stars(n int) string {
+	if n < 1000 {
+		return strconv.Itoa(n)
+	}
+	return fmt.Sprintf("%.1fk", float64(n)/1000)
 }
 
 // write writes data with \n line endings and one trailing newline.
