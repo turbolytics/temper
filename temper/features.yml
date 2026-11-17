@@ -35,3 +35,6 @@ features:
   - id: cli.version
     description: Prints the name, Temper by Turbolytics, and the version the binary was built as, whether stamped at release or installed with go install.
     requires: [unit, integration]
+  - id: site.findings
+    description: Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it.
+    requires: [unit]
