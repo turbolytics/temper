@@ -26,7 +26,7 @@
     requires: [unit]</code></pre>
 <p>Each test states what it proves:</p>
 <pre><code>func TestTotal(t *testing.T) {
-    <span class="hl">temper.Covers(t, "cart.total")</span>
+    <span class="hl">temper.Covers(t, "cart.total") // this test proves cart.total</span>
     if got := Total([]int{250, 100}); got != 350 {
         t.Fatalf("Total = %d, want 350", got)
     }
