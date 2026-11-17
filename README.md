@@ -651,7 +651,7 @@ proven.
 | Command | What it does |
 |---|---|
 | `temper check` | Validates declarations without running tests. It checks ids, files, levels, applicability, exemptions, lattice answers, and scenarios. |
-| `temper matrix` | Runs the checks, reads evidence, and writes `temper/status/` and `MATRIX.md`. |
+| `temper matrix` | Runs the checks, reads evidence, and writes `temper/status/` and `MATRIX.md`. If no level has evidence, it exits with code 2 and writes nothing. |
 | `temper matrix --all-levels` | Checks every level, including levels with no evidence. Use this in CI. |
 | `temper matrix --check` | Checks every level and writes nothing. Exits with code 3 if the committed output differs. Implies `--all-levels`. |
 | `temper matrix --json` | Prints every cell, error, and count as JSON. |
@@ -670,7 +670,7 @@ parent directory that contains a `temper.yml`.
 |---|---|
 | `0` | Every enforced cell that Temper checked is covered or exempt. |
 | `1` | An enforced cell is missing or failing. |
-| `2` | A declaration, evidence, or usage error occurred. Temper wrote nothing. |
+| `2` | A declaration, evidence, or usage error occurred, such as no evidence at any level. Temper wrote nothing. |
 | `3` | With `--check` only: the committed `temper/status/` or `MATRIX.md` is out of date. |
 
 If more than one code applies, Temper exits with the highest.

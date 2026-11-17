@@ -12,7 +12,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 
 | covered | exempt | failing | missing | unenforced |
 | ---: | ---: | ---: | ---: | ---: |
-| 43 | 0 | 0 | 0 | 0 |
+| 45 | 0 | 0 | 0 | 0 |
 
 ## Features
 
@@ -57,6 +57,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 | `matrix.exact_reference_only` | `cli` | ✅ | — |
 | `matrix.exemption_needs_passing_proof` | `cli` | ✅ | ✅ |
 | `matrix.failure_beats_pass` | `cli` | ✅ | — |
+| `matrix.no_evidence_is_an_error` | `cli` | ✅ | ✅ |
 | `matrix.requires_any_one_level_proves_it` | `cli` | ✅ | — |
 | `matrix.scenario_needs_declaration` | `cli` | ✅ | — |
 | `matrix.skip_never_covers` | `cli` | ✅ | ✅ |
@@ -67,6 +68,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 - `matrix.exact_reference_only` — Evidence credits only the item its reference names exactly; never by test name, id prefix, file path or level.
 - `matrix.exemption_needs_passing_proof` — A cell is exempt only while a passing exempts record from the declared proven_by test exists; a covers record, another test, a skip or a failure leaves it missing or failing.
 - `matrix.failure_beats_pass` — When several records claim one cell at one level, a failed or errored record makes the cell failing, whatever passed beside it. A pass never hides a failure.
+- `matrix.no_evidence_is_an_error` — With no evidence at any level and without --all-levels, temper matrix exits 2 and writes nothing. It never reports the committed statuses as the result of a run.
 - `matrix.requires_any_one_level_proves_it` — An invariant with requires_any is proven by a pass, or a proven exemption, at any one listed level; it is a gap once, per subject, only when no level is proven; and a failure at any level is still a gap.
 - `matrix.scenario_needs_declaration` — A member of a scenario-covered lattice is credited only by evidence from a declared scenario that lists it, and a member no scenario lists is a gap before any test runs.
 - `matrix.skip_never_covers` — A skipped test never makes a cell covered, at any level.
@@ -81,7 +83,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 | `matrix.output_deterministic` | `cli` | ✅ | — |
 | `matrix.stale_output_detected` | `cli` | ✅ | ✅ |
 
-- `matrix.not_run_never_judged` — A level with no evidence keeps its committed statuses and never affects the exit code, unless --all-levels judges it.
+- `matrix.not_run_never_judged` — When another level ran, a level with no evidence keeps its committed statuses and never affects the exit code, unless --all-levels judges it.
 - `matrix.output_deterministic` — The same declarations and evidence always produce the same bytes.
 - `matrix.stale_output_detected` — matrix --check exits 3 whenever the committed statuses or MATRIX.md differ from what the evidence produces.
 

@@ -71,12 +71,22 @@ invariants:
 
   - id: matrix.not_run_never_judged
     claim: >
-      A level with no evidence keeps its committed statuses and never affects
-      the exit code, unless --all-levels judges it.
+      When another level ran, a level with no evidence keeps its committed
+      statuses and never affects the exit code, unless --all-levels judges it.
     applies_to: cli
     class: safety
     family: output
     requires: [unit]
+
+  - id: matrix.no_evidence_is_an_error
+    claim: >
+      With no evidence at any level and without --all-levels, temper matrix
+      exits 2 and writes nothing. It never reports the committed statuses as
+      the result of a run.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit, integration]
 
   - id: matrix.requires_any_one_level_proves_it
     claim: >
