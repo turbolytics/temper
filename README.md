@@ -36,8 +36,8 @@ This README uses these terms. Each term is defined before it is used.
   in the `temper/` directory.
 - **Subject**: a concrete part of the system that an invariant applies to,
   such as one storage backend or one sink.
-- **Lattice**: a closed set of values that a subject must handle, such as
-  every data type a sink supports.
+- **Lattice**: a complete list of values that a subject must handle, such as
+  every data type a sink supports. The values are its members.
 - **Scenario**: a sequence of inputs and expected outputs over time.
 - **Level**: a stage of testing, such as `unit` or `integration`. You run
   each level as a separate test command.
@@ -312,16 +312,17 @@ exempt:
 
 ### Lattice
 
-A lattice is a closed set of values, such as data types, units, or classifier
-rules. Every applicable subject must answer for every member of the set.
+A lattice is a complete list of values, called members, such as data types,
+units, or classifier rules. Each subject it applies to must say whether it
+supports every member.
 
 `temper check` reports two kinds of errors:
 
-- An answer for a value that is not a member. This is usually a typo.
-- A member with no answer. This is a gap.
+- A subject names a value that is not a member. This is usually a typo.
+- A subject says nothing about a member. This is a gap.
 
-A lattice can also require scenarios instead of subject answers. In that
-case, each member needs a scenario that proves it.
+A lattice can also require scenarios instead of subject entries. Then each
+member needs a scenario that proves it.
 
 ```yaml
 id: sku.units
@@ -375,7 +376,7 @@ These eight rules stay the same in every 0.x release:
 3. A skipped test is not coverage.
 4. The runner sets the level. A test does not.
 5. An exemption needs a passing test.
-6. A closed set has no unknown members and no unanswered members.
+6. A lattice is complete. A subject may not name a value outside it or leave a member out.
 7. An unknown reference is an error.
 8. Declarations keep their history.
 
@@ -467,9 +468,10 @@ func TestIntegration_MemoryStoreForgetsOnRestart(t *testing.T) {
 The cell shows ☑️ while this test passes. If the test fails, the cell shows
 ❌. If you delete the test, or change it to call `Covers`, the cell shows ⬜.
 
-### Answer a closed set
+### Cover every member of a lattice
 
-Each subject answers every member of the lattice:
+Under `answers:`, each subject says whether it supports every member of the
+lattice:
 
 ```yaml
 # temper/subjects/store.file.yml
@@ -494,11 +496,11 @@ If you leave out a member, `temper check` reports it:
 temper/subjects/store.memory.yml: store.memory does not answer sku.units/weight_kg (R6 gap)
 ```
 
-An answer written as a map must include `supported: true` or
+An entry written as a map must include `supported: true` or
 `unsupported: true`. Temper reports an error if the map has neither. Without
 this rule, a field such as `outcome: unsupported` could be read as support.
 
-An answer can also carry your own fields, such as column types or expected
+An entry can also carry your own fields, such as column types or expected
 values. Temper ignores fields it does not define.
 
 ```yaml
@@ -626,7 +628,8 @@ This project declares its structure in temper/. Before finishing any change:
 - A subject that cannot hold an invariant gets an exemption with a reason and
   a test that proves it (temper.Exempts). Never delete an invariant to make
   the matrix pass.
-- Lattices are closed: answer every member for every applicable subject.
+- Lattices are complete: every subject they apply to says whether it supports
+  each member.
 - Run `temper clean`, each level through `temper run --level <level> -- …`,
   then `temper check` and `temper matrix --all-levels`, and fix what they
   report.
@@ -650,7 +653,7 @@ proven.
 
 | Command | What it does |
 |---|---|
-| `temper check` | Validates declarations without running tests. It checks ids, files, levels, applicability, exemptions, lattice answers, and scenarios. |
+| `temper check` | Validates declarations without running tests. It checks ids, files, levels, applicability, exemptions, lattice entries, and scenarios. |
 | `temper matrix` | Runs the checks, reads evidence, and writes `temper/status/` and `MATRIX.md`. If no level has evidence, it exits with code 2 and writes nothing. |
 | `temper matrix --all-levels` | Checks every level, including levels with no evidence. Use this in CI. |
 | `temper matrix --check` | Checks every level and writes nothing. Exits with code 3 if the committed output differs. Implies `--all-levels`. |

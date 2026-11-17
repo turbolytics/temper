@@ -15,7 +15,8 @@ This project declares its structure in temper/. Before finishing any change:
 - A subject that cannot hold an invariant gets an exemption with a reason and
   a test that proves it (temper.Exempts). Never delete an invariant to make
   the matrix pass.
-- Lattices are closed: answer every member for every applicable subject.
+- Lattices are complete: every subject they apply to says whether it supports
+  each member.
 - Run `make matrix` (clean, every level through `temper run`, then
   `temper matrix --all-levels`) and commit `temper/status/` and `MATRIX.md`.
   `make check-matrix` must exit 0 before you finish.
