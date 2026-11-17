@@ -98,3 +98,4 @@ footer {
   color: var(--muted);
 }
 footer p { margin: 4px 0; }
+.hero p.small { font-size: 16px; }
