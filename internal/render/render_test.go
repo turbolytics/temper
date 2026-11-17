@@ -132,3 +132,27 @@ func TestMarkdown_RequiresAnyWithoutStatusReadsMissing(t *testing.T) {
 		t.Fatalf("an unknown requires_any row must read missing at each of its levels:\n%s", out)
 	}
 }
+
+// A lattice that requires several levels shows one mark per level in each
+// cell, so it says which mark is which. One level needs no legend.
+func TestMarkdown_MultiLevelLatticeHasLegend(t *testing.T) {
+	temper.Covers(t, "cli.render")
+	p, s := fixture()
+	p.Lattices = append(p.Lattices, model.Lattice{ID: "sink.modes", Description: "Every write mode.", AppliesTo: "sink",
+		Requires: []string{"unit", "integration"}, Members: []model.Member{{Key: "append"}}})
+	s.Put("lattice", "sink.modes", "append", "sink.kafka", "unit", status.Covered)
+	s.Put("lattice", "sink.modes", "append", "sink.kafka", "integration", status.Failing)
+	out := string(Markdown(p, s))
+
+	modes := out[strings.Index(out, "### `sink.modes`"):]
+	if want := "Each cell shows one mark per level, in order: `unit`, `integration`."; !strings.Contains(modes, want) {
+		t.Errorf("multi-level lattice lacks the legend %q:\n%s", want, modes)
+	}
+	if !strings.Contains(modes, "| `append` | ✅ ❌ |") {
+		t.Errorf("multi-level cell is not one mark per level in order:\n%s", modes)
+	}
+	types := out[strings.Index(out, "### `sink.types`"):strings.Index(out, "### `sink.modes`")]
+	if strings.Contains(types, "Each cell shows") {
+		t.Errorf("single-level lattice should have no legend:\n%s", types)
+	}
+}
