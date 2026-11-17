@@ -47,9 +47,9 @@ header.top {
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 700; font-size: 20px; text-decoration: none; }
 .brand .mark { display: block; }
 .brand span { color: var(--muted); font-weight: 400; margin-left: -4px; }
-nav { display: flex; gap: 20px; }
-nav a { color: var(--fg); text-decoration: none; }
-nav a:hover { color: var(--accent); }
+header.top nav { display: flex; flex-wrap: wrap; gap: 20px; }
+header.top nav a { color: var(--fg); text-decoration: none; }
+header.top nav a:hover { color: var(--accent); }
 main { padding-top: 24px; padding-bottom: 48px; }
 h1 { font-size: 32px; line-height: 1.2; margin: 16px 0; }
 h2 { font-size: 22px; margin: 32px 0 8px; }
@@ -79,12 +79,13 @@ pre .hl {
 .breadth { font-size: 18px; font-weight: 600; }
 .findings-layout {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns: 290px minmax(0, 1fr);
   gap: 32px;
   align-items: start;
   margin-top: 24px;
 }
 .sidebar {
+  display: block;
   position: sticky;
   top: 16px;
   max-height: calc(100vh - 32px);
@@ -98,7 +99,7 @@ pre .hl {
 .sidebar ul { list-style: none; margin: 0; padding: 0; }
 .sidebar a {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-columns: 68px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: baseline;
   padding: 6px 4px;
