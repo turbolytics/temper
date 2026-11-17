@@ -2,10 +2,11 @@ repo,stars,language,checked,ours
 apache/iceberg-python,1171,Python,2026-11-17,no
 fsspec/filesystem_spec,1385,Python,2026-11-17,no
 lovoo/goka,2552,Go,2026-11-17,no
-narwhals-dev/narwhals,1750,Python,2026-11-17,no
+narwhals-dev/narwhals,1751,Python,2026-11-17,no
 polarsignals/frostdb,1553,Go,2026-11-17,no
-pydata/xarray,4235,Python,2026-11-17,no
-ThreeDotsLabs/watermill,9966,Go,2026-11-17,no
+psycopg/psycopg,2533,Python,2026-11-17,no
+pydata/xarray,4236,Python,2026-11-17,no
+ThreeDotsLabs/watermill,9967,Go,2026-11-17,no
 ThreeDotsLabs/watermill-kafka,79,Go,2026-11-17,no
 turbolytics/sql-flow,808,Go,2026-11-17,yes
 zarr-developers/zarr-python,2090,Python,2026-11-17,no
