@@ -271,6 +271,15 @@ func (w *writer) lattices() {
 			}
 		}
 		sort.Slice(subjects, func(i, j int) bool { return subjects[i].ID < subjects[j].ID })
+		if len(l.Requires) > 1 {
+			// Subjects take the columns, so each cell holds one mark per level.
+			names := make([]string, len(l.Requires))
+			for i, lv := range l.Requires {
+				names[i] = code(lv)
+			}
+			w.line("Each cell shows one mark per level, in order: %s.", strings.Join(names, ", "))
+			w.line("")
+		}
 		head := []string{"Member"}
 		sep := []string{"---"}
 		for _, s := range subjects {
