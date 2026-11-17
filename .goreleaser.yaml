@@ -53,8 +53,8 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: https://github.com/turbolytics/temper
-    description: Declare what software must do, and verify the tests prove it
+    description: "Temper by Turbolytics: declare what software must do, and verify the tests prove it"
     license: MIT
     skip_upload: auto
     test: |
-      assert_match "temper", shell_output("#{bin}/temper version")
+      assert_match "Temper by Turbolytics #{version}", shell_output("#{bin}/temper version")

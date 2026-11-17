@@ -1,4 +1,4 @@
-# Temper
+# Temper by Turbolytics
 
 **Trust the implementation. Verify the structure.**
 
@@ -662,7 +662,7 @@ proven.
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE`, and `TEMPER_RUN` set. Adds evidence and never deletes it. |
 | `temper clean` | Deletes all evidence. |
 | `temper guide` | Prints the guide to working in a Temper project. The guide matches the installed version. |
-| `temper version` | Prints the version. |
+| `temper version` | Prints the name and version. |
 
 Every command accepts `--root DIR`. By default, Temper uses the nearest
 parent directory that contains a `temper.yml`.

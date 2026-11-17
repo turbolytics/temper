@@ -225,7 +225,7 @@ func TestIntegration_RunAndExample(t *testing.T) {
 
 func TestIntegration_Version(t *testing.T) {
 	temper.Covers(t, "cli.version")
-	if code, out := temperBin(t, t.TempDir(), "version"); code != 0 || !strings.HasPrefix(out, "temper ") {
+	if code, out := temperBin(t, t.TempDir(), "version"); code != 0 || !strings.HasPrefix(out, "Temper by Turbolytics ") {
 		t.Fatalf("version = %d, %q", code, out)
 	}
 }
