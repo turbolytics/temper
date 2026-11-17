@@ -1,0 +1,29 @@
+{{define "base"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<meta name="description" content="Temper checks that your tests prove what your system must do.">
+<link rel="stylesheet" href="{{.Base}}style.css">
+{{.Snippet}}
+</head>
+<body>
+<header class="top">
+<a class="brand" href="{{.Base}}">Temper <span>by Turbolytics</span></a>
+<nav>
+<a href="{{.Base}}findings/">Findings</a>
+<a href="{{.Base}}matrix/">Matrix</a>
+<a href="https://github.com/turbolytics/temper">GitHub</a>
+</nav>
+</header>
+<main>
+{{template "content" .}}
+</main>
+<footer>
+<p><a href="https://turbolytics.io">Temper by Turbolytics</a></p>
+<p><a data-ph="cta-contact" href="https://turbolytics.io/contact">Want this run on your system?</a></p>
+</footer>
+</body>
+</html>
+{{end}}

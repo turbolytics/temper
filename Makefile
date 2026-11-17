@@ -3,7 +3,7 @@
 TEMPER  := go run ./cmd/temper
 EXAMPLE := examples/inventory
 
-.PHONY: test evidence matrix check-matrix example example-matrix
+.PHONY: test evidence matrix check-matrix example example-matrix site serve-site
 
 test:
 	go vet ./...
@@ -36,3 +36,11 @@ example-matrix:
 	$(TEMPER) --root $(EXAMPLE) run --level unit -- go -C $(EXAMPLE) test ./...
 	$(TEMPER) --root $(EXAMPLE) run --level integration -- go -C $(EXAMPLE) test -tags integration -run '^TestIntegration' ./...
 	$(TEMPER) --root $(EXAMPLE) matrix --all-levels
+
+# The website, for a local preview. Analytics is off.
+site:
+	go run ./site -out site/_build -no-analytics
+
+# Build the website, then serve it at http://localhost:8000.
+serve-site: site
+	python3 -m http.server 8000 --directory site/_build
