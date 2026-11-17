@@ -15,7 +15,7 @@ import (
 	"github.com/turbolytics/temper/findings"
 )
 
-//go:embed templates/*.html style.css posthog.js favicon.svg
+//go:embed templates/*.html style.css posthog.js favicon.svg og.png
 var assets embed.FS
 
 // Options says where to read the repository and where to write the site.
@@ -27,20 +27,30 @@ type Options struct {
 
 // config is site/config.json. The PostHog project key is public by design.
 type config struct {
-	PostHogKey  string `json:"posthog_key"`
-	PostHogHost string `json:"posthog_host"`
+	PostHogKey         string `json:"posthog_key"`
+	PostHogHost        string `json:"posthog_host"`
+	SiteURL            string `json:"site_url"`                 // where the site is served, ending in /
+	GoogleVerification string `json:"google_site_verification"` // the Search Console HTML tag's code, or empty
 }
+
+// DefaultSiteURL is where GitHub Pages serves the site when the config does
+// not say.
+const DefaultSiteURL = "https://turbolytics.github.io/temper/"
 
 // page is what every template sees.
 type page struct {
-	Title     string
-	Base      string // the relative path back to the site root: "./" or "../"
-	Snippet   template.HTML
-	Home      home
-	Projects  []project
-	MatrixDoc template.HTML
-	Snippets  map[string]string // the tutorial's quotes from Temper's own files
-	TestHTML  template.HTML     // the tutorial's test, with its temper calls highlighted
+	Title       string
+	Description string // the line search results show under the title
+	Canonical   string // this page's one absolute address
+	SiteURL     string
+	GoogleCode  string
+	Base        string // the relative path back to the site root: "./" or "../"
+	Snippet     template.HTML
+	Home        home
+	Projects    []project
+	MatrixDoc   template.HTML
+	Snippets    map[string]string // the tutorial's quotes from Temper's own files
+	TestHTML    template.HTML     // the tutorial's test, with its temper calls highlighted
 }
 
 // home is the breadth of the findings. It counts other people's projects
@@ -104,17 +114,22 @@ func Build(opts Options) error {
 		return err
 	}
 
-	base := page{Snippet: snippet, Home: summarize(grouped)}
+	h := summarize(grouped)
+	base := page{Snippet: snippet, Home: h, SiteURL: cfg.SiteURL, GoogleCode: cfg.GoogleVerification}
 	out := []struct {
-		path, tmpl, title, rel string
+		path, tmpl, title, rel, url, description string
 	}{
-		{"index.html", "index.html", "Temper by Turbolytics", "./"},
-		{"findings/index.html", "findings.html", "Findings · Temper by Turbolytics", "../"},
-		{"tutorial/index.html", "tutorial.html", "Design with Temper · Temper by Turbolytics", "../"},
+		{"index.html", "index.html", "Temper by Turbolytics", "./", "",
+			"Temper is a framework for guiding LLMs to build resilient, bug-free software. Declare what your system must do. Temper fails the build when a promise has no proof."},
+		{"findings/index.html", "findings.html", "Findings · Temper by Turbolytics", "../", "findings/",
+			fmt.Sprintf("Bugs Temper helped find in %d open-source projects with %s GitHub stars. Each finding links to the issue, the fix and a Temper matrix.", h.Projects, h.Stars)},
+		{"tutorial/index.html", "tutorial.html", "Design with Temper · Temper by Turbolytics", "../", "tutorial/",
+			"A seven-step tutorial that designs Temper itself with Temper: levels, features, invariants, complete lists of cases, tests and the matrix."},
 	}
 	for _, o := range out {
 		p := base
 		p.Title, p.Base = o.title, o.rel
+		p.Description, p.Canonical = o.description, cfg.SiteURL+o.url
 		switch o.tmpl {
 		case "findings.html":
 			p.Projects = grouped
@@ -150,7 +165,22 @@ func Build(opts Options) error {
 			return err
 		}
 	}
-	return nil
+	// The preview image is binary, so it is copied byte for byte.
+	img, err := assets.ReadFile("og.png")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(opts.Out, "og.png"), img, 0o644); err != nil {
+		return err
+	}
+	var sm strings.Builder
+	sm.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
+	sm.WriteString(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+	for _, o := range out {
+		sm.WriteString("  <url><loc>" + cfg.SiteURL + o.url + "</loc></url>\n")
+	}
+	sm.WriteString("</urlset>\n")
+	return write(filepath.Join(opts.Out, "sitemap.xml"), []byte(sm.String()))
 }
 
 func readConfig(path string) (config, error) {
@@ -163,6 +193,12 @@ func readConfig(path string) (config, error) {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&cfg); err != nil {
 		return cfg, fmt.Errorf("%s: %w", path, err)
+	}
+	if cfg.SiteURL == "" {
+		cfg.SiteURL = DefaultSiteURL
+	}
+	if !strings.HasPrefix(cfg.SiteURL, "https://") || !strings.HasSuffix(cfg.SiteURL, "/") {
+		return cfg, fmt.Errorf("%s: site_url must start with https:// and end with /", path)
 	}
 	if cfg.PostHogKey != "" && !strings.HasPrefix(cfg.PostHogKey, "phc_") {
 		return cfg, fmt.Errorf("%s: posthog_key must be a public project key (phc_...), never a personal API key", path)

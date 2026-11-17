@@ -3,7 +3,7 @@
 TEMPER  := go run ./cmd/temper
 EXAMPLE := examples/inventory
 
-.PHONY: test evidence matrix check-matrix example example-matrix site serve-site refresh-projects
+.PHONY: test evidence matrix check-matrix example example-matrix site serve-site refresh-projects og-image
 
 test:
 	go vet ./...
@@ -49,3 +49,8 @@ serve-site: site
 # the API's rate limit. Commit the result.
 refresh-projects:
 	go run ./site -refresh-projects
+
+# Re-render the link-preview image from its source. Needs rsvg-convert
+# (brew install librsvg). Commit both files.
+og-image:
+	rsvg-convert -w 1200 -h 630 site/og.svg -o site/og.png

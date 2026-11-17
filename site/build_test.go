@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"image/png"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -408,5 +409,81 @@ func TestSnippetsFailOnAMissingID(t *testing.T) {
 	}
 	if !strings.HasPrefix(got, "  - id: cli.check\n") || strings.Contains(got, "cli.matrix") {
 		t.Errorf("yamlEntry returned the wrong block:\n%s", got)
+	}
+}
+
+const siteURL = "https://turbolytics.github.io/temper/"
+
+// Each page tells search engines and link previews what it is: its own
+// description, one canonical address, and a 1200x630 preview image.
+func TestPagesHaveSearchAndPreviewTags(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	out := build(t, false)
+	descriptions := map[string]bool{}
+	for p, path := range map[string]string{"index.html": "", "findings/index.html": "findings/", "tutorial/index.html": "tutorial/"} {
+		page := read(t, filepath.Join(out, p))
+		m := regexp.MustCompile(`<meta name="description" content="([^"]+)">`).FindStringSubmatch(page)
+		if m == nil {
+			t.Errorf("%s has no description", p)
+			continue
+		}
+		if descriptions[m[1]] {
+			t.Errorf("%s repeats another page's description", p)
+		}
+		descriptions[m[1]] = true
+		for _, want := range []string{
+			`<link rel="canonical" href="` + siteURL + path + `">`,
+			`<meta property="og:url" content="` + siteURL + path + `">`,
+			`<meta property="og:image" content="` + siteURL + `og.png">`,
+			`<meta property="og:title" content="`,
+			`<meta name="twitter:card" content="summary_large_image">`,
+		} {
+			if !strings.Contains(page, want) {
+				t.Errorf("%s lacks %s", p, want)
+			}
+		}
+	}
+	f, err := os.Open(filepath.Join(out, "og.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	cfg, err := png.DecodeConfig(f)
+	if err != nil || cfg.Width != 1200 || cfg.Height != 630 {
+		t.Fatalf("og.png must be a 1200x630 PNG, got %+v, %v", cfg, err)
+	}
+}
+
+func TestSitemapListsEveryPage(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	sitemap := read(t, filepath.Join(build(t, false), "sitemap.xml"))
+	if !strings.HasPrefix(sitemap, `<?xml version="1.0" encoding="UTF-8"?>`) {
+		t.Errorf("sitemap.xml has no XML declaration")
+	}
+	for _, path := range []string{"", "findings/", "tutorial/"} {
+		if !strings.Contains(sitemap, "<loc>"+siteURL+path+"</loc>") {
+			t.Errorf("sitemap.xml lacks %s", siteURL+path)
+		}
+	}
+}
+
+func TestGoogleVerificationOnlyWithCode(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	row := "acme/db,issue,7,https://github.com/acme/db/issues/7,Rows vanish.,reported,,2026-11-17,\n"
+	for _, tc := range []struct {
+		config string
+		want   int
+	}{
+		{`{"posthog_key": "", "posthog_host": "", "google_site_verification": "abc123"}`, 1},
+		{`{"posthog_key": "", "posthog_host": ""}`, 0},
+	} {
+		out := t.TempDir()
+		if err := Build(Options{Root: fakeRoot(t, csvHeader+row, tc.config), Out: out}); err != nil {
+			t.Fatal(err)
+		}
+		page := read(t, filepath.Join(out, "index.html"))
+		if got := strings.Count(page, `<meta name="google-site-verification" content="abc123">`); got != tc.want {
+			t.Errorf("config %s: verification tag appears %d times, want %d", tc.config, got, tc.want)
+		}
 	}
 }
