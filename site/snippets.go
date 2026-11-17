@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"go/ast"
-	"html"
-	"html/template"
 	"go/parser"
 	"go/token"
+	"html"
+	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
