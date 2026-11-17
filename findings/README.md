@@ -19,7 +19,7 @@ One row per issue or pull request.
 | `number` | yes | the issue or PR number |
 | `url` | yes | `https://github.com/<repo>/issues/<n>` for an issue, `https://github.com/<repo>/pull/<n>` for a PR |
 | `summary` | yes | one plain sentence, under 300 characters |
-| `status` | yes | issues: `reported`, `confirmed`, `fixed`, `not-a-bug`, `duplicate`. PRs: `draft`, `open`, `merged`, `closed` |
+| `status` | yes | issues: `reported`, `confirmed`, `fixed`, `not-a-bug`, `duplicate`, `declined`. PRs: `draft`, `open`, `merged`, `closed` |
 | `opened` | no | `YYYY-MM-DD`, in UTC |
 | `updated` | yes | `YYYY-MM-DD` |
 | `matrix_url` | no | a commit permalink to the Temper matrix for that project |
@@ -39,6 +39,8 @@ One row per issue or pull request.
   cannot change.
 - When a maintainer says a finding is documented behavior, set `not-a-bug`.
   Never delete the row.
+- When a maintainer closes an issue without judging the findings, set
+  `declined`. Never delete the row.
 
 `go test ./findings/` checks every rule.
 
