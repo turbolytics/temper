@@ -9,8 +9,13 @@ Temper works with Go and Python (pytest).
 [![PyPI](https://img.shields.io/pypi/v/temper-python)](https://pypi.org/project/temper-python/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+Website: <https://turbolytics.github.io/temper/>
+
 Temper checks that your tests prove what your system must do. It fails the
 build when something is not proven.
+
+**Findings:** Temper has helped find bugs in open-source projects. We
+reported each one to the maintainers. [See the findings](https://turbolytics.github.io/temper/findings/).
 
 ## Why
 

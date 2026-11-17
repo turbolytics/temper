@@ -12,3 +12,4 @@ cli.run: {unit: covered, integration: covered}
 cli.version: {unit: covered, integration: covered}
 declarations.extension_fields: {unit: covered, integration: not_required}
 declarations.load: {unit: covered, integration: not_required}
+site.findings: {unit: covered, integration: not_required}

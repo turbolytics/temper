@@ -1,0 +1,54 @@
+{{define "content"}}
+<section class="hero">
+<h1>Every promise, proven.</h1>
+<p class="lead">Declare what your system must do. Temper fails the build when a promise has no proof.</p>
+<p>Software development is moving to LLMs. Temper is a framework for guiding LLMs to build resilient, bug-free software.</p>
+<p>People specify the functional surface area of the system and its invariants: what it must do, and what it must never do.</p>
+<p>Temper associates each test with the functionality it proves. It builds a coverage report from those links. People and CI use the report to audit systems that LLMs generate.</p>
+<p class="small">Temper works with Go and Python (pytest).</p>
+</section>
+
+<section>
+<h2>Install</h2>
+<pre><code>brew install turbolytics/tap/temper</code></pre>
+<p>Or <code>go install github.com/turbolytics/temper/cmd/temper@latest</code>. For Python, <code>pip install temper-python</code>.</p>
+</section>
+
+<section>
+<h2>In 30 seconds</h2>
+<p>Declare what the system does in <code>temper/features.yml</code>:</p>
+<pre><code>features:
+  - id: cart.total
+    description: Totals a cart, applying the best discount.
+    requires: [unit]
+  - id: cart.checkout
+    description: Charges the card and empties the cart.
+    requires: [unit]</code></pre>
+<p>Each test states what it proves:</p>
+<pre><code>func TestTotal(t *testing.T) {
+    <span class="hl">temper.Covers(t, "cart.total") // this test proves cart.total</span>
+    if got := Total([]int{250, 100}); got != 350 {
+        t.Fatalf("Total = %d, want 350", got)
+    }
+}</code></pre>
+<p>Run the tests through Temper, then build the matrix:</p>
+<pre><code>temper run --level unit -- go test ./...
+temper matrix --all-levels</code></pre>
+<pre><code>temper/features.yml: cart.checkout is missing at unit
+summary: 1 covered, 0 exempt, 0 failing, 1 missing, 0 unenforced</code></pre>
+<p><code>cart.checkout</code> has no passing test, so the build fails. A skipped test does not count.</p>
+<p>Next, follow the <a href="{{.Base}}tutorial/">tutorial</a>, which designs Temper itself with Temper. The <a href="https://github.com/turbolytics/temper#readme">README</a> covers setup, and the <a href="https://github.com/turbolytics/temper/blob/main/SPEC.md">specification</a> has every rule.</p>
+</section>
+
+<section>
+<h2>Findings so far</h2>
+<p>Temper's findings span {{.Home.Projects}} open-source {{plural .Home.Projects "project" "projects"}} with {{.Home.Stars}} GitHub stars. We reported each bug to the project's maintainers.</p>
+<ul class="counts">
+<li>{{.Home.Issues}} issues:{{range $i, $c := .Home.IssueStatus}}{{if $i}},{{end}} {{$c.N}} {{$c.Status}}{{end}}</li>
+<li>{{.Home.PRs}} pull requests:{{range $i, $c := .Home.PRStatus}}{{if $i}},{{end}} {{$c.N}} {{$c.Status}}{{end}}</li>
+</ul>
+<p><a href="{{.Base}}findings/">See every finding</a>.</p>
+</section>
+
+{{template "cta" .}}
+{{end}}

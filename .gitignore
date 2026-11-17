@@ -1,2 +1,5 @@
 /.temper/
 /dist/
+
+# The website build (make site)
+/site/_build/

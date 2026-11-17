@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Temper">
+  <title>Temper</title>
+  <!-- A steel I-beam in temper colors: straw at the front, blue at the back. -->
+  <defs>
+    <linearGradient id="temper" gradientUnits="userSpaceOnUse" x1="14" y1="44" x2="54" y2="18">
+      <stop offset="0" stop-color="#E8C872"/>
+      <stop offset=".28" stop-color="#D9A441"/>
+      <stop offset=".52" stop-color="#B5712F"/>
+      <stop offset=".75" stop-color="#6E3B7A"/>
+      <stop offset="1" stop-color="#2F5A9E"/>
+    </linearGradient>
+  </defs>
+  <polygon points="17,37 17,51 51,29 51,15" fill="url(#temper)"/>
+  <polygon points="17,37 17,51 51,29 51,15" fill="#000" opacity=".38"/>
+  <polygon points="17,51 24,51 58,29 51,29" fill="url(#temper)"/>
+  <polygon points="24,51 24,56 58,34 58,29" fill="url(#temper)"/>
+  <polygon points="24,51 24,56 58,34 58,29" fill="#000" opacity=".25"/>
+  <polygon points="4,32 24,32 58,10 38,10" fill="url(#temper)"/>
+  <polygon points="24,32 24,37 58,15 58,10" fill="url(#temper)"/>
+  <polygon points="24,32 24,37 58,15 58,10" fill="#000" opacity=".25"/>
+  <polygon points="4,32 24,32 24,37 17,37 17,51 24,51 24,56 4,56 4,51 11,51 11,37 4,37" fill="#C9A24A"/>
+  <polygon points="4,32 24,32 24,37 17,37 17,51 24,51 24,56 4,56 4,51 11,51 11,37 4,37" fill="#fff" opacity=".18"/>
+</svg>
