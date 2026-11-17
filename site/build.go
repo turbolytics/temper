@@ -39,6 +39,7 @@ type page struct {
 	Home      home
 	Projects  []project
 	MatrixDoc template.HTML
+	Snippets  map[string]string // the tutorial's quotes from Temper's own files
 }
 
 // home is the breadth of the findings. It counts other people's projects
@@ -74,7 +75,7 @@ type item struct {
 	PH    string // the data-ph tag for the link
 }
 
-// Build writes index.html, findings/index.html, matrix/index.html,
+// Build writes index.html, findings/index.html, tutorial/index.html,
 // style.css and favicon.svg into opts.Out.
 func Build(opts Options) error {
 	rows, err := findings.Load(filepath.Join(opts.Root, "findings", "findings.csv"))
@@ -108,7 +109,7 @@ func Build(opts Options) error {
 	}{
 		{"index.html", "index.html", "Temper by Turbolytics", "./"},
 		{"findings/index.html", "findings.html", "Findings · Temper by Turbolytics", "../"},
-		{"matrix/index.html", "matrix.html", "Temper's matrix · Temper by Turbolytics", "../"},
+		{"tutorial/index.html", "tutorial.html", "Design with Temper · Temper by Turbolytics", "../"},
 	}
 	for _, o := range out {
 		p := base
@@ -116,12 +117,15 @@ func Build(opts Options) error {
 		switch o.tmpl {
 		case "findings.html":
 			p.Projects = grouped
-		case "matrix.html":
+		case "tutorial.html":
 			doc, err := matrixDoc(matrix)
 			if err != nil {
 				return err
 			}
 			p.MatrixDoc = doc
+			if p.Snippets, err = tutorialSnippets(opts.Root); err != nil {
+				return err
+			}
 		}
 		t, err := template.New("base.html").Funcs(funcs).ParseFS(assets, "templates/base.html", "templates/"+o.tmpl)
 		if err != nil {

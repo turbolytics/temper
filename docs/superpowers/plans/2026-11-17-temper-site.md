@@ -53,7 +53,7 @@ The starter file has 17 rows, checked against GitHub on 2026-11-17. Every row ex
 |---|---|
 | `/` | What Temper is in three sentences, the install command, a 30-second example, links to the README and SPEC, and a short "Findings so far" line with counts by status. |
 | `/findings/` | The findings, grouped by project. Within a project, issues first, then PRs. Each row shows the summary, status, dates, and links to the issue or PR and the matrix. Projects with a `fixed` or `confirmed` issue sort first, then by name. |
-| `/matrix/` | Temper's own `MATRIX.md`, rendered. Temper proves itself. |
+| `/tutorial/` | Design with Temper: seven steps that design Temper itself, quoting its own declarations and tests (read at build time), then Temper's own `MATRIX.md` as the result. (Replaced the original `/matrix/` page on 2026-11-17.) |
 
 Footer on every page: "Temper by Turbolytics", a link to turbolytics.io, and one line: "Want this run on your system?" linking to the Turbolytics contact page.
 

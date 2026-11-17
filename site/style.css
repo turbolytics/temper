@@ -147,6 +147,26 @@ pre .hl {
 .status-fixed, .status-merged, .status-confirmed { color: var(--ok); border-color: var(--ok); }
 .status-not-a-bug, .status-duplicate, .status-closed { color: var(--warn); border-color: var(--warn); }
 .note { color: var(--muted); }
+.step { margin-top: 36px; }
+.step h2 { display: flex; align-items: center; gap: 12px; }
+.step .n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 16px;
+  flex: none;
+}
+.file { margin: 12px 0 4px; color: var(--muted); font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.file + pre { margin-top: 0; }
+table.statuses { border-collapse: collapse; font-size: 15px; margin: 8px 0; }
+table.statuses th, table.statuses td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+table.statuses th { background: var(--code-bg); }
+p.lead { font-size: 19px; }
 .cta {
   margin-top: 40px;
   padding: 20px 24px;

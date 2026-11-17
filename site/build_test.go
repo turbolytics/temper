@@ -13,7 +13,7 @@ import (
 	"github.com/turbolytics/temper/findings"
 )
 
-var pages = []string{"index.html", "findings/index.html", "matrix/index.html"}
+var pages = []string{"index.html", "findings/index.html", "tutorial/index.html"}
 
 // build builds the real repository into a temp directory.
 func build(t *testing.T, analytics bool) string {
@@ -64,6 +64,19 @@ func fakeRoot(t *testing.T, csv, config string) string {
 			ours = "yes"
 		}
 		projects += r + ",100,Go,2026-11-17," + ours + "\n"
+	}
+	for _, path := range []string{"temper.yml", "temper/features.yml", "temper/invariants.yml", "temper/lattices/outcomes.yml", "temper/subjects/adapter.go.yml", "internal/matrix/matrix_test.go"} {
+		data, err := os.ReadFile(filepath.Join("..", path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		full := filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for path, data := range map[string]string{
 		"MATRIX.md":             string(matrix),
@@ -339,12 +352,53 @@ func TestContactOnEveryPage(t *testing.T) {
 // the sentence every project's MATRIX.md opens with.
 func TestMatrixPageNamesTemperSpecification(t *testing.T) {
 	temper.Covers(t, "site.findings")
-	page := read(t, filepath.Join(build(t, false), "matrix/index.html"))
+	page := read(t, filepath.Join(build(t, false), "tutorial/index.html"))
 	if strings.Contains(page, "Every row is a claim this project declares") {
 		t.Error("the generic MATRIX.md sentence is still on the page")
 	}
 	want := `Every row in the tables below is part of Temper's specification. Temper declares each one in its own <a href="https://github.com/turbolytics/temper/tree/main/temper"><code>temper/</code></a> directory.`
 	if !strings.Contains(page, want) {
 		t.Error("the matrix page lacks the specification sentence")
+	}
+}
+
+// The tutorial quotes Temper's own files, read at build time, so it cannot
+// drift from them.
+func TestTutorialQuotesLiveFiles(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	page := read(t, filepath.Join(build(t, false), "tutorial/index.html"))
+	for _, want := range []string{
+		"Validates declarations without running any test",          // temper/features.yml, cli.check
+		"A skipped test never makes a cell covered, at any level.", // temper/invariants.yml
+		"func TestBuild_SkipNeverCovers(t *testing.T) {",           // internal/matrix/matrix_test.go
+		`temper.Covers(t, &#34;matrix.skip_never_covers&#34;, temper.Subject(&#34;cli&#34;))`,
+		"- key: error", // temper/lattices/outcomes.yml
+		"the built binary against fixture projects and examples/inventory", // temper.yml
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("tutorial lacks %q", want)
+		}
+	}
+	for _, step := range []string{"Decide what counts as proof", "List what the system does", "Write what must never happen", "List every case", "Make each test state what it proves", "Run it, and read the result", "Hand it to an LLM"} {
+		if !strings.Contains(page, step) {
+			t.Errorf("tutorial lacks the step %q", step)
+		}
+	}
+}
+
+func TestSnippetsFailOnAMissingID(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	if _, err := yamlEntry("..", "temper/features.yml", "no.such.feature"); err == nil {
+		t.Error("a missing feature id should fail")
+	}
+	if _, err := goFunc("..", "internal/matrix/matrix_test.go", "TestNoSuchTest"); err == nil {
+		t.Error("a missing test should fail")
+	}
+	got, err := yamlEntry("..", "temper/features.yml", "cli.check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "  - id: cli.check\n") || strings.Contains(got, "cli.matrix") {
+		t.Errorf("yamlEntry returned the wrong block:\n%s", got)
 	}
 }

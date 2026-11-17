@@ -1,0 +1,76 @@
+{{define "content"}}
+<h1>Design with Temper</h1>
+<p class="lead">This tutorial designs a real project: Temper itself. Temper is built with Temper. Every snippet below comes from its repository, and the matrix at the end is its own.</p>
+<p>You design in this order. Decide what counts as proof. Say what the system does. Say what it must never do. Then make each test state what it proves.</p>
+
+<section class="step">
+<h2><span class="n">1</span> Decide what counts as proof</h2>
+<p>A level is one kind of proof. Temper has two. Unit tests check that the logic is right. Integration tests run the built binary against real projects. Name each level for what it proves, not for the tool that runs it.</p>
+<p class="file">temper.yml</p>
+<pre><code>{{index .Snippets "levels"}}</code></pre>
+</section>
+
+<section class="step">
+<h2><span class="n">2</span> List what the system does</h2>
+<p>A feature is one thing the system does, written so a person can check it. <code>requires</code> lists the levels that must prove it. Write features before the code. A list generated from the code describes only what exists. It cannot show what is missing.</p>
+<p class="file">temper/features.yml (two of them)</p>
+<pre><code>{{index .Snippets "features"}}</code></pre>
+</section>
+
+<section class="step">
+<h2><span class="n">3</span> Write what must never happen</h2>
+<p>An invariant is a promise the system never breaks. This step matters most. Ask what would make the system a failure, even if it technically works. For Temper, the worst failure is a green matrix that hides a gap. So its invariants are about honesty. <code>applies_to</code> names the kind of subject the promise is about.</p>
+<p class="file">temper/invariants.yml (two of them)</p>
+<pre><code>{{index .Snippets "invariants"}}</code></pre>
+</section>
+
+<section class="step">
+<h2><span class="n">4</span> List every case</h2>
+<p>Some promises cover a complete list of values. A lattice is that list. Every test outcome is one, so Temper declares all four.</p>
+<p class="file">temper/lattices/outcomes.yml</p>
+<pre><code>{{index .Snippets "lattice"}}</code></pre>
+<p>A subject is one concrete thing the promises apply to. Each subject must say, for every value, whether it supports it. The Go adapter supports all four. A new adapter that leaves out <code>error</code> fails <code>temper check</code>. Nothing is guessed.</p>
+<p class="file">temper/subjects/adapter.go.yml</p>
+<pre><code>{{index .Snippets "subject"}}</code></pre>
+</section>
+
+<section class="step">
+<h2><span class="n">5</span> Make each test state what it proves</h2>
+<p>A test calls <code>temper.Covers</code> once for each claim it proves. This test proves the invariant from step 3. It records two skipped tests and checks that the cell stays missing. Temper never infers a claim from a test's name.</p>
+<p class="file">internal/matrix/matrix_test.go</p>
+<pre><code>{{index .Snippets "test"}}</code></pre>
+</section>
+
+<section class="step">
+<h2><span class="n">6</span> Run it, and read the result</h2>
+<p>Run each level through <code>temper run</code>, then build the matrix:</p>
+<pre><code>temper clean
+temper run --level unit -- go test ./...
+temper run --level integration -- go test -tags integration -run '^TestIntegration' ./...
+temper matrix --all-levels</code></pre>
+<p>Each cell has one status. Here is what to do about each.</p>
+<table class="statuses">
+<thead><tr><th>Status</th><th>Meaning</th><th>What to do</th></tr></thead>
+<tbody>
+<tr><td>✅ covered</td><td>A passing test claimed it, and no test that claimed it failed.</td><td>Nothing.</td></tr>
+<tr><td>⬜ missing</td><td>No passing evidence. Every skip lands here.</td><td>Write the test that proves the claim. Do not weaken the declaration.</td></tr>
+<tr><td>❌ failing</td><td>A test that claimed it failed or errored.</td><td>Fix the code or the test. Never skip it.</td></tr>
+<tr><td>☑️ exempt</td><td>The subject is excused, and a passing test proves it.</td><td>Keep the proving test.</td></tr>
+<tr><td>⏳ unenforced</td><td>A known gap, tracked in an issue.</td><td>Close the issue, then remove <code>tracked_by</code>.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="step">
+<h2><span class="n">7</span> Hand it to an LLM</h2>
+<p>People own the declarations. An LLM writes the code and the tests. Give it the declarations and the guide, which <code>temper guide</code> prints. CI runs every level and fails the build on a gap.</p>
+<p>The LLM cannot pass by cutting corners. A skipped test never covers a cell. A test cannot choose its own level. A change to an invariant shows up in review, because people own that file.</p>
+</section>
+
+<h2 id="matrix">The result: Temper's matrix</h2>
+<p class="note">This is Temper's own matrix, from <a href="https://github.com/turbolytics/temper/blob/main/MATRIX.md">MATRIX.md</a>.</p>
+<div class="matrix">
+{{.MatrixDoc}}
+</div>
+{{template "cta" .}}
+{{end}}
