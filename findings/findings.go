@@ -1,5 +1,5 @@
-// Package findings reads findings.csv, the public record of the issues and
-// pull requests Temper helped find, and holds every row to its rules. The
+// Package findings reads findings.csv, the public record of the issues, pull
+// requests and audit reports Temper helped find, and holds every row to its rules. The
 // site and the tests share this code, so the rules live in one place.
 package findings
 
@@ -21,10 +21,10 @@ import (
 // such as a private note, fails the file.
 var Header = []string{"repo", "kind", "number", "url", "summary", "status", "opened", "updated", "matrix_url"}
 
-// Finding is one issue or pull request.
+// Finding is one issue, pull request or report.
 type Finding struct {
 	Repo      string // owner/name
-	Kind      string // issue, fix-pr, test-pr or temper-pr
+	Kind      string // issue, fix-pr, test-pr, temper-pr or report
 	Number    int
 	URL       string
 	Summary   string
@@ -34,16 +34,21 @@ type Finding struct {
 	MatrixURL string // a commit permalink, or empty
 }
 
-// IsIssue reports whether the finding is an issue rather than a pull request.
+// IsIssue reports whether the finding is an issue.
 func (f Finding) IsIssue() bool { return f.Kind == "issue" }
 
+// IsReport reports whether the finding is an audit report: a GitHub Discussion
+// posted when an audit found no bug worth filing.
+func (f Finding) IsReport() bool { return f.Kind == "report" }
+
 // Kinds in the order rows sort within a project.
-var Kinds = []string{"issue", "fix-pr", "test-pr", "temper-pr"}
+var Kinds = []string{"issue", "fix-pr", "test-pr", "temper-pr", "report"}
 
 var (
-	issueStatuses = []string{"reported", "confirmed", "fixed", "not-a-bug", "duplicate", "declined"}
-	prStatuses    = []string{"draft", "open", "merged", "closed"}
-	repoPattern   = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
+	issueStatuses  = []string{"reported", "confirmed", "fixed", "not-a-bug", "duplicate", "declined"}
+	prStatuses     = []string{"draft", "open", "merged", "closed"}
+	reportStatuses = []string{"posted", "acknowledged"}
+	repoPattern    = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 	// A matrix link points at a commit, so it cannot change under the reader.
 	matrixPattern = regexp.MustCompile(`^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/blob/[0-9a-f]{40}/\S+$`)
 )
@@ -198,6 +203,8 @@ func statusesFor(kind string) []string {
 	switch {
 	case kind == "issue":
 		return issueStatuses
+	case kind == "report":
+		return reportStatuses
 	case contains(Kinds, kind):
 		return prStatuses
 	}
@@ -206,8 +213,11 @@ func statusesFor(kind string) []string {
 
 func wantURL(f Finding) string {
 	path := "pull"
-	if f.IsIssue() {
+	switch {
+	case f.IsIssue():
 		path = "issues"
+	case f.IsReport():
+		path = "discussions"
 	}
 	return fmt.Sprintf("https://github.com/%s/%s/%d", f.Repo, path, f.Number)
 }

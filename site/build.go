@@ -56,10 +56,10 @@ type page struct {
 // home is the breadth of the findings. It counts other people's projects
 // only, never ours.
 type home struct {
-	Issues, Projects, PRs int
-	Stars                 string // combined GitHub stars, formatted
-	HasOurs               bool   // the findings include a Turbolytics project
-	IssueStatus, PRStatus []count
+	Issues, Projects, PRs, Reports      int
+	Stars                               string // combined GitHub stars, formatted
+	HasOurs                             bool   // the findings include a Turbolytics project
+	IssueStatus, PRStatus, ReportStatus []count
 }
 
 type count struct {
@@ -239,7 +239,7 @@ func posthogSnippet(cfg config, on bool) (template.HTML, error) {
 func summarize(projects []project) home {
 	var h home
 	total := 0
-	issues, prs := map[string]int{}, map[string]int{}
+	issues, prs, reports := map[string]int{}, map[string]int{}, map[string]int{}
 	for _, p := range projects {
 		if p.Ours {
 			h.HasOurs = true
@@ -248,10 +248,14 @@ func summarize(projects []project) home {
 		h.Projects++
 		total += p.stars
 		for _, it := range p.Items {
-			if it.IsIssue() {
+			switch {
+			case it.IsIssue():
 				h.Issues++
 				issues[it.Status]++
-			} else {
+			case it.IsReport():
+				h.Reports++
+				reports[it.Status]++
+			default:
 				h.PRs++
 				prs[it.Status]++
 			}
@@ -268,10 +272,16 @@ func summarize(projects []project) home {
 			h.PRStatus = append(h.PRStatus, count{s, prs[s]})
 		}
 	}
+	for _, s := range []string{"acknowledged", "posted"} {
+		if reports[s] > 0 {
+			h.ReportStatus = append(h.ReportStatus, count{s, reports[s]})
+		}
+	}
 	return h
 }
 
-var labels = map[string]string{"issue": "Issue", "fix-pr": "Fix PR", "test-pr": "Test PR", "temper-pr": "Temper PR"}
+var labels = map[string]string{"issue": "Issue", "fix-pr": "Fix PR", "test-pr": "Test PR", "temper-pr": "Temper PR",
+	"report": "Report"}
 
 // group puts rows under their project. Projects sort by stars, most first,
 // with ours last. Rows keep the CSV's order, which puts issues before PRs.
@@ -295,8 +305,11 @@ func group(rows []findings.Finding, projects []findings.Project) []project {
 			order = append(order, f.Repo)
 		}
 		ph := "finding-pr"
-		if f.IsIssue() {
+		switch {
+		case f.IsIssue():
 			ph = "finding-issue"
+		case f.IsReport():
+			ph = "finding-report"
 		}
 		p.Items = append(p.Items, item{Finding: f, Label: labels[f.Kind], Ref: fmt.Sprintf("%s#%d", f.Repo, f.Number), PH: ph})
 	}

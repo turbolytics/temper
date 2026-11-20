@@ -63,6 +63,20 @@ func TestParseAcceptsDeclinedIssue(t *testing.T) {
 	}
 }
 
+// An audit that found nothing worth filing is posted as a GitHub Discussion.
+// The record links to it, so a project that held up still shows.
+func TestParseAcceptsReport(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	row := "acme/db,report,12,https://github.com/acme/db/discussions/12,The audit found no bug worth filing.,posted,2026-11-20,2026-11-20,\n"
+	rows, err := Parse(strings.NewReader(header + goodIssue + row))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows[1].Kind != "report" || rows[1].IsIssue() || !rows[1].IsReport() {
+		t.Fatalf("row = %+v", rows[1])
+	}
+}
+
 // Each bad input breaks one rule. The error names the line and the rule.
 func TestParseRejectsEachBrokenRule(t *testing.T) {
 	temper.Covers(t, "site.findings")
@@ -101,6 +115,9 @@ func TestParseRejectsEachBrokenRule(t *testing.T) {
 		{"lowercase todo", header + issue(func(c []string) { c[4] = "todo: write this" }), "line 2: summary"},
 		{"same repo in two cases", header + goodIssue + strings.Replace(goodPR, "acme/db", "Acme/db", 2), "line 3: repo"},
 		{"header only", header, "no rows"},
+		{"report with an issue url", header + "acme/db,report,12,https://github.com/acme/db/issues/12,R.,posted,,2026-11-20,\n", "line 2: url"},
+		{"report cannot be merged", header + "acme/db,report,12,https://github.com/acme/db/discussions/12,R.,merged,,2026-11-20,\n", "line 2: status"},
+		{"issue cannot be posted", header + issue(func(c []string) { c[5] = "posted" }), "line 2: status"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := Parse(strings.NewReader(tc.input))

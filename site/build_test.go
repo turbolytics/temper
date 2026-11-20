@@ -268,6 +268,30 @@ func TestBreadthLeavesOutOurProjects(t *testing.T) {
 	}
 }
 
+// A report counts on its own, never as an issue or a pull request.
+func TestBreadthCountsReports(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	rows := csvHeader +
+		"acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,\n" +
+		"beta/kv,report,9,https://github.com/beta/kv/discussions/9,Held up.,posted,,2026-11-20,\n"
+	root := fakeRoot(t, rows, `{"posthog_key": "", "posthog_host": ""}`)
+	out := t.TempDir()
+	if err := Build(Options{Root: root, Out: out}); err != nil {
+		t.Fatal(err)
+	}
+	page := read(t, filepath.Join(out, "findings/index.html"))
+	if !strings.Contains(page, "2 projects · 200 GitHub stars · 1 issue · 0 pull requests · 1 report") {
+		t.Errorf("findings summary does not count the report")
+	}
+	if !strings.Contains(page, `<span class="kind">Report</span> <a data-ph="finding-report" href="https://github.com/beta/kv/discussions/9">`) {
+		t.Errorf("report row is not labeled and linked")
+	}
+	home := read(t, filepath.Join(out, "index.html"))
+	if !strings.Contains(home, "1 report: 1 posted") {
+		t.Errorf("home page does not count the report")
+	}
+}
+
 // The sidebar lists every project with its stars, sorted by stars, and each
 // entry jumps to that project's section.
 func TestFindingsSidebar(t *testing.T) {
