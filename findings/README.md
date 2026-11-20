@@ -1,7 +1,8 @@
 # Findings
 
 `findings.csv` is the public record of the issues and pull requests Temper
-helped find in other projects. The Temper site builds its findings page from
+helped find in other projects, and of the reports we posted when an audit found
+no bug worth filing. The Temper site builds its findings page from
 it.
 
 **Public facts only.** Strategy, next steps and private notes stay in the
@@ -10,24 +11,26 @@ column.
 
 ## Columns
 
-One row per issue or pull request.
+One row per issue, pull request or report.
 
 | Column | Required | Values |
 |---|---|---|
 | `repo` | yes | `owner/name` |
-| `kind` | yes | `issue`, `fix-pr`, `test-pr`, `temper-pr` |
-| `number` | yes | the issue or PR number |
-| `url` | yes | `https://github.com/<repo>/issues/<n>` for an issue, `https://github.com/<repo>/pull/<n>` for a PR |
+| `kind` | yes | `issue`, `fix-pr`, `test-pr`, `temper-pr`, `report` |
+| `number` | yes | the issue, PR or discussion number |
+| `url` | yes | `https://github.com/<repo>/issues/<n>` for an issue, `https://github.com/<repo>/pull/<n>` for a PR, `https://github.com/<repo>/discussions/<n>` for a report |
 | `summary` | yes | one plain sentence, under 300 characters |
-| `status` | yes | issues: `reported`, `confirmed`, `fixed`, `not-a-bug`, `duplicate`, `declined`. PRs: `draft`, `open`, `merged`, `closed` |
+| `status` | yes | issues: `reported`, `confirmed`, `fixed`, `not-a-bug`, `duplicate`, `declined`. PRs: `draft`, `open`, `merged`, `closed`. Reports: `posted`, `acknowledged` |
 | `opened` | no | `YYYY-MM-DD`, in UTC |
 | `updated` | yes | `YYYY-MM-DD` |
 | `matrix_url` | no | a commit permalink to the Temper matrix for that project |
 
 ## Rules
 
-- `status` must fit `kind`. An issue cannot be `merged`, and a PR cannot be
-  `confirmed`.
+- `status` must fit `kind`. An issue cannot be `merged`, a PR cannot be
+  `confirmed`, and a report cannot be either.
+- A report is a GitHub Discussion that shows a project held up against its
+  own docs. Use it only when the audit found no bug worth filing.
 - `url` must match `repo`, `kind` and `number`.
 - No two rows share a `url`.
 - Rows sort by `repo` (ignoring case), then by kind in the order above, then

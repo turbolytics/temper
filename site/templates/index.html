@@ -46,6 +46,7 @@ summary: 1 covered, 0 exempt, 0 failing, 1 missing, 0 unenforced</code></pre>
 <ul class="counts">
 <li>{{.Home.Issues}} issues:{{range $i, $c := .Home.IssueStatus}}{{if $i}},{{end}} {{$c.N}} {{$c.Status}}{{end}}</li>
 <li>{{.Home.PRs}} pull requests:{{range $i, $c := .Home.PRStatus}}{{if $i}},{{end}} {{$c.N}} {{$c.Status}}{{end}}</li>
+{{if .Home.Reports}}<li>{{.Home.Reports}} {{plural .Home.Reports "report" "reports"}}:{{range $i, $c := .Home.ReportStatus}}{{if $i}},{{end}} {{$c.N}} {{$c.Status}}{{end}}</li>{{end}}
 </ul>
 <p><a href="{{.Base}}findings/">See every finding</a>.</p>
 </section>
