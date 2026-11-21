@@ -46,6 +46,25 @@ type Logf func(format string, args ...any)
 // target has no running instance, and logs why.
 func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, logf Logf) (*Injected, error) {
 	in := &Injected{Name: name}
+	// Draw every value this fault may use first, in a fixed order, so what
+	// the system answers never changes which values come out of the draw.
+	var undo, window string
+	switch f.Do {
+	case "pause":
+		undo, window = "unpause", f.For
+	case "disconnect":
+		undo, window = "connect", f.For
+	case "kill", "stop":
+		undo, window = f.Then, f.After
+	}
+	if window != "" {
+		r, err := ParseRange(window)
+		if err != nil {
+			return nil, fmt.Errorf("fault %s: %w", name, err)
+		}
+		in.HealAfter = d.Duration(r)
+	}
+	roll, pick := d.rng.Float64(), d.rng.Int63()
 	if f.Do == "exec" {
 		c := Command{Service: f.Exec[0], Args: f.Exec[1:]}
 		in.Target = c.String()
@@ -53,7 +72,7 @@ func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, 
 		_, err := Do(ctx, e, c)
 		return in, err
 	}
-	targets, err := pickTargets(ctx, e, d, f, logf)
+	targets, err := pickTargets(ctx, e, roll, pick, f, logf)
 	if err != nil {
 		return nil, fmt.Errorf("fault %s: %w", name, err)
 	}
@@ -72,23 +91,6 @@ func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, 
 			return nil, fmt.Errorf("fault %s: %s %s: %w", name, f.Do, t, err)
 		}
 	}
-	var undo string
-	var window string
-	switch f.Do {
-	case "pause":
-		undo, window = "unpause", f.For
-	case "disconnect":
-		undo, window = "connect", f.For
-	case "kill", "stop":
-		undo, window = f.Then, f.After
-	}
-	if window != "" {
-		r, err := ParseRange(window)
-		if err != nil {
-			return nil, fmt.Errorf("fault %s: %w", name, err)
-		}
-		in.HealAfter = d.Duration(r)
-	}
 	if undo != "" {
 		heal := action(e, undo, f.Network)
 		in.Heal = func(ctx context.Context) error {
@@ -106,8 +108,9 @@ func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, 
 	return in, nil
 }
 
-// pickTargets resolves a fault's target to running containers.
-func pickTargets(ctx context.Context, e Engine, d *Draw, f model.Fault, logf Logf) ([]string, error) {
+// pickTargets resolves a fault's target to running containers. roll decides
+// target_from's chance, and pick chooses among a glob's instances.
+func pickTargets(ctx context.Context, e Engine, roll float64, pick int64, f model.Fault, logf Logf) ([]string, error) {
 	pattern := f.Target
 	if t := f.TargetFrom; t != nil {
 		pattern = t.Fallback
@@ -115,7 +118,7 @@ func pickTargets(ctx context.Context, e Engine, d *Draw, f model.Fault, logf Log
 		if t.Chance != nil {
 			chance = *t.Chance
 		}
-		if d.Chance(chance) {
+		if roll < chance {
 			value, err := Do(ctx, e, Command{Service: t.Exec[0], Args: t.Exec[1:]})
 			if err != nil {
 				logf("target_from failed, using %s: %v", t.Fallback, err)
@@ -144,7 +147,7 @@ func pickTargets(ctx context.Context, e Engine, d *Draw, f model.Fault, logf Log
 	if f.All {
 		return all, nil
 	}
-	return []string{all[d.Pick(len(all))]}, nil
+	return []string{all[pick%int64(len(all))]}, nil
 }
 
 func action(e Engine, do, network string) func(context.Context, string) error {

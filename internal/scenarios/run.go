@@ -211,17 +211,36 @@ func (r *runner) run(events []Event) {
 	if err := r.e.Teardown(context.Background()); err != nil {
 		r.logf("teardown: %v", err)
 	}
-	outcome, failed := temper.OutcomePass, []string{}
+	// The scenario's own record: fail when any verdict found a violation;
+	// otherwise error when the run stopped, a verdict errored or a covered
+	// reference was never decided; pass only when everything passed.
+	var anyFail, anyError bool
+	failed := []string{}
+	decided := map[string]bool{}
 	for _, v := range r.verdicts {
-		switch {
-		case v.Outcome == temper.OutcomeError && errors.Is(err, errStop):
-			outcome = temper.OutcomeError
-		case v.Outcome != temper.OutcomePass && outcome == temper.OutcomePass:
-			outcome = temper.OutcomeFail
+		decided[v.Reference] = true
+		switch v.Outcome {
+		case temper.OutcomeFail:
+			anyFail = true
+		case temper.OutcomeError:
+			anyError = true
 		}
 		if v.Outcome != temper.OutcomePass {
 			failed = append(failed, v.Reference+" "+v.Outcome)
 		}
+	}
+	for _, c := range r.sc.Covers {
+		if !decided[c] {
+			anyError = true
+			failed = append(failed, c+" undecided")
+		}
+	}
+	outcome := temper.OutcomePass
+	switch {
+	case anyFail:
+		outcome = temper.OutcomeFail
+	case anyError || err != nil:
+		outcome = temper.OutcomeError
 	}
 	detail := strings.Join(failed, ", ")
 	if r.stopped != nil {
@@ -310,7 +329,9 @@ func (r *runner) step(ev Event) error {
 		return r.waitUntil(ev.Until)
 	case "sleep":
 		r.logf("sleep %s", ev.Sleep)
-		return r.opt.Sleep(r.ctx, ev.Sleep)
+		if err := r.opt.Sleep(r.ctx, ev.Sleep); err != nil {
+			return r.fail(fmt.Errorf("interrupted: %w", err))
+		}
 	case "fault":
 		return r.fault(ev.Fault)
 	case "chaos":
@@ -354,7 +375,10 @@ func (r *runner) waitUntil(u *Until) error {
 // heals at once.
 func (r *runner) fault(name string) error {
 	f := r.p.Faults[name]
-	in, err := Inject(r.ctx, r.e, r.draw, name, f, r.logf)
+	// One draw from the run's generator seeds this injection's own, so what
+	// the live system answers (a target_from value, a glob that matches
+	// nothing) never shifts the faults, targets or durations after it.
+	in, err := Inject(r.ctx, r.e, NewDraw(r.draw.rng.Int63()), name, f, r.logf)
 	if err != nil {
 		return r.setup(err, "fault "+name)
 	}

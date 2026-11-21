@@ -328,12 +328,12 @@ func TestCheck_NonIntegerOutputIsError(t *testing.T) {
 		f := newFake()
 		f.outputs["exec postgres: psql lost"] = []string{out}
 		vs := run(t, f, testProject(), temperScenario(t, []string{"job.never_lost"}, "- check: {covers: job.never_lost, exec: [postgres, psql, lost]}\n"), Options{})
-		wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "fail"})
+		wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "error"})
 	}
 	f := newFake()
 	f.fail["exec postgres: psql lost"] = errors.New("exit status 2")
 	vs := run(t, f, testProject(), temperScenario(t, []string{"job.never_lost"}, "- check: {covers: job.never_lost, exec: [postgres, psql, lost]}\n"), Options{})
-	wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "fail"})
+	wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "error"})
 }
 
 func TestCheck_Expect(t *testing.T) {
@@ -363,13 +363,13 @@ func TestCheck_ResultsMissingKeyIsError(t *testing.T) {
 	f := newFake()
 	f.outputs["host: cat r.json"] = []string{`{"a.x": 0}`}
 	vs := run(t, f, testProject(), temperScenario(t, []string{"a.x", "b.x"}, ev), Options{})
-	wantOutcomes(t, vs, map[string]string{"cluster.go a.x": "pass", "cluster.go b.x": "error", "cluster.go s.faults": "fail"})
+	wantOutcomes(t, vs, map[string]string{"cluster.go a.x": "pass", "cluster.go b.x": "error", "cluster.go s.faults": "error"})
 
 	for _, out := range []string{`{"a.x": 0, "b.x": 0, "c.x": 0}`, `not json`, `{"a.x": "zero", "b.x": 0}`} {
 		f = newFake()
 		f.outputs["host: cat r.json"] = []string{out}
 		vs = run(t, f, testProject(), temperScenario(t, []string{"a.x", "b.x"}, ev), Options{})
-		wantOutcomes(t, vs, map[string]string{"cluster.go a.x": "error", "cluster.go b.x": "error", "cluster.go s.faults": "fail"})
+		wantOutcomes(t, vs, map[string]string{"cluster.go a.x": "error", "cluster.go b.x": "error", "cluster.go s.faults": "error"})
 	}
 }
 
@@ -450,4 +450,78 @@ func readFile(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+func TestRun_InterruptDuringSleepIsError(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.setup_failure_is_error", temper.Subject("cli"))
+	ctx, cancel := context.WithCancel(context.Background())
+	f := newFake()
+	f.onCall = func(line string) {
+		if line == "teardown" {
+			cancel()
+		}
+	}
+	c := newClock()
+	vs, err := RunScenario(ctx, f, testProject(), temperScenario(t, []string{"job.never_lost"},
+		"- sleep: 4s\n- check: {covers: job.never_lost, exec: [postgres, psql, lost]}\n"), Options{Now: c.Now, Sleep: c.Sleep})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "error"})
+}
+
+func TestRun_ScenarioRecordFailBeatsErrorBeatsPass(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.check_decides_its_own_claim", temper.Subject("cli"))
+	// A check that errors: the scenario could not decide, which is error, not a finding.
+	f := newFake()
+	f.outputs["exec postgres: psql lost"] = []string{"ERROR: x"}
+	vs := run(t, f, testProject(), temperScenario(t, []string{"job.never_lost"}, "- check: {covers: job.never_lost, exec: [postgres, psql, lost]}\n"), Options{})
+	wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "error"})
+	// A drain that stalls (a finding), then a setup step that fails: still a finding.
+	f = newFake()
+	f.outputs["exec postgres: psql remaining"] = []string{"5"}
+	f.fail["run setup: after"] = errors.New("exit status 1")
+	vs = run(t, f, testProject(), temperScenario(t, []string{"job.never_lost", "complete_tx.effect_once"},
+		"- drain: {remaining: [postgres, psql, remaining], stall: 2s, covers: job.never_lost}\n- run: [setup, after]\n- check: {covers: complete_tx.effect_once, exec: [postgres, psql, dup]}\n"), Options{})
+	wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "fail", "cluster.go complete_tx.effect_once": "error", "cluster.go s.faults": "fail"})
+}
+
+// faultNames lists the faults a run's log shows injected, in order.
+func faultNames(log string) []string {
+	var out []string
+	for _, line := range strings.Split(log, "\n") {
+		if i := strings.Index(line, " fault "); i >= 0 && !strings.Contains(line, "healed") {
+			name, _, _ := strings.Cut(line[i+len(" fault "):], ":")
+			out = append(out, strings.Fields(name)[0])
+		}
+	}
+	return out
+}
+
+func TestRun_LiveAnswersDoNotShiftTheSeed(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.seed_replays", temper.Subject("cli"))
+	p := testProject()
+	p.Faults["leader_pause"] = model.Fault{
+		TargetFrom: &model.TargetFrom{Exec: []string{"postgres", "psql", "leader"}, Map: "worker-{value}", Fallback: "worker-*"},
+		Do:         "pause", For: "1s-3s",
+	}
+	sc := temperScenario(t, []string{"job.never_lost"}, `
+- up: {postgres: 1, worker-go: 3}
+- chaos: {duration: 60s, every: 1s-4s, faults: [leader_pause, worker_pause, worker_kill]}
+- check: {covers: job.never_lost, exec: [postgres, psql, lost]}
+`)
+	sc.Seed = 70
+	var logs [2]strings.Builder
+	for i, leader := range []string{"go-2", "nope"} {
+		f := newFake()
+		f.outputs["exec postgres: psql leader"] = []string{leader}
+		run(t, f, p, sc, Options{Log: &logs[i]})
+	}
+	a, b := faultNames(logs[0].String()), faultNames(logs[1].String())
+	if len(a) < 10 || !reflect.DeepEqual(a, b) {
+		t.Fatalf("the leader's answer changed the fault sequence:\n%v\n%v", a, b)
+	}
 }

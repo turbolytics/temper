@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -235,15 +236,56 @@ func (c *compose) holdArgs(name string, cmd Command) (start, stop []string) {
 	return start, stop
 }
 
+// holdGrace is how long a held command must survive to count as held.
+const holdGrace = 300 * time.Millisecond
+
+// lockedBuffer collects a held command's output.
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return strings.TrimSpace(l.b.String())
+}
+
 func (c *compose) Background(ctx context.Context, name string, cmd Command) (func() error, error) {
 	start, stop := c.holdArgs(name, cmd)
 	proc := exec.Command(start[0], start[1:]...)
+	out := &lockedBuffer{}
+	proc.Stdout, proc.Stderr = out, out
 	if err := proc.Start(); err != nil {
 		return nil, fmt.Errorf("hold %s: %w", name, err)
 	}
 	done := make(chan error, 1)
 	go func() { done <- proc.Wait() }()
+	// A command that dies at once (it cannot connect, its lock fails) was
+	// never held.
+	select {
+	case err := <-done:
+		if err != nil {
+			return nil, fmt.Errorf("hold %s exited at once (%v): %s", name, err, out.String())
+		}
+		done <- nil
+	case <-time.After(holdGrace):
+	}
 	return func() error {
+		select {
+		case err := <-done:
+			if err == nil {
+				err = errors.New("exit status 0")
+			}
+			return fmt.Errorf("hold %s exited before release (%v): %s", name, err, out.String())
+		default:
+		}
 		if stop != nil {
 			if _, err := c.run(context.Background(), stop[0], stop[1:]...); err != nil {
 				_ = proc.Process.Signal(syscall.SIGTERM)

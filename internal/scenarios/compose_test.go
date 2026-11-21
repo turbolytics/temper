@@ -122,3 +122,31 @@ func TestCompose_HoldArgs(t *testing.T) {
 		t.Errorf("run hold stop = %s", got)
 	}
 }
+
+func TestCompose_HoldThatDiesIsAnError(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.setup_failure_is_error", temper.Subject("cli"))
+	e := NewCompose("compose.yml", "p", time.Second, ExecRun)
+	ctx := context.Background()
+	// Dies at once: the hold itself fails, with the command's output.
+	if _, err := e.Background(ctx, "dead", Command{Host: true, Args: []string{"sh", "-c", "echo cannot connect >&2; exit 3"}}); err == nil || !strings.Contains(err.Error(), "cannot connect") {
+		t.Fatalf("Background of a command that dies = %v, want an error with its output", err)
+	}
+	// Exits after the grace period, before release: release reports it.
+	stop, err := e.Background(ctx, "short", Command{Host: true, Args: []string{"sh", "-c", "sleep 0.6; echo lock lost >&2; exit 1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+	if err := stop(); err == nil || !strings.Contains(err.Error(), "exited before release") || !strings.Contains(err.Error(), "lock lost") {
+		t.Fatalf("release of a hold that exited = %v", err)
+	}
+	// Still running at release: release stops it cleanly.
+	stop, err = e.Background(ctx, "held", Command{Host: true, Args: []string{"sleep", "30"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stop(); err != nil {
+		t.Fatalf("release of a running hold = %v", err)
+	}
+}
