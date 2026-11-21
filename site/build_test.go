@@ -259,6 +259,42 @@ func TestMarkdownRendersMatrixShape(t *testing.T) {
 	}
 }
 
+// Matrix format 2 wraps code spans in bold and links, and anchors each
+// promise with an <a id> tag that its row links to.
+func TestMarkdownRendersMatrixFormat2(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	in := "**14 features at `unit`.**\n\n" +
+		"| Invariant | go |\n| --- | --- |\n| [`a.b_c`](#inv-a.b_c) | ✅ |\n\n" +
+		"- <a id=\"inv-a.b_c\"></a>**`a.b_c`** · safety — Never <b>lies</b>.\n" +
+		"- <a id=\"x\" onclick=\"y\"></a> stays text\n"
+	got := string(Markdown([]byte(in)))
+	for _, want := range []string{
+		"<p><strong>14 features at <code>unit</code>.</strong></p>",
+		`<td><a href="#inv-a.b_c"><code>a.b_c</code></a></td>`,
+		`<li><a id="inv-a.b_c"></a><strong><code>a.b_c</code></strong> · safety — Never &lt;b&gt;lies&lt;/b&gt;.</li>`,
+		`<li>&lt;a id=&#34;x&#34; onclick=&#34;y&#34;&gt;&lt;/a&gt; stays text</li>`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("markdown output lacks %q\n%s", want, got)
+		}
+	}
+}
+
+// The real MATRIX.md renders with no Markdown syntax left over.
+func TestMarkdownRendersTheRealMatrix(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	src, err := os.ReadFile(filepath.Join("..", "MATRIX.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(Markdown(src))
+	for _, leftover := range []string{"**", "](#", "&lt;a id"} {
+		if strings.Contains(got, leftover) {
+			t.Errorf("rendered MATRIX.md still contains %q", leftover)
+		}
+	}
+}
+
 // The breadth line counts other people's projects only. Our own project is
 // listed, labeled, and left out of the totals.
 func TestBreadthLeavesOutOurProjects(t *testing.T) {
