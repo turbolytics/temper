@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -45,6 +47,7 @@ type page struct {
 	SiteURL     string
 	GoogleCode  string
 	Base        string // the relative path back to the site root: "./" or "../"
+	CSS         string // style.css with a content hash, so caches never serve a stale copy
 	Snippet     template.HTML
 	Home        home
 	Projects    []project
@@ -114,8 +117,13 @@ func Build(opts Options) error {
 		return err
 	}
 
+	css, err := assets.ReadFile("style.css")
+	if err != nil {
+		return err
+	}
 	h := summarize(grouped)
-	base := page{Snippet: snippet, Home: h, SiteURL: cfg.SiteURL, GoogleCode: cfg.GoogleVerification}
+	base := page{Snippet: snippet, Home: h, SiteURL: cfg.SiteURL, GoogleCode: cfg.GoogleVerification,
+		CSS: "style.css?v=" + contentHash(css)}
 	out := []struct {
 		path, tmpl, title, rel, url, description string
 	}{
@@ -374,4 +382,11 @@ func write(path string, data []byte) error {
 	data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 	data = append(bytes.TrimRight(data, "\n"), '\n')
 	return os.WriteFile(path, data, 0o644)
+}
+
+// contentHash is the first 12 hex digits of data's SHA-256: a cache key
+// that changes whenever the file does.
+func contentHash(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])[:12]
 }

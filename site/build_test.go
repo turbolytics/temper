@@ -116,6 +116,23 @@ func TestBuildWritesEveryPageWithFooter(t *testing.T) {
 	}
 }
 
+// A CDN in front of Pages caches style.css for hours. Each page links the
+// stylesheet by a hash of its contents, so a changed stylesheet is a new URL
+// and no cache can pair new HTML with old CSS.
+func TestPagesLinkStylesheetByContentHash(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	out := build(t, false)
+	want := "style.css?v=" + contentHash([]byte(read(t, filepath.Join(out, "style.css"))))
+	if !regexp.MustCompile(`^style\.css\?v=[0-9a-f]{12}$`).MatchString(want) {
+		t.Fatalf("hash link %q is not 12 hex digits", want)
+	}
+	for _, p := range pages {
+		if page := read(t, filepath.Join(out, p)); !strings.Contains(page, want+`"`) {
+			t.Errorf("%s does not link %s", p, want)
+		}
+	}
+}
+
 func TestFindingsPageListsEveryURL(t *testing.T) {
 	temper.Covers(t, "site.findings")
 	rows, err := findings.Load("../findings/findings.csv")
