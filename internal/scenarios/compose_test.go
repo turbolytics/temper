@@ -18,6 +18,9 @@ type recorder struct {
 	lines []string
 	fail  error
 	ps    string
+	// psSeq, when set, answers successive ps calls in turn; the last repeats.
+	psSeq []string
+	logs  string
 }
 
 func (r *recorder) run(ctx context.Context, name string, args ...string) ([]byte, []byte, error) {
@@ -27,7 +30,17 @@ func (r *recorder) run(ctx context.Context, name string, args ...string) ([]byte
 		return nil, nil, r.fail
 	}
 	if strings.Contains(line, " ps ") {
+		if len(r.psSeq) > 0 {
+			out := r.psSeq[0]
+			if len(r.psSeq) > 1 {
+				r.psSeq = r.psSeq[1:]
+			}
+			return []byte(out), nil, nil
+		}
 		return []byte(r.ps), nil, nil
+	}
+	if strings.Contains(line, " logs ") {
+		return []byte(r.logs), nil, nil
 	}
 	return []byte(" out \n"), nil, nil
 }
@@ -39,6 +52,7 @@ func TestCompose_CommandLines(t *testing.T) {
 {"Name":"p-worker-go-3","Service":"worker-go","State":"running","Health":""}
 `}
 	e := NewCompose("compose.yml", "p", time.Second, r.run)
+	e.(*compose).settle = 0
 	ctx := context.Background()
 	must := func(err error) {
 		t.Helper()
@@ -63,7 +77,7 @@ func TestCompose_CommandLines(t *testing.T) {
 	must(e.Teardown(ctx))
 	want := []string{
 		"docker compose -f compose.yml -p p up -d --no-recreate --scale worker-go=3 worker-go",
-		"docker compose -f compose.yml -p p ps --format json worker-go",
+		"docker compose -f compose.yml -p p ps -a --format json worker-go",
 		"docker pause p-worker-go-1",
 		"docker network disconnect p_default p-worker-go-1",
 		"docker compose -f compose.yml -p p exec -T --index 2 postgres psql -c SELECT 1",
@@ -211,5 +225,46 @@ func TestHeld_AwaitTimeoutRunsTheStopCommand(t *testing.T) {
 	}
 	if !h.Exited() {
 		t.Error("the local client is still running")
+	}
+}
+
+func TestCompose_UpExitedIsNamed(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.setup_failure_is_error", temper.Subject("cli"))
+	r := &recorder{ps: `{"Name":"p-db-1","Service":"db","State":"exited","Health":"","ExitCode":1}`, logs: "db-1  | initdb: No space left on device\n"}
+	start := time.Now()
+	err := NewCompose("compose.yml", "p", time.Minute, r.run).Up(context.Background(), "db", 1)
+	if err == nil || !strings.Contains(err.Error(), "exited with code 1") || !strings.Contains(err.Error(), "No space left on device") {
+		t.Fatalf("Up = %v, want the exit code and the service's last logs", err)
+	}
+	if time.Since(start) > 5*time.Second {
+		t.Errorf("Up took %s; an exited service fails at once", time.Since(start))
+	}
+	if !strings.Contains(strings.Join(r.lines, "\n"), "ps -a --format json db") {
+		t.Errorf("ps does not list exited containers: %v", r.lines)
+	}
+}
+
+func TestCompose_UpRunningMustSettle(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.setup_failure_is_error", temper.Subject("cli"))
+	running := `{"Name":"p-plain-1","Service":"plain","State":"running","Health":""}`
+	r := &recorder{psSeq: []string{running, running, `{"Name":"p-plain-1","Service":"plain","State":"exited","Health":"","ExitCode":3}`}}
+	c := NewCompose("compose.yml", "p", time.Minute, r.run).(*compose)
+	c.poll, c.settle = 10*time.Millisecond, 200*time.Millisecond
+	if err := c.Up(context.Background(), "plain", 1); err == nil || !strings.Contains(err.Error(), "exited with code 3") {
+		t.Fatalf("Up of a service that exits soon after starting = %v", err)
+	}
+	r = &recorder{ps: running}
+	c = NewCompose("compose.yml", "p", time.Minute, r.run).(*compose)
+	c.poll, c.settle = 10*time.Millisecond, 50*time.Millisecond
+	if err := c.Up(context.Background(), "plain", 1); err != nil {
+		t.Fatalf("Up of a service that stays up = %v", err)
+	}
+	healthy := &recorder{ps: `{"Name":"p-db-1","Service":"db","State":"running","Health":"healthy"}`}
+	c = NewCompose("compose.yml", "p", time.Minute, healthy.run).(*compose)
+	c.settle = time.Hour
+	if err := c.Up(context.Background(), "db", 1); err != nil {
+		t.Fatalf("a healthy service waits for no settle period: %v", err)
 	}
 }

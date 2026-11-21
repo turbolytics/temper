@@ -37,7 +37,10 @@ func ExecRun(ctx context.Context, name string, args ...string) ([]byte, []byte, 
 type compose struct {
 	file, project string
 	ready, poll   time.Duration
-	run           RunFunc
+	// settle is how long a service without a health check must stay running
+	// to count as ready: a container that starts and then dies is not up.
+	settle time.Duration
+	run    RunFunc
 }
 
 // NewCompose drives the Compose file as project. ready bounds how long Up
@@ -46,7 +49,7 @@ func NewCompose(file, project string, ready time.Duration, run RunFunc) Engine {
 	if ready <= 0 {
 		ready = time.Minute
 	}
-	return &compose{file: file, project: project, ready: ready, poll: 500 * time.Millisecond, run: run}
+	return &compose{file: file, project: project, ready: ready, poll: 500 * time.Millisecond, settle: 2 * time.Second, run: run}
 }
 
 func (c *compose) args(rest ...string) []string {
@@ -75,12 +78,17 @@ func (c *compose) compose(ctx context.Context, rest ...string) (string, error) {
 // psEntry is one container from `docker compose ps --format json`.
 type psEntry struct {
 	Name, Service, State, Health string
+	ExitCode                     int
 }
 
 // ps lists containers. Compose prints a JSON array in older versions and
 // one object per line in newer ones; both parse.
 func (c *compose) ps(ctx context.Context, services ...string) ([]psEntry, error) {
-	out, err := c.compose(ctx, append([]string{"ps", "--format", "json"}, services...)...)
+	return c.psArgs(ctx, append([]string{"ps", "--format", "json"}, services...))
+}
+
+func (c *compose) psArgs(ctx context.Context, args []string) ([]psEntry, error) {
+	out, err := c.compose(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -112,26 +120,40 @@ func (c *compose) Up(ctx context.Context, service string, replicas int) error {
 		return nil
 	}
 	deadline := time.Now().Add(c.ready)
+	var steady time.Time
 	for {
-		list, err := c.ps(ctx, service)
+		// -a lists exited containers too, so a service that died says so.
+		list, err := c.psArgs(ctx, []string{"ps", "-a", "--format", "json", service})
 		if err != nil {
 			return err
 		}
-		ready, states := 0, []string{}
+		ready, healthChecked, states := 0, true, []string{}
 		for _, e := range list {
 			if e.Service != service {
 				continue
 			}
 			states = append(states, e.Name+" "+e.State+" "+e.Health)
+			if e.State == "exited" || e.State == "dead" {
+				return fmt.Errorf("service %s exited with code %d before it was ready%s", service, e.ExitCode, c.lastLogs(ctx, service))
+			}
 			if e.State == "running" && (e.Health == "" || e.Health == "healthy") {
 				ready++
+				healthChecked = healthChecked && e.Health == "healthy"
 			}
 		}
-		if ready >= replicas {
+		switch {
+		case ready < replicas:
+			steady = time.Time{}
+		case healthChecked:
+			return nil // a passing health check is proof enough
+		case steady.IsZero():
+			steady = time.Now()
+		}
+		if !steady.IsZero() && time.Since(steady) >= c.settle {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("service %s not ready after %s: %d of %d ready (%s)", service, c.ready, ready, replicas, strings.Join(states, "; "))
+			return fmt.Errorf("service %s not ready after %s: %d of %d ready (%s)%s", service, c.ready, ready, replicas, strings.Join(states, "; "), c.lastLogs(ctx, service))
 		}
 		select {
 		case <-ctx.Done():
@@ -139,6 +161,16 @@ func (c *compose) Up(ctx context.Context, service string, replicas int) error {
 		case <-time.After(c.poll):
 		}
 	}
+}
+
+// lastLogs is the service's last log lines, for an error saying why it is
+// not up; empty when there are none.
+func (c *compose) lastLogs(ctx context.Context, service string) string {
+	out, err := c.compose(ctx, "logs", "--no-color", "--tail", "20", service)
+	if err != nil || strings.TrimSpace(out) == "" {
+		return ""
+	}
+	return "; its last log lines:\n" + out
 }
 
 func (c *compose) Down(ctx context.Context, services []string) error {
