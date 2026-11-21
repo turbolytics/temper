@@ -9,6 +9,7 @@ narwhals-dev/narwhals,1751,Python,2026-11-17,no
 polarsignals/frostdb,1553,Go,2026-11-17,no
 psycopg/psycopg,2533,Python,2026-11-17,no
 pydata/xarray,4236,Python,2026-11-17,no
+riverqueue/river,5931,Go,2026-11-21,no
 ThreeDotsLabs/watermill,9967,Go,2026-11-17,no
 ThreeDotsLabs/watermill-kafka,79,Go,2026-11-17,no
 turbolytics/sql-flow,808,Go,2026-11-17,yes
