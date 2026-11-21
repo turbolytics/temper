@@ -1,0 +1,45 @@
+pack: service
+doc: >
+  Faults on one Compose service, or every service a glob matches: crashes,
+  clean stops, freezes, restarts and network cuts. Include it once per kind
+  of process, with as naming it (worker, broker, api).
+params:
+  target: {doc: the Compose service or glob these faults hit; one running instance is drawn from the seed}
+  network: {default: default, doc: the Compose network disconnect cuts}
+faults:
+  kill:
+    doc: >
+      SIGKILL one instance, as a crash or an OOM kill does, and start it
+      again after 0.5-2.5 s. Work it held must be recovered by someone else.
+    target: "{target}"
+    do: kill
+    then: start
+    after: 0.5s-2.5s
+  stop:
+    doc: >
+      Stop one instance with SIGTERM and its grace period, as a deploy does,
+      and start it again after 0.5-2.5 s. Shutdown must hand off cleanly.
+    target: "{target}"
+    do: stop
+    then: start
+    after: 0.5s-2.5s
+  pause:
+    doc: >
+      Freeze one instance for 2-8 s, as a long GC pause or a stalled VM
+      does. Its leases and timeouts expire while it still believes it holds
+      them: the classic source of double work.
+    target: "{target}"
+    do: pause
+    for: 2s-8s
+  restart:
+    doc: Restart one instance gracefully.
+    target: "{target}"
+    do: restart
+  disconnect:
+    doc: >
+      Cut one instance off the network for 2-6 s, then reconnect it. It
+      keeps running and keeps its state: a partition, not a crash.
+    target: "{target}"
+    do: disconnect
+    network: "{network}"
+    for: 2s-6s

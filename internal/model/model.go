@@ -258,6 +258,8 @@ type Scenario struct {
 
 // Fault is one named fault in faults.yml.
 type Fault struct {
+	// Doc says what the fault does and why it matters.
+	Doc        string      `yaml:"doc"`
 	Target     string      `yaml:"target"`
 	TargetFrom *TargetFrom `yaml:"target_from"`
 	Do         string      `yaml:"do"`
