@@ -15,28 +15,54 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0c10">
 {{if .GoogleCode}}<meta name="google-site-verification" content="{{.GoogleCode}}">
 {{end}}
 <link rel="icon" type="image/svg+xml" href="{{.Base}}favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="{{.Base}}style.css">
 {{.Snippet}}
 </head>
 <body>
 <header class="top">
-<a class="brand" href="{{.Base}}"><img class="mark" src="{{.Base}}favicon.svg" alt="" width="32" height="32">Temper <span>by Turbolytics</span></a>
+<div class="bar">
+<a class="brand" href="{{.Base}}"><img class="mark" src="{{.Base}}favicon.svg" alt="" width="28" height="28">temper <span>by turbolytics</span></a>
 <nav>
 <a href="{{.Base}}findings/">Findings</a>
 <a href="{{.Base}}tutorial/">Tutorial</a>
 <a href="https://github.com/turbolytics/temper">GitHub</a>
 <a data-ph="nav-contact" href="https://turbolytics.io/contact">Contact</a>
 </nav>
+</div>
 </header>
 <main>
 {{template "content" .}}
 </main>
 <footer>
-<p><a href="https://turbolytics.io">Temper by Turbolytics</a></p>
-<p><a data-ph="cta-contact" href="https://turbolytics.io/contact">Want this run on your system?</a></p>
+<div class="cols">
+<div>
+<p class="who">turbolytics</p>
+<p class="blurb">Formal verification and continuous verification for software built with LLMs.</p>
+</div>
+<div>
+<p class="eyebrow">Temper</p>
+<ul>
+<li><a href="{{.Base}}findings/">Findings</a></li>
+<li><a href="{{.Base}}tutorial/">Tutorial</a></li>
+<li><a href="https://github.com/turbolytics/temper">GitHub</a></li>
+</ul>
+</div>
+<div>
+<p class="eyebrow">Company</p>
+<ul>
+<li><a href="https://turbolytics.io">turbolytics.io</a></li>
+<li><a data-ph="cta-contact" href="https://turbolytics.io/contact">Want this run on your system?</a></li>
+</ul>
+</div>
+</div>
+<div class="legal"><p><a href="https://turbolytics.io">Temper by Turbolytics</a></p></div>
 </footer>
 </body>
 </html>
@@ -44,7 +70,8 @@
 
 {{define "cta"}}
 <section class="cta">
-<h2>Work with us</h2>
+<p class="eyebrow">Work with us</p>
+<h2>Verify what your LLMs build</h2>
 <p>Contact us to get onboarded to Temper, or to train your team to build better software with LLMs.</p>
 <p><a class="button" data-ph="cta-contact" href="https://turbolytics.io/contact">Contact us</a></p>
 </section>
