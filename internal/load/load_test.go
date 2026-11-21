@@ -437,3 +437,46 @@ func TestLoad_FaultExecForms(t *testing.T) {
 		t.Errorf("two names in one exec: errors = %v", errs)
 	}
 }
+
+func TestLoad_PacksExpandIntoProject(t *testing.T) {
+	temper.Covers(t, "declarations.recipe_packs")
+	temper.Covers(t, "recipes.names_mean_one_thing", temper.Subject("cli"))
+	root := writeProject(t, map[string]string{
+		"temper.yml":          minimalConfig + "packs:\n  - pack: postgres\n    with: {db: river}\n  - pack: service\n    as: worker\n    with: {target: \"worker-*\"}\n",
+		"temper/commands.yml": "commands:\n  migrate: {run: [tool, migrate]}\n",
+		"temper/faults.yml":   "faults:\n  mine: {target: x, do: pause, for: 1s}\n",
+	})
+	p, errs := Load(root)
+	if len(errs) != 0 {
+		t.Fatalf("errors: %v", errs)
+	}
+	if got := p.Commands["postgres.sql"].Exec; !reflect.DeepEqual(got, []string{"postgres", "psql", "-U", "postgres", "-d", "river", "-Atc"}) {
+		t.Errorf("postgres.sql = %v", got)
+	}
+	if p.Faults["postgres.crash"].Do != "kill" || p.Faults["worker.pause"].Target != "worker-*" {
+		t.Errorf("faults = %+v", p.Faults)
+	}
+	if _, ok := p.Commands["migrate"]; !ok {
+		t.Error("the project's own command is gone")
+	}
+	if _, ok := p.Faults["mine"]; !ok {
+		t.Error("the project's own fault is gone")
+	}
+}
+
+func TestLoad_PackErrors(t *testing.T) {
+	temper.Covers(t, "declarations.recipe_packs")
+	temper.Covers(t, "recipes.names_mean_one_thing", temper.Subject("cli"))
+	for packs, want := range map[string]string{
+		"  - pack: nope\n": "no recipe pack \"nope\"",
+		"  - pack: postgres\n    with: {database: x}\n": "database",
+		"  - pack: service\n":                           "target",
+		"  - pack: postgres\n  - pack: postgres\n":      "includes postgres twice",
+		"  - pack: postgres\n    as: Bad.Name\n":        "Bad.Name",
+	} {
+		_, errs := Load(writeProject(t, map[string]string{"temper.yml": minimalConfig + "packs:\n" + packs}))
+		if len(errs) != 1 || errs[0].File != "temper.yml" || errs[0].Rule != "§6" || !strings.Contains(errs[0].Message, want) {
+			t.Errorf("%q: errors = %v, want one temper.yml §6 error containing %q", packs, errs, want)
+		}
+	}
+}

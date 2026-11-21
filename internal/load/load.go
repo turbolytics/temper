@@ -22,6 +22,7 @@ import (
 
 	"github.com/turbolytics/temper/internal/diag"
 	"github.com/turbolytics/temper/internal/model"
+	"github.com/turbolytics/temper/internal/recipes"
 )
 
 // FindRoot walks up from start to the nearest directory holding temper.yml.
@@ -123,7 +124,52 @@ func Load(root string) (*model.Project, diag.List) {
 	if p.Commands == nil {
 		p.Commands = map[string]model.Command{}
 	}
+	l.includePacks(p)
 	return p, l.errs
+}
+
+// packName is the name a pack's definitions are used under: <as>.<name>.
+var packName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// includePacks expands each pack temper.yml lists into the project's
+// commands and faults, as <as>.<name>. A pack's names always hold a dot and
+// a project's never do, so neither can shadow the other.
+func (l *loader) includePacks(p *model.Project) {
+	fail := func(msg string) {
+		l.errs = append(l.errs, diag.Error{File: "temper.yml", Message: msg, Rule: "§6"})
+	}
+	seen := map[string]bool{}
+	for _, ref := range p.Config.Packs {
+		pack, ok := recipes.Get(ref.Pack)
+		if !ok {
+			fail(fmt.Sprintf("includes no recipe pack %q; temper recipes list shows them", ref.Pack))
+			continue
+		}
+		as := ref.As
+		if as == "" {
+			as = ref.Pack
+		}
+		if !packName.MatchString(as) {
+			fail(fmt.Sprintf("names pack %s as %q; a name is lowercase letters, digits and underscores", ref.Pack, as))
+			continue
+		}
+		if seen[as] {
+			fail(fmt.Sprintf("includes %s twice under one name; give one an as", as))
+			continue
+		}
+		seen[as] = true
+		cmds, faults, err := recipes.Expand(pack, as, ref.With)
+		if err != nil {
+			fail(err.Error())
+			continue
+		}
+		for n, c := range cmds {
+			p.Commands[n] = c
+		}
+		for n, f := range faults {
+			p.Faults[n] = f
+		}
+	}
 }
 
 type loader struct {
