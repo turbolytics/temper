@@ -306,3 +306,78 @@ func TestLoad_OnlyXDashIsAnExtension(t *testing.T) {
 		}
 	}
 }
+
+func TestLoad_FaultsAndRunnerFields(t *testing.T) {
+	temper.Covers(t, "declarations.load")
+	temper.Covers(t, "cli.scenarios_run")
+	root := writeProject(t, map[string]string{
+		"temper.yml": minimalConfig,
+		"temper/faults.yml": `faults:
+  worker_pause:
+    target: "worker-*"
+    do: pause
+    for: 3s-9s
+  leader_pause:
+    target_from:
+      exec: [postgres, psql, -Atc, "SELECT leader_id FROM river_leader"]
+      map: "worker-{value}"
+      chance: 0.5
+      fallback: "worker-*"
+    do: pause
+    for: 3s-9s
+    covers: [job.never_lost]
+`,
+		"temper/scenarios/river.yml": `- id: river.faults
+  runner: temper
+  name: n
+  description: d
+  covers: [job.never_lost]
+  seed: 70
+  subjects:
+    cluster.go: {worker-go: 3}
+  events:
+    - up: {postgres: 1}
+`,
+	})
+	p, errs := Load(root)
+	if len(errs) != 0 {
+		t.Fatalf("errors: %v", errs)
+	}
+	want := map[string]model.Fault{
+		"worker_pause": {Target: "worker-*", Do: "pause", For: "3s-9s"},
+		"leader_pause": {
+			TargetFrom: &model.TargetFrom{Exec: []string{"postgres", "psql", "-Atc", "SELECT leader_id FROM river_leader"}, Map: "worker-{value}", Chance: 0.5, Fallback: "worker-*"},
+			Do:         "pause", For: "3s-9s", Covers: []string{"job.never_lost"},
+		},
+	}
+	if !reflect.DeepEqual(p.Faults, want) {
+		t.Errorf("faults = %+v", p.Faults)
+	}
+	if len(p.Scenarios) != 1 {
+		t.Fatalf("scenarios = %+v", p.Scenarios)
+	}
+	sc := p.Scenarios[0]
+	if sc.Runner != "temper" || sc.Seed != 70 || sc.Compose != "compose.yml" || !reflect.DeepEqual(sc.Subjects, map[string]map[string]int{"cluster.go": {"worker-go": 3}}) {
+		t.Errorf("scenario = %+v", sc)
+	}
+}
+
+func TestLoad_FaultsRejectUnknownFields(t *testing.T) {
+	temper.Covers(t, "declarations.load")
+	root := writeProject(t, map[string]string{
+		"temper.yml":        minimalConfig,
+		"temper/faults.yml": "faults:\n  f:\n    do: pause\n    for: 1s\n    durationn: 2s\n",
+	})
+	_, errs := Load(root)
+	if len(errs) != 1 || errs[0].File != "temper/faults.yml" || !strings.Contains(errs[0].Message, "durationn") {
+		t.Fatalf("errors = %v", errs)
+	}
+}
+
+func TestLoad_NoFaultsFileIsEmpty(t *testing.T) {
+	temper.Covers(t, "declarations.load")
+	p, errs := Load(writeProject(t, map[string]string{"temper.yml": minimalConfig}))
+	if len(errs) != 0 || p.Faults == nil || len(p.Faults) != 0 {
+		t.Fatalf("faults = %v, errors = %v", p.Faults, errs)
+	}
+}

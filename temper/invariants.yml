@@ -153,3 +153,44 @@ invariants:
     class: safety
     family: adapter
     requires: [unit]
+
+  # What the fault scenario runner must never do.
+
+  - id: scenarios.setup_failure_is_error
+    claim: >
+      A scenario that cannot run, because Docker is missing, a service never
+      becomes ready or a setup step fails, records error for every reference
+      it covers; never pass, fail or skip.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
+
+  - id: scenarios.check_decides_its_own_claim
+    claim: >
+      Each check's outcome lands only on the reference that check decides; a
+      failing check never fails another reference, and a passing one never
+      covers another.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
+
+  - id: scenarios.seed_replays
+    claim: >
+      The same scenario and seed draw the same fault sequence, targets and
+      durations, so any run can be replayed.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
+
+  - id: scenarios.faults_heal
+    claim: >
+      Every fault the runner injects is healed before the run ends, including
+      when the run is interrupted; no container is left paused, stopped or
+      disconnected.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit, integration]
