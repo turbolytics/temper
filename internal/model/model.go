@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -157,6 +158,24 @@ type Exemption struct {
 	Invariant string `yaml:"invariant"`
 	Reason    string `yaml:"reason"`
 	ProvenBy  string `yaml:"proven_by"`
+}
+
+// ProvenBy returns the test that proves the subject's exemption for ref: an
+// invariant it is exempt from, or a lattice member (item/member) it answers
+// unsupported with proven_by. ok is false when it declares none.
+func (s Subject) ProvenBy(ref string) (test string, ok bool) {
+	if item, member, isMember := strings.Cut(ref, "/"); isMember {
+		a, found := s.Answers[item][member]
+		if !found || a.Supported || a.ProvenBy == "" {
+			return "", false
+		}
+		return a.ProvenBy, true
+	}
+	e, found := s.Exemption(ref)
+	if !found {
+		return "", false
+	}
+	return e.ProvenBy, true
 }
 
 // Answer is a subject's answer for one lattice member.

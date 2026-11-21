@@ -82,11 +82,17 @@ type Drain struct {
 // Results, every reference in the JSON object Cmd prints, each of which
 // must match a Decides entry.
 type Check struct {
-	Covers  string
+	Covers string
+	// Exempts names the reference this check proves an exemption for, in
+	// place of Covers.
+	Exempts string
 	Cmd     Command
 	Expect  int
 	Results bool
 	Decides []string
+	// ExemptPatterns are a results check's exempts entries: keys they match
+	// prove exemptions where the subject declares one.
+	ExemptPatterns []string
 }
 
 // Range is a duration drawn between Min and Max.
@@ -474,7 +480,7 @@ func (ps parser) parseDrain(v any) (*Drain, error) {
 }
 
 func (ps parser) parseCheck(v any) (*Check, error) {
-	m, err := ps.cmdFields(v, "check", "covers", "exec", "run", "host", "instance", "expect", "results")
+	m, err := ps.cmdFields(v, "check", "covers", "exempts", "exec", "run", "host", "instance", "expect", "results")
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +488,7 @@ func (ps parser) parseCheck(v any) (*Check, error) {
 		if len(m) != 1 {
 			return nil, errors.New("check: results stands alone")
 		}
-		rm, err := ps.cmdFields(r, "check results", "exec", "run", "host", "instance", "decides")
+		rm, err := ps.cmdFields(r, "check results", "exec", "run", "host", "instance", "decides", "exempts")
 		if err != nil {
 			return nil, err
 		}
@@ -497,17 +503,24 @@ func (ps parser) parseCheck(v any) (*Check, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &Check{Results: true, Cmd: c, Decides: d}, nil
+		ch := &Check{Results: true, Cmd: c, Decides: d}
+		if ex, ok := rm["exempts"]; ok {
+			if ch.ExemptPatterns, err = strings_(ex, "check exempts"); err != nil {
+				return nil, err
+			}
+		}
+		return ch, nil
 	}
 	cov, _ := m["covers"].(string)
-	if cov == "" {
-		return nil, errors.New("check needs covers, the reference it decides, or results")
+	ex, _ := m["exempts"].(string)
+	if (cov == "") == (ex == "") {
+		return nil, errors.New("check needs covers or exempts, exactly one: the reference it decides or proves an exemption for; or results")
 	}
 	c, err := ps.parseCommand(m, "check")
 	if err != nil {
 		return nil, err
 	}
-	ch := &Check{Covers: cov, Cmd: c}
+	ch := &Check{Covers: cov, Exempts: ex, Cmd: c}
 	if x, ok := m["expect"]; ok {
 		n, ok := x.(int)
 		if !ok {
@@ -527,13 +540,37 @@ func Decided(events []Event) []string {
 		switch {
 		case e.Check != nil && e.Check.Results:
 			out = append(out, e.Check.Decides...)
-		case e.Check != nil:
+		case e.Check != nil && e.Check.Covers != "":
 			out = append(out, e.Check.Covers)
 		case e.Drain != nil:
 			out = append(out, e.Drain.Covers...)
 		}
 	}
 	return out
+}
+
+// Exempted lists the exemption proofs the events decide: each exempts check,
+// and each results check's exempts patterns, as written.
+func Exempted(events []Event) []string {
+	var out []string
+	for _, e := range events {
+		switch {
+		case e.Check != nil && e.Check.Results:
+			out = append(out, e.Check.ExemptPatterns...)
+		case e.Check != nil && e.Check.Exempts != "":
+			out = append(out, e.Check.Exempts)
+		}
+	}
+	return out
+}
+
+// TestID is the test a scenario's record names: <scenario>/<subject>/<check>,
+// or <scenario>/<check> without a subject.
+func TestID(scenario, subject, check string) string {
+	if subject == "" {
+		return scenario + "/" + check
+	}
+	return scenario + "/" + subject + "/" + check
 }
 
 // Matches reports whether a decides entry names ref: exactly, or, for a

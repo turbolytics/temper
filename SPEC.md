@@ -563,6 +563,26 @@ names with a dot belong to packs, so a pack never shadows a project's
 definition. A fault's `exec` and `target_from.exec` are a list or a named
 command written as a mapping: `exec: {postgres.statement: "SELECT 1"}`.
 
+**Exemption proofs.** A check proves an exemption, instead of deciding a
+claim, with `exempts:` in place of `covers:`:
+
+```yaml
+- check: {exempts: types.operators/row, run: [oracle, refuses, op.join, row]}
+```
+
+It passes when the command prints `expect` (default 0: the refusal happened
+as declared), and its record is an `exempts` record whose `test` is
+`<scenario>/<subject>/<ref>`. The subject must declare that exemption, an
+invariant in `exempt` or a lattice member answered `unsupported`, with
+`proven_by` naming that test; §10's rules then apply unchanged. A `results`
+check may also list `exempts:` patterns: a key they match is an exemption
+proof where the subject declares the exemption, and a claim it covers
+otherwise, so one object decides a whole lattice row; a key only `exempts:`
+matches must be declared. An exempted reference is listed in `covers`, and
+counts as decided. No drain or fault may decide a reference the scenario
+proves exempt, and when a run stops early, an exemption it would have proved
+records `error` as an exemption proof, so the cell shows failing.
+
 **The subject.** `{subject}` in any command an event runs is replaced with
 the subject the run is for, so one expanded scenario can tell its programs
 which subject to check: `check: {results: {run: [oracle, check, "{subject}"], decides: [...]}}`.
@@ -603,6 +623,7 @@ A scenario runner adds the scenario:
 
 `temper scenarios run` is a scenario runner too. Its records name the
 subject the run was for, and their `test` is `<scenario>/<subject>/<check>`.
+A check that proves an exemption writes an `exempts` record (§11).
 `<check>` is the reference the check decides, `drain` or the fault's name
 for a liveness verdict, or the scenario id for the scenario's own record.
 A record from an expanded scenario must name one of its `subjects` (R7).

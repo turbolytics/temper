@@ -32,10 +32,14 @@ func WriteEvidence(dir, level, run string, now time.Time, vs []Verdict) error {
 	}
 	at := now.UTC().Format(time.RFC3339)
 	for _, v := range vs {
-		line, err := json.Marshal(temper.Record{
+		rec := temper.Record{
 			Covers: v.Reference, Subject: v.Subject, Scenario: v.Scenario, Test: v.Test,
 			Level: level, Outcome: v.Outcome, Run: run, At: at,
-		})
+		}
+		if v.Exempt {
+			rec.Covers, rec.Exempts = "", v.Reference
+		}
+		line, err := json.Marshal(rec)
 		if err != nil {
 			f.Close()
 			return err

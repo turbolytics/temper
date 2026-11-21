@@ -132,7 +132,8 @@ func checkTemperEvents(p *model.Project, sc model.Scenario, add func(rule, msg s
 			add("§11", "starts $subject but has no subjects to expand")
 		}
 	}
-	decided := scenarios.Decided(events)
+	exempted := scenarios.Exempted(events)
+	decided := append(scenarios.Decided(events), exempted...)
 	covered := map[string]bool{}
 	for _, c := range sc.Covers {
 		covered[c] = true
@@ -147,6 +148,90 @@ func checkTemperEvents(p *model.Project, sc model.Scenario, add func(rule, msg s
 	for _, d := range decided {
 		if !strings.HasSuffix(d, "/*") && !covered[d] {
 			add("§11", fmt.Sprintf("decides %s, which the scenario does not cover", d))
+		}
+	}
+	checkExemptionProofs(p, sc, events, add)
+}
+
+// checkExemptionProofs holds each exemption a scenario proves to its
+// declaration: an exempts check needs the subject to declare the exemption,
+// and every declared exemption it proves must name this scenario's test in
+// proven_by (§10, R5), for every subject it runs on.
+func checkExemptionProofs(p *model.Project, sc model.Scenario, events []scenarios.Event, add func(rule, msg string)) {
+	subjects := []string{sc.Subject}
+	if len(sc.Subjects) > 0 {
+		subjects = subjects[:0]
+		for s := range sc.Subjects {
+			subjects = append(subjects, s)
+		}
+		sort.Strings(subjects)
+	}
+	for _, sid := range subjects {
+		subj, _ := p.Subject(sid)
+		proves := func(ref string, mustDeclare bool) {
+			test, ok := subj.ProvenBy(ref)
+			want := scenarios.TestID(sc.ID, sid, ref)
+			switch {
+			case !ok && mustDeclare && sid == "":
+				add("§11", fmt.Sprintf("proves an exemption for %s, but the scenario names no subject", ref))
+			case !ok && mustDeclare:
+				add("§11", fmt.Sprintf("proves an exemption for %s, but %s declares no exemption for it", ref, sid))
+			case ok && test != want:
+				add("§11", fmt.Sprintf("proves the exemption for %s on %s, whose proven_by is %s; it must be %s", ref, sid, test, want))
+			}
+		}
+		for _, e := range events {
+			if e.Check == nil {
+				continue
+			}
+			if e.Check.Exempts != "" {
+				proves(e.Check.Exempts, true)
+			}
+			for _, pat := range e.Check.ExemptPatterns {
+				for _, c := range sc.Covers {
+					if !scenarios.Matches(pat, c) {
+						continue
+					}
+					// A key only exempts: decides is always a proof, so it
+					// must be declared; one decides also matches is decided by
+					// the declaration.
+					alsoDecided := false
+					for _, d := range e.Check.Decides {
+						alsoDecided = alsoDecided || scenarios.Matches(d, c)
+					}
+					proves(c, !alsoDecided)
+				}
+			}
+		}
+	}
+	// The matrix judges an exempt cell by exempts records alone, so a drain
+	// or fault that decides a reference this scenario proves exempt would
+	// fail unseen.
+	proved := map[string]bool{}
+	for _, sid := range subjects {
+		subj, _ := p.Subject(sid)
+		for _, c := range sc.Covers {
+			if test, ok := subj.ProvenBy(c); ok && test == scenarios.TestID(sc.ID, sid, c) {
+				proved[c] = true
+			}
+		}
+	}
+	for _, e := range events {
+		var covers []string
+		switch {
+		case e.Drain != nil:
+			covers = e.Drain.Covers
+		case e.Fault != "":
+			covers = p.Faults[e.Fault].Covers
+		case e.Chaos != nil:
+			for _, f := range e.Chaos.Faults {
+				covers = append(covers, p.Faults[f].Covers...)
+			}
+		}
+		for _, c := range covers {
+			if proved[c] {
+				add("§11", fmt.Sprintf("proves the exemption for %s, so no drain or fault may decide it", c))
+			}
 		}
 	}
 }
