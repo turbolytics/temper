@@ -546,6 +546,16 @@ A scenario runner adds the scenario:
 {"covers":"heuristics/failed.state","scenario":"failed.state.healthy_worker","test":"TestScenarios/failed.state.healthy_worker","level":"unit","outcome":"pass"}
 ```
 
+`temper scenarios run` is a scenario runner too. Its records name the
+subject the run was for, and their `test` is `<scenario>/<subject>/<check>`.
+`<check>` is the reference the check decides, `drain` or the fault's name
+for a liveness verdict, or the scenario id for the scenario's own record.
+A record from an expanded scenario must name one of its `subjects` (R7).
+
+```json
+{"covers":"job.never_lost","subject":"cluster.go","scenario":"river.faults","test":"river.faults/cluster.go/job.never_lost","level":"faults","outcome":"pass"}
+```
+
 | Field | Required | Meaning |
 |---|---|---|
 | `covers` | one of | A reference (§5) this test proves. |

@@ -142,7 +142,9 @@ func (v *validator) exemptionDeclared(reference string, subj model.Subject) bool
 
 // scenarioDeclares holds a record carrying a scenario to that scenario's
 // declaration: it must list the reference (or be the scenario itself), and
-// a scenario with a subject proves only for that subject.
+// a scenario with a subject proves only for that subject. An expanded
+// scenario proves for each subject in its subjects, and every record it
+// writes names one.
 func (v *validator) scenarioDeclares(reference string) bool {
 	r := v.r.Record
 	sc, ok := v.p.Scenario(r.Scenario)
@@ -153,6 +155,13 @@ func (v *validator) scenarioDeclares(reference string) bool {
 	if reference != sc.ID && !slices.Contains(sc.Covers, reference) {
 		v.fail(reference, fmt.Sprintf("scenario %s does not cover it", sc.ID), "R7")
 		return false
+	}
+	if len(sc.Subjects) > 0 {
+		if _, ok := sc.Subjects[r.Subject]; !ok {
+			v.fail(reference, fmt.Sprintf("scenario %s does not run on subject %q", sc.ID, r.Subject), "R7")
+			return false
+		}
+		return true
 	}
 	if sc.Subject != "" && r.Subject != sc.Subject {
 		v.fail(reference, fmt.Sprintf("scenario %s is for subject %s; the record names %q", sc.ID, sc.Subject, r.Subject), "R7")
