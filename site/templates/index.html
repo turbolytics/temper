@@ -50,6 +50,8 @@ summary: 1 covered, 0 exempt, 0 failing, 1 missing, 0 unenforced</code></pre>
 {{if .Home.Reports}}<li>{{.Home.Reports}} {{plural .Home.Reports "report" "reports"}}:{{range $i, $c := .Home.ReportStatus}}{{if $i}},{{end}} {{$c.N}} {{$c.Status}}{{end}}</li>{{end}}
 </ul>
 <p><a href="{{.Base}}findings/">See every finding</a>.</p>
+{{range .CaseStudies}}<p class="case-link">Case study: <a href="{{$.Base}}case-studies/{{.Slug}}/">{{.Title}}</a></p>
+{{end}}
 </section>
 
 {{template "cta" .}}

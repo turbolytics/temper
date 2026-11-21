@@ -269,3 +269,16 @@ footer .legal a { color: var(--text-faint); }
   footer .cols { grid-template-columns: 1fr 1fr; }
   footer .cols > div:first-child { grid-column: 1 / -1; }
 }
+
+/* Case studies: cards on the index, a link on findings and home. */
+.studies { display: flex; flex-direction: column; gap: 20px; margin-top: 32px; }
+main > section.studies { border-top: 0; padding-top: 0; }
+.study { padding: 24px 28px 8px; background: var(--bg-raised); border: 1px solid var(--border); border-left: 2px solid var(--accent); border-radius: 10px; }
+.study h2 { margin: 0 0 8px; font-size: 1.35rem; }
+.study h2 a { color: var(--text); text-decoration: none; }
+.study h2 a:hover { color: var(--accent); }
+.study p { max-width: var(--measure); }
+.case-link { font: 14px var(--font-mono); margin: 4px 0 8px; }
+.study-body h2 { margin-top: 40px; }
+.study-body h3 { font-size: 1.15rem; }
+.study-body .note { font-size: 15px; margin-top: 32px; }

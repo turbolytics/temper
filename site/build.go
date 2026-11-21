@@ -54,6 +54,26 @@ type page struct {
 	MatrixDoc   template.HTML
 	Snippets    map[string]string // the tutorial's quotes from Temper's own files
 	TestHTML    template.HTML     // the tutorial's test, with its temper calls highlighted
+	CaseStudies []caseStudy
+}
+
+// caseStudy is an audit written up with the project's approval. Each one has
+// its own template, case-<Slug>.html, and is linked from the Case Studies
+// index, the home page and the project's findings.
+type caseStudy struct {
+	Slug    string // the page lives at case-studies/<Slug>/
+	Repo    string // the findings.csv repo it belongs to
+	Title   string
+	Summary string // one or two sentences for the index and the home page
+}
+
+var caseStudies = []caseStudy{
+	{
+		Slug:    "feldera",
+		Repo:    "feldera/feldera",
+		Title:   "Feldera's incremental views under an outside audit",
+		Summary: "Feldera's incremental views matched a full recompute under churn, at 1, 4 and 8 workers, for all 29 SQL types. The audit found two edge cases, and the team took both the same day.",
+	},
 }
 
 // home is the breadth of the findings. It counts other people's projects
@@ -71,15 +91,16 @@ type count struct {
 }
 
 type project struct {
-	Repo     string
-	Name     string // the part after the slash
-	URL      string
-	Anchor   string // the section id, such as threedotslabs-watermill
-	Stars    string // formatted, such as 10.0k
-	stars    int
-	Language string
-	Ours     bool
-	Items    []item
+	Repo      string
+	Name      string // the part after the slash
+	URL       string
+	Anchor    string // the section id, such as threedotslabs-watermill
+	Stars     string // formatted, such as 10.0k
+	stars     int
+	Language  string
+	Ours      bool
+	Items     []item
+	CaseStudy string // the case study's path from the site root, or empty
 }
 
 type item struct {
@@ -121,8 +142,15 @@ func Build(opts Options) error {
 	if err != nil {
 		return err
 	}
+	for i := range grouped {
+		for _, c := range caseStudies {
+			if strings.EqualFold(grouped[i].Repo, c.Repo) {
+				grouped[i].CaseStudy = "case-studies/" + c.Slug + "/"
+			}
+		}
+	}
 	h := summarize(grouped)
-	base := page{Snippet: snippet, Home: h, SiteURL: cfg.SiteURL, GoogleCode: cfg.GoogleVerification,
+	base := page{CaseStudies: caseStudies, Snippet: snippet, Home: h, SiteURL: cfg.SiteURL, GoogleCode: cfg.GoogleVerification,
 		CSS: "style.css?v=" + contentHash(css)}
 	out := []struct {
 		path, tmpl, title, rel, url, description string
@@ -133,6 +161,13 @@ func Build(opts Options) error {
 			fmt.Sprintf("Bugs Temper helped find in %d open-source projects with %s GitHub stars. Each finding links to the issue, the fix and a Temper matrix.", h.Projects, h.Stars)},
 		{"tutorial/index.html", "tutorial.html", "Design with Temper · Temper by Turbolytics", "../", "tutorial/",
 			"A seven-step tutorial that designs Temper itself with Temper: levels, features, invariants, complete lists of cases, tests and the matrix."},
+		{"case-studies/index.html", "case-studies.html", "Case Studies · Temper by Turbolytics", "../", "case-studies/",
+			"Audits of open-source systems against their own documented guarantees, written up with each project's approval."},
+	}
+	for _, c := range caseStudies {
+		out = append(out, struct{ path, tmpl, title, rel, url, description string }{
+			"case-studies/" + c.Slug + "/index.html", "case-" + c.Slug + ".html", c.Title + " · Temper by Turbolytics",
+			"../../", "case-studies/" + c.Slug + "/", c.Summary})
 	}
 	for _, o := range out {
 		p := base

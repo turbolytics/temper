@@ -12,7 +12,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 
 | covered | exempt | failing | missing | unenforced |
 | ---: | ---: | ---: | ---: | ---: |
-| 46 | 0 | 0 | 0 | 0 |
+| 47 | 0 | 0 | 0 | 0 |
 
 ## Features
 
@@ -31,6 +31,7 @@ Exempt cells are excused by a passing proof. Regenerate with `temper matrix`.
 | `cli.guide` | Prints the guide an LLM or a person needs to work in a Temper project, matching the installed version. | ✅ | ✅ |
 | `cli.version` | Prints the name, Temper by Turbolytics, and the version the binary was built as, whether stamped at release or installed with go install. | ✅ | ✅ |
 | `site.findings` | Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it. | ✅ | — |
+| `site.case_studies` | Builds the Case Studies pages, audits written up with the project's approval, linked from the top-level nav and from each project's findings. | ✅ | — |
 
 ## Invariants
 

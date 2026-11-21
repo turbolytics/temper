@@ -21,6 +21,8 @@
 <section class="project" id="{{.Anchor}}">
 <h2><a href="{{.URL}}">{{.Repo}}</a></h2>
 <p class="project-meta">★ {{.Stars}} · {{.Language}}{{if .Ours}} · Our project{{end}}</p>
+{{if .CaseStudy}}<p class="case-link"><a href="{{$.Base}}{{.CaseStudy}}">Read the case study</a></p>
+{{end}}
 <ul class="findings">
 {{range .Items}}<li>
 <p class="meta"><span class="kind">{{.Label}}</span> <a data-ph="{{.PH}}" href="{{.URL}}">{{.Ref}}</a> <span class="status status-{{.Status}}">{{.Status}}</span></p>

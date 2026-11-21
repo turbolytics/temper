@@ -14,7 +14,7 @@ import (
 	"github.com/turbolytics/temper/findings"
 )
 
-var pages = []string{"index.html", "findings/index.html", "tutorial/index.html"}
+var pages = []string{"index.html", "findings/index.html", "tutorial/index.html", "case-studies/index.html", "case-studies/feldera/index.html"}
 
 // build builds the real repository into a temp directory.
 func build(t *testing.T, analytics bool) string {
@@ -532,5 +532,42 @@ func TestGoogleVerificationOnlyWithCode(t *testing.T) {
 		if got := strings.Count(page, `<meta name="google-site-verification" content="abc123">`); got != tc.want {
 			t.Errorf("config %s: verification tag appears %d times, want %d", tc.config, got, tc.want)
 		}
+	}
+}
+
+func TestCaseStudiesAreLinkedFromNavAndFindings(t *testing.T) {
+	temper.Covers(t, "site.case_studies")
+	out := build(t, false)
+	for _, p := range pages {
+		depth := strings.Count(p, "/")
+		want := `<a href="` + strings.Repeat("../", depth) + `case-studies/">Case Studies</a>`
+		if depth == 0 {
+			want = `<a href="./case-studies/">Case Studies</a>`
+		}
+		if page := read(t, filepath.Join(out, p)); !strings.Contains(page, want) {
+			t.Errorf("%s: nav lacks %s", p, want)
+		}
+	}
+	index := read(t, filepath.Join(out, "case-studies/index.html"))
+	if !strings.Contains(index, `href="feldera/"`) {
+		t.Error("the Case Studies index does not link the Feldera case study")
+	}
+	study := read(t, filepath.Join(out, "case-studies/feldera/index.html"))
+	for _, want := range []string{
+		"https://github.com/feldera/feldera/discussions/8029",
+		"https://github.com/feldera/feldera/issues/8032",
+		"https://github.com/feldera/feldera/issues/8033",
+		"https://github.com/feldera/feldera/pull/8034",
+		"https://github.com/turbolytics/feldera/blob/68df7b19a17083e9729ab46ca55da15ff1016e9e/MATRIX.md",
+	} {
+		if !strings.Contains(study, `href="`+want+`"`) {
+			t.Errorf("the Feldera case study does not link %s", want)
+		}
+	}
+	findingsPage := read(t, filepath.Join(out, "findings/index.html"))
+	section := findingsPage[strings.Index(findingsPage, `id="feldera-feldera"`):]
+	section = section[:strings.Index(section, "</section>")]
+	if !strings.Contains(section, `href="../case-studies/feldera/"`) {
+		t.Error("the findings page's Feldera section does not link its case study")
 	}
 }
