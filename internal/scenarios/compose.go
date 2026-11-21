@@ -342,6 +342,11 @@ func (c *compose) Background(ctx context.Context, name string, cmd Command) (Hel
 	return h, nil
 }
 
+func (c *compose) Build(ctx context.Context) error {
+	_, err := c.compose(ctx, "build")
+	return err
+}
+
 func (c *compose) Teardown(ctx context.Context) error {
 	_, err := c.compose(ctx, "down", "-v", "--remove-orphans")
 	return err

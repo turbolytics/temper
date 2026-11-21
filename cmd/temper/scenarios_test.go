@@ -103,6 +103,7 @@ func (f *cliEngine) Background(ctx context.Context, name string, c scenarios.Com
 	return cliHeld{f: f, name: name}, f.rec("hold " + name)
 }
 func (f *cliEngine) Teardown(ctx context.Context) error { return f.rec("down -v") }
+func (f *cliEngine) Build(ctx context.Context) error    { return f.rec("build") }
 
 // useFakeEngine makes temper scenarios run use a fake engine, and returns
 // it. It clears the runner's environment, because these tests themselves run
@@ -359,5 +360,24 @@ func TestScenariosRun_Usage(t *testing.T) {
 	edit(t, root, "temper/scenarios/river.yml", func(s string) string { return strings.Replace(s, "worker_pause]", "nope]", 1) })
 	if code, _, errOut := cli(t, "--root", root, "scenarios", "run"); code != 2 || !strings.Contains(errOut, "nope") {
 		t.Errorf("a scenario that fails temper check ran: %d %s", code, errOut)
+	}
+}
+
+func TestScenariosRun_BuildFlag(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := useFakeEngine(t)
+	root := scenarioProject(t)
+	if code, out, errOut := cli(t, "--root", root, "scenarios", "run", "--build"); code != 0 {
+		t.Fatalf("scenarios run --build = %d\n%s\n%s", code, out, errOut)
+	}
+	if calls := f.Calls(); len(calls) == 0 || calls[0] != "build" {
+		t.Errorf("calls = %v, want build first", calls)
+	}
+	f2 := useFakeEngine(t)
+	cli(t, "--root", root, "scenarios", "run")
+	for _, c := range f2.Calls() {
+		if c == "build" {
+			t.Error("built without --build")
+		}
 	}
 }

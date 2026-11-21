@@ -584,3 +584,30 @@ func TestRelease_HeldExitedEarlyIsError(t *testing.T) {
 		t.Error("ran the release command for a hold that had already exited")
 	}
 }
+
+func TestRun_BuildFailureIsError(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.setup_failure_is_error", temper.Subject("cli"))
+	sc := temperScenario(t, []string{"job.never_lost"}, "- up: {$subject: true}\n- check: {covers: job.never_lost, host: [echo, '0']}\n")
+	sc.Subject = ""
+	sc.Subjects = map[string]map[string]int{"cluster.go": {"worker-go": 1}, "cluster.go_js": {"worker-js": 1}}
+	f := newFake()
+	f.fail["build"] = errors.New("failed to solve: Dockerfile:3: COPY failed")
+	vs := run(t, f, testProject(), sc, Options{Build: true})
+	wantOutcomes(t, vs, map[string]string{
+		"cluster.go job.never_lost": "error", "cluster.go s.faults": "error",
+		"cluster.go_js job.never_lost": "error", "cluster.go_js s.faults": "error",
+	})
+	builds := 0
+	for _, c := range f.Calls() {
+		if strings.HasPrefix(c, "up ") {
+			t.Fatalf("started services after the build failed: %v", f.Calls())
+		}
+		if c == "build" {
+			builds++
+		}
+	}
+	if builds != 1 || !strings.Contains(vs[0].Detail, "COPY failed") {
+		t.Errorf("builds = %d, detail = %q", builds, vs[0].Detail)
+	}
+}

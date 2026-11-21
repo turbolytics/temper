@@ -169,6 +169,8 @@ func (f *fakeEngine) Background(ctx context.Context, name string, c Command) (He
 	return &fakeHeld{f: f, name: name, exited: f.holdExits[name]}, nil
 }
 
+func (f *fakeEngine) Build(ctx context.Context) error { return f.record("build") }
+
 func (f *fakeEngine) Teardown(ctx context.Context) error {
 	if err := f.record("teardown"); err != nil {
 		return err

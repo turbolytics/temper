@@ -72,7 +72,7 @@ commands:
   render                             rewrite MATRIX.md from the committed statuses
   run --level LEVEL [--run ID] -- COMMAND [ARGS...]
                                      run COMMAND with TEMPER_LEVEL and TEMPER_EVIDENCE set
-  scenarios run [--scenario ID] [--subject ID] [--seed N] [--compose FILE]
+  scenarios run [--scenario ID] [--subject ID] [--seed N] [--compose FILE] [--build]
                                      run runner: temper scenarios against Docker Compose
   clean                              delete all evidence
   guide                              print the guide for working in a Temper project

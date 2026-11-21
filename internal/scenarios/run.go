@@ -41,6 +41,8 @@ type Options struct {
 	Sleep  func(context.Context, time.Duration) error
 	// Poll is how often wait_until and drain poll. Default 1s.
 	Poll time.Duration
+	// Build builds the topology's images before the first subject runs.
+	Build bool
 }
 
 func (o *Options) defaults() {
@@ -84,6 +86,12 @@ func RunScenario(ctx context.Context, e Engine, p *model.Project, sc model.Scena
 		}
 		sort.Strings(subjects)
 	}
+	// One build serves every subject. A failed build fails each subject's run
+	// as a setup step.
+	var built error
+	if opt.Build {
+		built = e.Build(ctx)
+	}
 	var out []Verdict
 	for i, subj := range subjects {
 		if opt.Subject != "" && subj != opt.Subject {
@@ -96,7 +104,7 @@ func RunScenario(ctx context.Context, e Engine, p *model.Project, sc model.Scena
 		case opt.Seed != nil:
 			seed = *opt.Seed + int64(i)
 		}
-		r := &runner{ctx: ctx, e: e, p: p, sc: sc, subject: subj, counts: sc.Subjects[subj], draw: NewDraw(seed), opt: opt, holds: map[string]hold{}}
+		r := &runner{ctx: ctx, e: e, p: p, sc: sc, subject: subj, counts: sc.Subjects[subj], draw: NewDraw(seed), opt: opt, holds: map[string]hold{}, built: built}
 		r.openLog()
 		r.logf("%s seed %d", r.label(), seed)
 		r.run(events)
@@ -134,6 +142,7 @@ type runner struct {
 	holds    map[string]hold
 	verdicts []Verdict
 	stopped  error // why the run stopped early, if it did
+	built    error // the build's failure, when --build failed
 
 	mu      sync.Mutex
 	logFile *os.File
@@ -206,7 +215,10 @@ func (r *runner) covered(ref string) bool {
 
 // run executes the events, then the scenario's own verdict.
 func (r *runner) run(events []Event) {
-	err := r.setup(r.e.Teardown(r.ctx), "teardown before the run")
+	err := r.setup(r.built, "build")
+	if err == nil {
+		err = r.setup(r.e.Teardown(r.ctx), "teardown before the run")
+	}
 	for i := 0; err == nil && i < len(events); i++ {
 		err = r.step(events[i])
 		if err == nil && r.ctx.Err() != nil {

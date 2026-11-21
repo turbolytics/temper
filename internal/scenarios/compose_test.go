@@ -180,3 +180,14 @@ func TestCompose_OutputCarriesStderr(t *testing.T) {
 		t.Fatalf("Host = %+v, %v", out, err)
 	}
 }
+
+func TestCompose_BuildCommandLine(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	r := &recorder{}
+	if err := NewCompose("compose.yml", "p", time.Second, r.run).Build(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(r.lines, []string{"docker compose -f compose.yml -p p build"}) {
+		t.Errorf("lines = %v", r.lines)
+	}
+}

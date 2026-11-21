@@ -49,6 +49,8 @@ type Engine interface {
 	Host(ctx context.Context, cmd []string) (Output, error)
 	// Background starts c and keeps it running.
 	Background(ctx context.Context, name string, c Command) (Held, error)
+	// Build builds every image the topology builds.
+	Build(ctx context.Context) error
 	// Teardown removes the whole topology, volumes included.
 	Teardown(ctx context.Context) error
 }
