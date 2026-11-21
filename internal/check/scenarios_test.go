@@ -178,7 +178,7 @@ func TestScenarios_UnknownFaultActionIsReported(t *testing.T) {
 		want string
 	}{
 		"explode":    {model.Fault{Target: "a", Do: "explode"}, "does explode, which is not an action"},
-		"bare_exec":  {model.Fault{Do: "exec"}, "does exec but names no exec command"},
+		"bare_exec":  {model.Fault{Do: "exec"}, "does exec, but its exec needs a command"},
 		"bare_pause": {model.Fault{Target: "a", Do: "pause"}, "does pause but has no for"},
 		"no_target":  {model.Fault{Do: "kill"}, "names no target"},
 		"bad_range":  {model.Fault{Target: "a", Do: "pause", For: "9s-3s"}, "for"},
@@ -208,4 +208,48 @@ func TestScenarios_SubjectsMustBeDeclared(t *testing.T) {
 		"temper/scenarios/faults.yml", "§11", "s.faults", "names both subject and subjects")
 	expect(t, Check(project(base, func(p *model.Project) { p.Scenarios[0].Subject = "sink.kafka" })),
 		"temper/scenarios/faults.yml", "§11", "s.faults", "$subject")
+}
+
+func withCommands(cmds map[string]model.Command) func(*model.Project) {
+	return func(p *model.Project) { p.Commands = cmds }
+}
+
+func TestCheck_ReservedCommandName(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	temper.Covers(t, "recipes.names_mean_one_thing", temper.Subject("cli"))
+	for _, name := range []string{"check", "covers", "exec", "release", "Bad"} {
+		errs := Check(project(withCommands(map[string]model.Command{name: {Exec: []string{"pg", "psql"}}})))
+		expect(t, errs, "temper/commands.yml", "§11", name, name)
+	}
+	if errs := Check(project(withCommands(map[string]model.Command{"sql": {Exec: []string{"pg", "psql"}}}))); len(errs) != 0 {
+		t.Fatalf("a good name is reported:\n%s", render(errs))
+	}
+}
+
+func TestCheck_CommandNeedsOneForm(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	for name, c := range map[string]model.Command{
+		"two":   {Exec: []string{"pg", "psql"}, Run: []string{"tool", "x"}},
+		"none":  {Doc: "nothing to run"},
+		"short": {Exec: []string{"pg"}},
+	} {
+		expect(t, Check(project(withCommands(map[string]model.Command{name: c}))), "temper/commands.yml", "§11", name, name)
+	}
+}
+
+func TestCheck_FaultUsesNamedCommand(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	ok := withTemperScenario([]string{"sink.kafka"}, "- check: {covers: sink.kafka, host: [echo, '0']}\n")
+	cmds := withCommands(map[string]model.Command{"stmt": {Exec: []string{"pg", "psql", "-c"}}, "end": {Exec: []string{"pg", "psql", "-c", "'{1}'"}}})
+	p := project(ok, cmds)
+	p.Faults["named"] = model.Fault{Do: "exec", Exec: model.CommandUse{Name: "stmt", Args: []string{"SELECT 1"}}}
+	if errs := Check(p); len(errs) != 0 {
+		t.Fatalf("a fault using a named command is reported:\n%s", render(errs))
+	}
+	p = project(ok, cmds)
+	p.Faults["unknown"] = model.Fault{Do: "exec", Exec: model.CommandUse{Name: "nope"}}
+	p.Faults["count"] = model.Fault{Do: "exec", Exec: model.CommandUse{Name: "end"}}
+	errs := Check(p)
+	expect(t, errs, "temper/faults.yml", "§11", "unknown", "nope")
+	expect(t, errs, "temper/faults.yml", "§11", "count", "takes 1")
 }

@@ -58,7 +58,7 @@ func heal(t *testing.T, in *Injected) {
 func TestFault_PauseThenUnpause(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
 	f := fakeWith(map[string][]string{"worker-go": {"worker-go-1", "worker-go-2", "worker-go-3"}, "postgres": {"postgres-1"}})
-	in, err := Inject(context.Background(), f, NewDraw(70), "worker_pause", model.Fault{Target: "worker-*", Do: "pause", For: "3s-9s"}, t.Logf)
+	in, err := Inject(context.Background(), f, NewDraw(70), "worker_pause", model.Fault{Target: "worker-*", Do: "pause", For: "3s-9s"}, nil, t.Logf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestFault_PauseThenUnpause(t *testing.T) {
 func TestFault_AllTargetsEveryInstance(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
 	f := fakeWith(map[string][]string{"worker-go": {"worker-go-1", "worker-go-2"}})
-	in, err := Inject(context.Background(), f, NewDraw(1), "all_stop", model.Fault{Target: "worker-*", Do: "stop", Then: "start", After: "1s", All: true}, t.Logf)
+	in, err := Inject(context.Background(), f, NewDraw(1), "all_stop", model.Fault{Target: "worker-*", Do: "stop", Then: "start", After: "1s", All: true}, nil, t.Logf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestFault_TargetFromUsesMappedInstance(t *testing.T) {
 		in, err := Inject(context.Background(), f, NewDraw(3), "leader_pause", model.Fault{
 			TargetFrom: &model.TargetFrom{Exec: model.CommandUse{List: []string{"postgres", "psql", "-Atc", "SELECT leader_id"}}, Map: "worker-{value}", Chance: c.chance, Fallback: "worker-*"},
 			Do:         "pause", For: "1s",
-		}, t.Logf)
+		}, nil, t.Logf)
 		if err != nil || in == nil {
 			t.Fatalf("Inject = %v, %v", in, err)
 		}
@@ -118,7 +118,7 @@ func TestFault_NoInstanceIsSkipped(t *testing.T) {
 	f := fakeWith(map[string][]string{"postgres": {"postgres-1"}})
 	var logged []string
 	in, err := Inject(context.Background(), f, NewDraw(1), "worker_pause", model.Fault{Target: "worker-*", Do: "pause", For: "1s"},
-		func(format string, args ...any) { logged = append(logged, format) })
+		nil, func(format string, args ...any) { logged = append(logged, format) })
 	if in != nil || err != nil {
 		t.Fatalf("Inject = %v, %v; want nil, nil", in, err)
 	}
@@ -133,7 +133,7 @@ func TestFault_NoInstanceIsSkipped(t *testing.T) {
 func TestFault_KillThenStartAfterDelay(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
 	f := fakeWith(map[string][]string{"postgres": {"postgres-1"}})
-	in, err := Inject(context.Background(), f, NewDraw(1), "pg_crash", model.Fault{Target: "postgres", Do: "kill", Then: "start", After: "0s-2s"}, t.Logf)
+	in, err := Inject(context.Background(), f, NewDraw(1), "pg_crash", model.Fault{Target: "postgres", Do: "kill", Then: "start", After: "0s-2s"}, nil, t.Logf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestFault_ExecAndRestartHaveNothingToHeal(t *testing.T) {
 		"pg_restart":   {Target: "postgres", Do: "restart"},
 		"worker_kill":  {Target: "postgres", Do: "kill"},
 	} {
-		in, err := Inject(context.Background(), f, NewDraw(1), name, flt, t.Logf)
+		in, err := Inject(context.Background(), f, NewDraw(1), name, flt, nil, t.Logf)
 		if err != nil || in == nil || in.Heal != nil || in.HealAfter != 0 {
 			t.Errorf("%s: Inject = %+v, %v; want no heal", name, in, err)
 		}
@@ -169,7 +169,7 @@ func TestFault_ExecAndRestartHaveNothingToHeal(t *testing.T) {
 func TestFault_DisconnectHealsByConnect(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
 	f := fakeWith(map[string][]string{"kafka": {"kafka-1"}})
-	in, err := Inject(context.Background(), f, NewDraw(1), "broker_cut", model.Fault{Target: "kafka", Do: "disconnect", Network: "default", For: "6s"}, t.Logf)
+	in, err := Inject(context.Background(), f, NewDraw(1), "broker_cut", model.Fault{Target: "kafka", Do: "disconnect", Network: "default", For: "6s"}, nil, t.Logf)
 	if err != nil {
 		t.Fatal(err)
 	}

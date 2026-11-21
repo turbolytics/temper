@@ -525,3 +525,16 @@ func TestRun_LiveAnswersDoNotShiftTheSeed(t *testing.T) {
 		t.Fatalf("the leader's answer changed the fault sequence:\n%v\n%v", a, b)
 	}
 }
+
+func TestRun_FaultExecByName(t *testing.T) {
+	temper.Covers(t, "declarations.recipe_packs")
+	p := testProject()
+	p.Commands = map[string]model.Command{"postgres.end_session": {Exec: []string{"postgres", "psql", "-Atc", "end '{1}'"}}}
+	p.Faults["end_probe"] = model.Fault{Do: "exec", Exec: model.CommandUse{Name: "postgres.end_session", Args: []string{"probe"}}}
+	f := newFake()
+	f.outputs["exec postgres: psql lost"] = []string{"0"}
+	run(t, f, p, temperScenario(t, []string{"job.never_lost"}, "- fault: end_probe\n- check: {covers: job.never_lost, exec: [postgres, psql, lost]}\n"), Options{})
+	if !strings.Contains(strings.Join(f.Calls(), "\n"), "exec postgres: psql -Atc end 'probe'") {
+		t.Errorf("calls = %v", f.Calls())
+	}
+}

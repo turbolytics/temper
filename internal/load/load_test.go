@@ -480,3 +480,21 @@ func TestLoad_PackErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestLoad_DotsAreForPacks(t *testing.T) {
+	temper.Covers(t, "declarations.recipe_packs")
+	temper.Covers(t, "recipes.names_mean_one_thing", temper.Subject("cli"))
+	_, errs := Load(writeProject(t, map[string]string{
+		"temper.yml":          minimalConfig + "packs:\n  - pack: postgres\n",
+		"temper/commands.yml": "commands:\n  postgres.sql: {exec: [pg, psql]}\n",
+		"temper/faults.yml":   "faults:\n  postgres.crash: {target: x, do: kill}\n",
+	}))
+	if len(errs) != 2 {
+		t.Fatalf("errors = %v, want one for each dotted name", errs)
+	}
+	for _, e := range errs {
+		if e.Rule != "§11" || !strings.Contains(e.Message, "reserved for packs") {
+			t.Errorf("error = %v", e)
+		}
+	}
+}

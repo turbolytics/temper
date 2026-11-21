@@ -6,9 +6,13 @@ package scenarios
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/turbolytics/temper/internal/model"
 )
 
 // Command is a command a scenario runs: in a running container of Service
@@ -107,11 +111,27 @@ var kinds = map[string]bool{
 	"drain": true, "check": true,
 }
 
-// ParseEvents reads a scenario's events. Errors name the event, from 1.
-func ParseEvents(raw []map[string]any) ([]Event, error) {
+// parser reads events, knowing the project's named commands.
+type parser struct{ cmds map[string]model.Command }
+
+// fieldNames are the keys events use inside their mappings.
+var fieldNames = map[string]bool{
+	"instance": true, "covers": true, "expect": true, "results": true, "decides": true,
+	"name": true, "equals": true, "at_least": true, "timeout": true, "remaining": true,
+	"stall": true, "max": true, "duration": true, "every": true, "faults": true,
+}
+
+// Reserved reports whether name is an event kind or an event field, which a
+// named command may not be called.
+func Reserved(name string) bool { return kinds[name] || fieldNames[name] }
+
+// ParseEvents reads a scenario's events, resolving named commands from
+// cmds. Errors name the event, from 1.
+func ParseEvents(raw []map[string]any, cmds map[string]model.Command) ([]Event, error) {
+	ps := parser{cmds: cmds}
 	out := make([]Event, 0, len(raw))
 	for i, m := range raw {
-		e, err := parseEvent(m)
+		e, err := ps.parseEvent(m)
 		if err != nil {
 			return nil, fmt.Errorf("event %d: %w", i+1, err)
 		}
@@ -120,13 +140,13 @@ func ParseEvents(raw []map[string]any) ([]Event, error) {
 	return out, nil
 }
 
-func parseEvent(m map[string]any) (Event, error) {
+func (ps parser) parseEvent(m map[string]any) (Event, error) {
 	var kind string
 	for k := range m {
 		if k == "instance" {
 			continue
 		}
-		if !kinds[k] {
+		if _, named := ps.cmds[k]; !kinds[k] && !named {
 			return Event{}, fmt.Errorf("unknown event %s", k)
 		}
 		if kind != "" {
@@ -137,10 +157,21 @@ func parseEvent(m map[string]any) (Event, error) {
 	if kind == "" {
 		return Event{}, errors.New("is empty")
 	}
+	v := m[kind]
+	if _, named := ps.cmds[kind]; named {
+		c, err := ps.parseCommand(map[string]any{kind: v, "instance": m["instance"]}, kind)
+		if err != nil {
+			return Event{}, err
+		}
+		e := Event{Kind: "exec", Cmd: &c}
+		if c.Run {
+			e.Kind = "run"
+		}
+		return e, nil
+	}
 	if _, ok := m["instance"]; ok && kind != "exec" {
 		return Event{}, errors.New("instance applies only to exec")
 	}
-	v := m[kind]
 	e := Event{Kind: kind}
 	var err error
 	switch kind {
@@ -163,7 +194,7 @@ func parseEvent(m map[string]any) (Event, error) {
 		}
 	case "exec", "host", "run":
 		var c Command
-		c, err = parseCommand(map[string]any{kind: v, "instance": m["instance"]}, kind)
+		c, err = ps.parseCommand(map[string]any{kind: v, "instance": m["instance"]}, kind)
 		e.Cmd = &c
 		if kind == "host" {
 			e.Kind = "exec"
@@ -171,27 +202,27 @@ func parseEvent(m map[string]any) (Event, error) {
 	case "sleep":
 		e.Sleep, err = duration(v, "sleep")
 	case "hold":
-		e.Cmd, e.Name, err = parseHold(v)
+		e.Cmd, e.Name, err = ps.parseHold(v)
 	case "wait_until":
-		e.Until, err = parseUntil(v)
+		e.Until, err = ps.parseUntil(v)
 	case "chaos":
-		e.Chaos, err = parseChaos(v)
+		e.Chaos, err = ps.parseChaos(v)
 	case "drain":
-		e.Drain, err = parseDrain(v)
+		e.Drain, err = ps.parseDrain(v)
 	case "check":
-		e.Check, err = parseCheck(v)
+		e.Check, err = ps.parseCheck(v)
 	}
 	return e, err
 }
 
 // fields reads v as a mapping holding only the allowed keys.
-func fields(v any, what string, allowed ...string) (map[string]any, error) {
+func (ps parser) fields(v any, what string, allowed ...string) (map[string]any, error) {
 	m, ok := v.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("%s needs a mapping", what)
 	}
 	for k := range m {
-		found := false
+		_, found := ps.cmds[k]
 		for _, a := range allowed {
 			found = found || a == k
 		}
@@ -254,7 +285,7 @@ func duration(v any, what string) (time.Duration, error) {
 
 // parseCommand reads the one of exec, run or host that m holds, and an
 // optional instance.
-func parseCommand(m map[string]any, what string) (Command, error) {
+func (ps parser) parseCommand(m map[string]any, what string) (Command, error) {
 	var c Command
 	n := 0
 	for _, k := range []string{"exec", "run", "host"} {
@@ -276,8 +307,21 @@ func parseCommand(m map[string]any, what string) (Command, error) {
 		}
 		c = Command{Service: args[0], Args: args[1:], Run: k == "run"}
 	}
+	for k, v := range m {
+		if _, named := ps.cmds[k]; !named {
+			continue
+		}
+		n++
+		args, err := arguments(v, k)
+		if err != nil {
+			return c, err
+		}
+		if c, err = Resolve(ps.cmds, k, args); err != nil {
+			return c, err
+		}
+	}
 	if n != 1 {
-		return c, fmt.Errorf("%s needs exec, run or host, exactly one", what)
+		return c, fmt.Errorf("%s needs exec, run, host or a named command, exactly one", what)
 	}
 	if inst, ok := m["instance"]; ok && inst != nil {
 		i, ok := inst.(int)
@@ -289,8 +333,8 @@ func parseCommand(m map[string]any, what string) (Command, error) {
 	return c, nil
 }
 
-func parseHold(v any) (*Command, string, error) {
-	m, err := fields(v, "hold", "name", "exec", "run", "host", "instance")
+func (ps parser) parseHold(v any) (*Command, string, error) {
+	m, err := ps.fields(v, "hold", "name", "exec", "run", "host", "instance")
 	if err != nil {
 		return nil, "", err
 	}
@@ -298,16 +342,16 @@ func parseHold(v any) (*Command, string, error) {
 	if name == "" {
 		return nil, "", errors.New("hold needs a name")
 	}
-	c, err := parseCommand(m, "hold")
+	c, err := ps.parseCommand(m, "hold")
 	return &c, name, err
 }
 
-func parseUntil(v any) (*Until, error) {
-	m, err := fields(v, "wait_until", "exec", "run", "host", "instance", "equals", "at_least", "timeout")
+func (ps parser) parseUntil(v any) (*Until, error) {
+	m, err := ps.fields(v, "wait_until", "exec", "run", "host", "instance", "equals", "at_least", "timeout")
 	if err != nil {
 		return nil, err
 	}
-	c, err := parseCommand(m, "wait_until")
+	c, err := ps.parseCommand(m, "wait_until")
 	if err != nil {
 		return nil, err
 	}
@@ -334,8 +378,8 @@ func parseUntil(v any) (*Until, error) {
 	return u, nil
 }
 
-func parseChaos(v any) (*Chaos, error) {
-	m, err := fields(v, "chaos", "duration", "every", "faults")
+func (ps parser) parseChaos(v any) (*Chaos, error) {
+	m, err := ps.fields(v, "chaos", "duration", "every", "faults")
 	if err != nil {
 		return nil, err
 	}
@@ -356,17 +400,17 @@ func parseChaos(v any) (*Chaos, error) {
 	return c, nil
 }
 
-func parseDrain(v any) (*Drain, error) {
-	m, err := fields(v, "drain", "remaining", "stall", "max", "covers")
+func (ps parser) parseDrain(v any) (*Drain, error) {
+	m, err := ps.fields(v, "drain", "remaining", "stall", "max", "covers")
 	if err != nil {
 		return nil, err
 	}
 	d := &Drain{Stall: time.Minute, Max: 10 * time.Minute}
 	switch r := m["remaining"].(type) {
 	case []any:
-		d.Remaining, err = parseCommand(map[string]any{"exec": r}, "drain remaining")
+		d.Remaining, err = ps.parseCommand(map[string]any{"exec": r}, "drain remaining")
 	case map[string]any:
-		d.Remaining, err = parseCommand(r, "drain remaining")
+		d.Remaining, err = ps.parseCommand(r, "drain remaining")
 	default:
 		err = errors.New("drain needs remaining, a command that prints a count")
 	}
@@ -396,8 +440,8 @@ func parseDrain(v any) (*Drain, error) {
 	return d, nil
 }
 
-func parseCheck(v any) (*Check, error) {
-	m, err := fields(v, "check", "covers", "exec", "run", "host", "instance", "expect", "results")
+func (ps parser) parseCheck(v any) (*Check, error) {
+	m, err := ps.fields(v, "check", "covers", "exec", "run", "host", "instance", "expect", "results")
 	if err != nil {
 		return nil, err
 	}
@@ -405,11 +449,11 @@ func parseCheck(v any) (*Check, error) {
 		if len(m) != 1 {
 			return nil, errors.New("check: results stands alone")
 		}
-		rm, err := fields(r, "check results", "exec", "run", "host", "instance", "decides")
+		rm, err := ps.fields(r, "check results", "exec", "run", "host", "instance", "decides")
 		if err != nil {
 			return nil, err
 		}
-		c, err := parseCommand(rm, "check results")
+		c, err := ps.parseCommand(rm, "check results")
 		if err != nil {
 			return nil, err
 		}
@@ -426,7 +470,7 @@ func parseCheck(v any) (*Check, error) {
 	if cov == "" {
 		return nil, errors.New("check needs covers, the reference it decides, or results")
 	}
-	c, err := parseCommand(m, "check")
+	c, err := ps.parseCommand(m, "check")
 	if err != nil {
 		return nil, err
 	}
@@ -488,4 +532,89 @@ func FaultNames(events []Event) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// arguments reads a named command's arguments: nothing, one string, or a list.
+func arguments(v any, name string) ([]string, error) {
+	switch a := v.(type) {
+	case nil:
+		return nil, nil
+	case []any:
+		if len(a) == 0 {
+			return nil, nil
+		}
+		return strings_(a, name)
+	case map[string]any:
+		return nil, fmt.Errorf("%s's arguments are a string or a list", name)
+	default:
+		return []string{fmt.Sprint(a)}, nil
+	}
+}
+
+// placeholder matches a use argument's slot in a named command: {1}, {2}, ...
+var placeholder = regexp.MustCompile(`\{([1-9][0-9]*)\}`)
+
+// Resolve turns a named command and its arguments into a Command. With
+// placeholders, the command takes exactly as many arguments as its highest
+// one, and they fill the slots; without them, the arguments are appended.
+func Resolve(cmds map[string]model.Command, name string, args []string) (Command, error) {
+	def, ok := cmds[name]
+	if !ok {
+		return Command{}, fmt.Errorf("names command %s, which is not declared", name)
+	}
+	var form []string
+	c := Command{}
+	switch {
+	case len(def.Exec) > 0:
+		form = def.Exec
+	case len(def.Run) > 0:
+		form, c.Run = def.Run, true
+	case len(def.Host) > 0:
+		form, c.Host = def.Host, true
+	default:
+		return Command{}, fmt.Errorf("command %s has no exec, run or host", name)
+	}
+	highest := 0
+	for _, s := range form {
+		for _, m := range placeholder.FindAllStringSubmatch(s, -1) {
+			if n, _ := strconv.Atoi(m[1]); n > highest {
+				highest = n
+			}
+		}
+	}
+	full := append([]string(nil), form...)
+	if highest == 0 {
+		full = append(full, args...)
+	} else {
+		if len(args) != highest {
+			return Command{}, fmt.Errorf("command %s takes %d argument(s), not %d", name, highest, len(args))
+		}
+		for i, s := range full {
+			full[i] = placeholder.ReplaceAllStringFunc(s, func(m string) string {
+				n, _ := strconv.Atoi(m[1 : len(m)-1])
+				return args[n-1]
+			})
+		}
+	}
+	if c.Host {
+		c.Args = full
+		return c, nil
+	}
+	if len(full) < 2 {
+		return Command{}, fmt.Errorf("command %s needs a service and a command", name)
+	}
+	c.Service, c.Args = full[0], full[1:]
+	return c, nil
+}
+
+// ResolveUse turns a command written in a fault into a Command: a list runs
+// with exec; a named command resolves with its arguments.
+func ResolveUse(cmds map[string]model.Command, u model.CommandUse) (Command, error) {
+	if u.Name != "" {
+		return Resolve(cmds, u.Name, u.Args)
+	}
+	if len(u.List) < 2 {
+		return Command{}, errors.New("needs a command: [service, command, ...] or {name: arguments}")
+	}
+	return Command{Service: u.List[0], Args: u.List[1:]}, nil
 }

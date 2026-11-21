@@ -72,7 +72,7 @@ func (o *Options) defaults() {
 // temper check reports first.
 func RunScenario(ctx context.Context, e Engine, p *model.Project, sc model.Scenario, opt Options) ([]Verdict, error) {
 	opt.defaults()
-	events, err := ParseEvents(sc.Events)
+	events, err := ParseEvents(sc.Events, p.Commands)
 	if err != nil {
 		return nil, fmt.Errorf("scenario %s: %w", sc.ID, err)
 	}
@@ -378,7 +378,7 @@ func (r *runner) fault(name string) error {
 	// One draw from the run's generator seeds this injection's own, so what
 	// the live system answers (a target_from value, a glob that matches
 	// nothing) never shifts the faults, targets or durations after it.
-	in, err := Inject(r.ctx, r.e, NewDraw(r.draw.rng.Int63()), name, f, r.logf)
+	in, err := Inject(r.ctx, r.e, NewDraw(r.draw.rng.Int63()), name, f, r.p.Commands, r.logf)
 	if err != nil {
 		return r.setup(err, "fault "+name)
 	}

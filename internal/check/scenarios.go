@@ -3,6 +3,7 @@ package check
 import (
 	"fmt"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -116,7 +117,7 @@ func checkScenarioLattices(p *model.Project) diag.List {
 // scenario covers is decided by some check, and every check decides a
 // reference the scenario covers.
 func checkTemperEvents(p *model.Project, sc model.Scenario, add func(rule, msg string)) {
-	events, err := scenarios.ParseEvents(sc.Events)
+	events, err := scenarios.ParseEvents(sc.Events, p.Commands)
 	if err != nil {
 		add("§11", err.Error())
 		return
@@ -173,8 +174,10 @@ func checkFaults(p *model.Project) diag.List {
 		case !faultActions[f.Do]:
 			add(fmt.Sprintf("does %s, which is not an action (kill, stop, start, restart, pause, unpause, disconnect, connect, exec)", f.Do))
 			continue
-		case f.Do == "exec" && len(f.Exec.List) < 2 && f.Exec.Name == "":
-			add("does exec but names no exec command: [service, command, ...]")
+		case f.Do == "exec":
+			if _, err := scenarios.ResolveUse(p.Commands, f.Exec); err != nil {
+				add("does exec, but its exec " + err.Error())
+			}
 		case f.Do != "exec" && f.Target == "" && f.TargetFrom == nil:
 			add("names no target or target_from")
 		}
@@ -196,8 +199,8 @@ func checkFaults(p *model.Project) diag.List {
 			add(fmt.Sprintf("then %s, which is not start or restart", f.Then))
 		}
 		if t := f.TargetFrom; t != nil {
-			if len(t.Exec.List) < 2 && t.Exec.Name == "" {
-				add("target_from needs exec: [service, command, ...]")
+			if _, err := scenarios.ResolveUse(p.Commands, t.Exec); err != nil {
+				add("target_from's exec " + err.Error())
 			}
 			if !strings.Contains(t.Map, "{value}") {
 				add("target_from map must contain {value}, where the printed value goes")
@@ -210,6 +213,51 @@ func checkFaults(p *model.Project) diag.List {
 			if _, ok := ResolveRef(p, c); !ok {
 				out = append(out, diag.Error{File: file, ID: n, Message: fmt.Sprintf("covers %s, which does not resolve", c), Rule: "§14.8"})
 			}
+		}
+	}
+	return out
+}
+
+// commandName is a project's own command name; a pack's always holds a dot.
+var commandName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// checkCommands validates commands.yml, and the forms of the commands packs
+// supply: each runs one way, exec or run with a service and a command.
+func checkCommands(p *model.Project) diag.List {
+	var out diag.List
+	names := make([]string, 0, len(p.Commands))
+	for n := range p.Commands {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		c := p.Commands[n]
+		file := path.Join(p.Config.Dir, "commands.yml")
+		if strings.Contains(n, ".") {
+			file = "temper.yml"
+		}
+		add := func(msg string) {
+			out = append(out, diag.Error{File: file, ID: n, Message: msg, Rule: "§11"})
+		}
+		if !strings.Contains(n, ".") {
+			switch {
+			case !commandName.MatchString(n):
+				add(fmt.Sprintf("command %s: a name is lowercase letters, digits and underscores, with no dot", n))
+			case scenarios.Reserved(n):
+				add(fmt.Sprintf("command %s has the name of an event or an event field", n))
+			}
+		}
+		forms := 0
+		for _, f := range [][]string{c.Exec, c.Run, c.Host} {
+			if len(f) > 0 {
+				forms++
+			}
+		}
+		switch {
+		case forms != 1:
+			add(fmt.Sprintf("command %s needs exactly one of exec, run or host", n))
+		case len(c.Exec) == 1 || len(c.Run) == 1:
+			add(fmt.Sprintf("command %s needs a service and a command", n))
 		}
 	}
 	return out
