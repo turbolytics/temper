@@ -35,7 +35,7 @@ type config struct {
 
 // DefaultSiteURL is where GitHub Pages serves the site when the config does
 // not say.
-const DefaultSiteURL = "https://turbolytics.github.io/temper/"
+const DefaultSiteURL = "https://temper.turbolytics.io/"
 
 // page is what every template sees.
 type page struct {

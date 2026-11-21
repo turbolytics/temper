@@ -442,7 +442,7 @@ func TestSnippetsFailOnAMissingID(t *testing.T) {
 	}
 }
 
-const siteURL = "https://turbolytics.github.io/temper/"
+const siteURL = "https://temper.turbolytics.io/"
 
 // Each page tells search engines and link previews what it is: its own
 // description, one canonical address, and a 1200x630 preview image.
