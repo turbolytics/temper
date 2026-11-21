@@ -343,10 +343,11 @@ func TestLoad_FaultsAndRunnerFields(t *testing.T) {
 	if len(errs) != 0 {
 		t.Fatalf("errors: %v", errs)
 	}
+	half := 0.5
 	want := map[string]model.Fault{
 		"worker_pause": {Target: "worker-*", Do: "pause", For: "3s-9s"},
 		"leader_pause": {
-			TargetFrom: &model.TargetFrom{Exec: []string{"postgres", "psql", "-Atc", "SELECT leader_id FROM river_leader"}, Map: "worker-{value}", Chance: 0.5, Fallback: "worker-*"},
+			TargetFrom: &model.TargetFrom{Exec: []string{"postgres", "psql", "-Atc", "SELECT leader_id FROM river_leader"}, Map: "worker-{value}", Chance: &half, Fallback: "worker-*"},
 			Do:         "pause", For: "3s-9s", Covers: []string{"job.never_lost"},
 		},
 	}

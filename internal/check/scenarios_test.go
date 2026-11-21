@@ -3,6 +3,8 @@ package check
 import (
 	"testing"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/turbolytics/temper"
 	"github.com/turbolytics/temper/internal/model"
 )
@@ -103,4 +105,107 @@ func TestResolveRef(t *testing.T) {
 			t.Errorf("ResolveRef(%q) = %q, true; want unresolved", r, kind)
 		}
 	}
+}
+
+// withTemperScenario adds a runner: temper scenario with these covers and
+// events (YAML), and a faults.yml holding worker_pause.
+func withTemperScenario(covers []string, events string) func(*model.Project) {
+	return func(p *model.Project) {
+		var raw []map[string]any
+		if err := yaml.Unmarshal([]byte(events), &raw); err != nil {
+			panic(err)
+		}
+		p.Scenarios = append(p.Scenarios, model.Scenario{
+			ID: "s.faults", Runner: "temper", Name: "n", Description: "d", Covers: covers,
+			Events: raw, Compose: "compose.yml", File: "temper/scenarios/faults.yml",
+		})
+		p.Faults = map[string]model.Fault{"worker_pause": {Target: "worker-*", Do: "pause", For: "3s-9s"}}
+	}
+}
+
+func TestScenarios_RunnerTemperNeedsNoAt(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	errs := Check(project(withTemperScenario([]string{"sink.kafka"},
+		"- up: {kafka: 1}\n- fault: worker_pause\n- check: {covers: sink.kafka, host: [echo, '0']}\n")))
+	if len(errs) != 0 {
+		t.Fatalf("errors:\n%s", render(errs))
+	}
+}
+
+func TestScenarios_EventErrorsAreReported(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	expect(t, Check(project(withTemperScenario([]string{"sink.kafka"}, "- explode: true\n"))),
+		"temper/scenarios/faults.yml", "§11", "s.faults", "event 1: unknown event explode")
+}
+
+func TestScenarios_UndecidedCoverIsReported(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	errs := Check(project(withTemperScenario([]string{"sink.kafka", "s.one"},
+		"- check: {covers: sink.kafka, host: [echo, '0']}\n"), withHeuristics([]string{"heuristics/up.working", "heuristics/idle.stopped"})))
+	expect(t, errs, "temper/scenarios/faults.yml", "§11", "s.faults", "covers s.one, which no check decides")
+}
+
+func TestScenarios_CheckOutsideCoversIsReported(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	errs := Check(project(withTemperScenario([]string{"sink.kafka"},
+		"- check: {covers: sink.kafka, host: [echo, '0']}\n- check: {covers: nope.x, host: [echo, '0']}\n")))
+	expect(t, errs, "temper/scenarios/faults.yml", "§11", "s.faults", "decides nope.x, which the scenario does not cover")
+}
+
+func TestScenarios_DecidesPatternCountsAsDecided(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	errs := Check(project(withHeuristics(), withTemperScenario([]string{"heuristics/up.working", "heuristics/idle.stopped"},
+		"- check: {results: {host: [cat, r.json], decides: [heuristics/*]}}\n")))
+	if len(errs) != 0 {
+		t.Fatalf("errors:\n%s", render(errs))
+	}
+}
+
+func TestScenarios_UnknownFaultIsReported(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	for _, ev := range []string{"- fault: nope\n", "- chaos: {duration: 1s, every: 1s, faults: [worker_pause, nope]}\n"} {
+		expect(t, Check(project(withTemperScenario([]string{"sink.kafka"}, ev+"- check: {covers: sink.kafka, host: [echo, '0']}\n"))),
+			"temper/scenarios/faults.yml", "§11", "s.faults", "names fault nope, which faults.yml does not declare")
+	}
+}
+
+func TestScenarios_UnknownFaultActionIsReported(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	two := 2.0
+	ok := withTemperScenario([]string{"sink.kafka"}, "- check: {covers: sink.kafka, host: [echo, '0']}\n")
+	for name, c := range map[string]struct {
+		f    model.Fault
+		want string
+	}{
+		"explode":    {model.Fault{Target: "a", Do: "explode"}, "does explode, which is not an action"},
+		"bare_exec":  {model.Fault{Do: "exec"}, "does exec but names no exec command"},
+		"bare_pause": {model.Fault{Target: "a", Do: "pause"}, "does pause but has no for"},
+		"no_target":  {model.Fault{Do: "kill"}, "names no target"},
+		"bad_range":  {model.Fault{Target: "a", Do: "pause", For: "9s-3s"}, "for"},
+		"bad_then":   {model.Fault{Target: "a", Do: "kill", Then: "explode"}, "then explode"},
+		"no_net":     {model.Fault{Target: "a", Do: "disconnect", For: "1s"}, "names no network"},
+		"bad_map":    {model.Fault{TargetFrom: &model.TargetFrom{Exec: []string{"pg", "x"}, Map: "worker"}, Do: "kill"}, "map"},
+		"bad_chance": {model.Fault{TargetFrom: &model.TargetFrom{Exec: []string{"pg", "x"}, Map: "w-{value}", Chance: &two}, Do: "kill"}, "chance"},
+	} {
+		p := project(ok)
+		p.Faults[name] = c.f
+		expect(t, Check(p), "temper/faults.yml", "§11", name, c.want)
+	}
+}
+
+func TestScenarios_SubjectsMustBeDeclared(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	base := withTemperScenario([]string{"sink.flush.keeps_batch"}, "- up: {$subject: true}\n- check: {covers: sink.flush.keeps_batch, host: [echo, '0']}\n")
+	subjects := func(m map[string]map[string]int) func(*model.Project) {
+		return func(p *model.Project) { p.Scenarios[0].Subjects = m }
+	}
+	if errs := Check(project(base, subjects(map[string]map[string]int{"sink.kafka": {"worker": 1}}))); len(errs) != 0 {
+		t.Fatalf("errors:\n%s", render(errs))
+	}
+	expect(t, Check(project(base, subjects(map[string]map[string]int{"cluster.x": {"worker": 1}}))),
+		"temper/scenarios/faults.yml", "R7", "s.faults", "cluster.x")
+	expect(t, Check(project(base, subjects(map[string]map[string]int{"sink.kafka": {}}), func(p *model.Project) { p.Scenarios[0].Subject = "sink.kafka" })),
+		"temper/scenarios/faults.yml", "§11", "s.faults", "names both subject and subjects")
+	expect(t, Check(project(base, func(p *model.Project) { p.Scenarios[0].Subject = "sink.kafka" })),
+		"temper/scenarios/faults.yml", "§11", "s.faults", "$subject")
 }

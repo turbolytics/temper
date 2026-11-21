@@ -106,12 +106,14 @@ temper/
   lattices/<id>.yml         # one file per lattice
   subjects/<id>.yml         # one file per subject
   scenarios/<group>.yml     # scenarios, grouped however suits the project
+  faults.yml                # named faults for runner: temper scenarios (§11)
   status/                   # GENERATED, committed: one status per cell
     features.yml            #   one row per feature
     subjects/<id>.yml       #   one row per invariant or lattice member, per subject
     lattices/<id>.yml       #   one row per member of a scenario-covered lattice
 MATRIX.md                   # GENERATED, committed: the rendered matrix
 .temper/evidence/*.jsonl    # GENERATED, not committed: evidence records from test runs
+.temper/scenarios/          # GENERATED, not committed: run logs from temper scenarios run
 ```
 
 Paths are configurable in `temper.yml` (§6). Generated files carry a header
@@ -403,9 +405,9 @@ payloads belong to the project.
 | `id` | yes | The scenario. |
 | `name` | yes | A sentence a reader understands without the code. |
 | `covers` | yes | References (§5) this scenario proves. Must resolve. |
-| `subject` | when `covers` names a per-subject item | The subject the scenario proves invariants or subject-lattice members for. |
+| `subject` | when `covers` names a per-subject item | The subject the scenario proves invariants or subject-lattice members for. A `runner: temper` scenario may use `subjects` instead. |
 | `description` | yes | The claim, including what the system cannot know and therefore must not say. |
-| `events` | yes | Ordered entries. Each has `at` (a duration from start) and is either an input (project-defined fields) or an `expect`. `every` and `until` repeat an input. |
+| `events` | yes | Ordered entries. Each has `at` (a duration from start) and is either an input (project-defined fields) or an `expect`. `every` and `until` repeat an input. A `runner: temper` scenario uses the event vocabulary below instead. |
 
 **Conventions worth keeping:**
 - An expectation names the rule or reason that produced the outcome
@@ -418,6 +420,109 @@ record per `covers` reference, plus one for the scenario id itself, each
 carrying `scenario: <id>` (and the scenario's `subject`, if it has one).
 Temper holds that evidence to the declaration: a record naming a scenario
 that does not list its reference is an error (R7).
+
+### Fault scenarios: `runner: temper`
+
+A scenario with `runner: temper` is run by Temper itself, with
+`temper scenarios run`, against the project's Docker Compose topology. Its
+events use the vocabulary below instead of `at`. Every other scenario keeps
+the meaning above: the project's own runner executes it.
+
+```yaml
+- id: river.faults
+  runner: temper
+  name: River clusters under worker and Postgres faults
+  description: Jobs are never lost, and a completed job's effect happens once.
+  covers: [job.never_lost, complete_tx.effect_once]
+  subjects:
+    cluster.go:    {worker-go: 3}
+    cluster.go_js: {worker-go: 2, worker-js: 2}
+  seed: 70
+  events:
+    - up: {postgres: 1}
+    - run: [setup, probe, migrate]
+    - up: {$subject: true, inserter: 1}
+    - chaos: {duration: 150s, every: 2s-6s, faults: [worker_kill, pg_pause]}
+    - down: [inserter]
+    - drain: {remaining: [postgres, psql, -Atc, "SELECT count(*) FROM river_job WHERE state <> 'completed'"],
+              stall: 60s, max: 10m, covers: job.never_lost}
+    - check: {covers: job.never_lost, exec: [postgres, psql, -Atc, "SELECT count(*) FROM lost"]}
+    - check: {covers: complete_tx.effect_once, exec: [postgres, psql, -Atc, "SELECT count(*) FROM dup"]}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `runner` | no | `temper` for a scenario Temper runs. |
+| `compose` | no | The Compose file, relative to the root. Default `compose.yml`. |
+| `seed` | no | Starts every random draw: fault, target and duration. Default 0. |
+| `subjects` | no | Expands the scenario: one run per subject, mapping each to the services and replica counts `up: {$subject: true}` starts. Replaces `subject`. Each key must be a declared subject, and each per-subject reference in `covers` must apply to every one. |
+
+Events run in order. Each list item holds exactly one event.
+
+| Event | Meaning |
+|---|---|
+| `up: {service: n, $subject: true}` | Start services at these replica counts, plus this subject's when `$subject` is true, and wait until each is ready: healthy when it has a health check, otherwise running. |
+| `down: [service, ...]` | Stop these services. |
+| `start: service` / `stop: service` | Start or stop one service. |
+| `exec: [service, cmd, ...]` | Run a command in a running container, in replica `instance: n` (default 1), and require exit 0. `host: [cmd, ...]` runs it on the host. |
+| `run: [service, cmd, ...]` | Run a command in a one-shot container of a service, without starting its dependencies, and require exit 0. |
+| `hold: {name, exec \| run \| host}` | Start a command in the background and keep it running. |
+| `release: name` | Stop a held command. A hold never released stops when the run ends. |
+| `wait_until: {exec \| run \| host, equals \| at_least, timeout}` | Poll a command until its output equals a value, or is an integer of at least a value. Default timeout 60s. |
+| `sleep: 4s` | Wait. |
+| `fault: name` | Inject one named fault now, and wait for it to heal. |
+| `chaos: {duration, every, faults: [...]}` | For `duration`, draw a fault from the list, inject it, wait for it to heal, then wait a drawn `every`. One fault at a time, so a seed replays. The fault in flight finishes after `duration` passes. |
+| `drain: {remaining, stall, max, covers}` | Wait while `remaining` (a command that prints a count) falls, until it prints 0. It fails `covers` when the count stops falling for `stall` (default 60s) or the drain passes `max` (default 10m). |
+| `check: {covers, exec \| run \| host, expect}` | Decide one reference: pass when the command prints `expect` (default 0). |
+| `check: {results: {exec \| run \| host, decides: [...]}}` | Decide many references: the command prints a JSON object from reference to violation count. Each key must match a `decides` entry, which may end in `/*` for every member of a lattice. |
+
+Durations are Go durations (`500ms`, `4s`, `10m`). A range `3s-9s` is drawn
+from the seed.
+
+**Named faults** live in `faults.yml`, under `faults:`, and any scenario may
+use them.
+
+```yaml
+faults:
+  worker_kill: {target: "worker-*", do: kill, then: start, after: 0.5s-2.5s}
+  pg_pause:    {target: postgres, do: pause, for: 2s-8s}
+  pg_terminate:
+    do: exec
+    exec: [postgres, psql, -c, "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name LIKE 'probe-%'"]
+  leader_pause:
+    target_from: {exec: [postgres, psql, -Atc, "SELECT leader_id FROM river_leader"], map: "worker-{value}", chance: 0.5, fallback: "worker-*"}
+    do: pause
+    for: 3s-9s
+```
+
+| Field | Meaning |
+|---|---|
+| `target` | A Compose service, glob allowed. One running instance is drawn, or every one with `all: true`. |
+| `target_from` | A command prints a value, and `map` turns it into an instance name (`<service>-<n>`). It is used with probability `chance` (default 1), otherwise `fallback`. |
+| `do` | `kill`, `stop`, `start`, `restart`, `pause`, `unpause`, `disconnect`, `connect` or `exec`. |
+| `then`, `after` | For `kill` and `stop`: `start` or `restart` the instance after a drawn delay. |
+| `for` | For `pause` and `disconnect`: heal after a drawn duration. Required. |
+| `network` | For `disconnect` and `connect`. |
+| `exec` | For `exec`: `[service, cmd, ...]`. |
+| `covers` | References that fail if the fault cannot heal. |
+
+**Outcomes.** A scenario Temper runs records one outcome per check, not one
+for all of `covers`, and `temper check` requires every reference in
+`covers` to be decided by a check, a `drain`'s `covers` or a `decides` entry.
+
+- A check passes when its output equals `expect`, and fails otherwise. It
+  errors when its command fails or prints something that is not an integer.
+  A `results` check errors for a decided key the JSON leaves out, and for the
+  whole check when the JSON holds a key outside `decides`.
+- A failed setup step (`up`, `exec`, `run`, `hold`, `wait_until`, or any
+  event before the first `fault` or `chaos`) means the scenario could not
+  run: the run of that subject stops, and every reference records `error`.
+- A drain that stalls, or a fault that cannot heal, records `fail` for its
+  `covers`. The checks still run, because they read committed state.
+- The scenario id's own record passes only when every other verdict passed.
+
+Without `TEMPER_LEVEL` and `TEMPER_EVIDENCE`, `temper scenarios run` still
+runs and prints each verdict, but records nothing.
 
 ## 12. Evidence
 

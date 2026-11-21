@@ -219,9 +219,10 @@ type Fault struct {
 // TargetFrom picks a fault's target at run time: a command prints a value,
 // and Map names the instance it means.
 type TargetFrom struct {
-	Exec     []string `yaml:"exec"`
-	Map      string   `yaml:"map"`
-	Chance   float64  `yaml:"chance"`
+	Exec []string `yaml:"exec"`
+	Map  string   `yaml:"map"`
+	// Chance is how often to use the printed target; nil means always.
+	Chance   *float64 `yaml:"chance"`
 	Fallback string   `yaml:"fallback"`
 }
 
