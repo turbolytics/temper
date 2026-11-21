@@ -22,6 +22,9 @@ import (
 // one subject.
 type Verdict struct {
 	Scenario, Subject, Reference, Test, Outcome, Detail string
+	// Exempt marks a proof of the subject's exemption for Reference, written
+	// as an exempts record.
+	Exempt bool
 }
 
 // Options steer a run. Zero values run every subject at the scenario's
@@ -200,8 +203,28 @@ func (r *runner) test(check string) string {
 }
 
 func (r *runner) verdict(ref, check, outcome, detail string) {
-	r.verdicts = append(r.verdicts, Verdict{Scenario: r.sc.ID, Subject: r.subject, Reference: ref, Test: r.test(check), Outcome: outcome, Detail: detail})
-	r.logf("verdict %s %s: %s %s", ref, outcome, check, detail)
+	r.verdictAs(ref, check, outcome, detail, false)
+}
+
+// verdictAs records a verdict; exempt makes it a proof of an exemption.
+func (r *runner) verdictAs(ref, check, outcome, detail string, exempt bool) {
+	r.verdicts = append(r.verdicts, Verdict{Scenario: r.sc.ID, Subject: r.subject, Reference: ref, Test: r.test(check), Outcome: outcome, Detail: detail, Exempt: exempt})
+	kind := "verdict"
+	if exempt {
+		kind = "exemption proof"
+	}
+	r.logf("%s %s %s: %s %s", kind, ref, outcome, check, detail)
+}
+
+// declaresExemption reports whether this run's subject declares an
+// exemption for ref.
+func (r *runner) declaresExemption(ref string) bool {
+	subj, ok := r.p.Subject(r.subject)
+	if !ok {
+		return false
+	}
+	_, declared := subj.ProvenBy(ref)
+	return declared
 }
 
 func (r *runner) covered(ref string) bool {
@@ -504,35 +527,49 @@ func (r *runner) check(c *Check) {
 		r.results(c, out, err)
 		return
 	}
+	ref, exempt := c.Covers, false
+	if c.Exempts != "" {
+		ref, exempt = c.Exempts, true
+	}
 	switch n, perr := strconv.Atoi(strings.TrimSpace(out)); {
 	case err != nil:
-		r.verdict(c.Covers, c.Covers, temper.OutcomeError, err.Error())
+		r.verdictAs(ref, ref, temper.OutcomeError, err.Error(), exempt)
 	case perr != nil:
-		r.verdict(c.Covers, c.Covers, temper.OutcomeError, fmt.Sprintf("printed %q, not a count", out))
+		r.verdictAs(ref, ref, temper.OutcomeError, fmt.Sprintf("printed %q, not a count", out), exempt)
 	case n == c.Expect:
-		r.logf("check %s: printed %d, pass", c.Covers, n)
-		r.verdict(c.Covers, c.Covers, temper.OutcomePass, "")
+		r.logf("check %s: printed %d, pass", ref, n)
+		r.verdictAs(ref, ref, temper.OutcomePass, "", exempt)
 	default:
-		r.logf("check %s: printed %d, expected %d, fail", c.Covers, n, c.Expect)
-		r.verdict(c.Covers, c.Covers, temper.OutcomeFail, fmt.Sprintf("printed %d, expected %d", n, c.Expect))
+		r.logf("check %s: printed %d, expected %d, fail", ref, n, c.Expect)
+		r.verdictAs(ref, ref, temper.OutcomeFail, fmt.Sprintf("printed %d, expected %d", n, c.Expect), exempt)
 	}
 }
 
-// results decides every covered reference a results check's decides
-// entries match, from the JSON object the command printed.
+// results decides every covered reference a results check's decides or
+// exempts entries match, from the JSON object the command printed. A key an
+// exempts entry matches proves an exemption where the subject declares one;
+// otherwise it decides the claim.
 func (r *runner) results(c *Check, out string, err error) {
-	var refs []string
-	for _, ref := range r.sc.Covers {
-		for _, d := range c.Decides {
-			if Matches(d, ref) {
-				refs = append(refs, ref)
-				break
+	patterns := append(append([]string(nil), c.Decides...), c.ExemptPatterns...)
+	matchesAny := func(list []string, ref string) bool {
+		for _, p := range list {
+			if Matches(p, ref) {
+				return true
 			}
+		}
+		return false
+	}
+	var refs []string
+	exempt := map[string]bool{}
+	for _, ref := range r.sc.Covers {
+		if matchesAny(patterns, ref) {
+			refs = append(refs, ref)
+			exempt[ref] = matchesAny(c.ExemptPatterns, ref) && r.declaresExemption(ref)
 		}
 	}
 	all := func(why string) {
 		for _, ref := range refs {
-			r.verdict(ref, ref, temper.OutcomeError, why)
+			r.verdictAs(ref, ref, temper.OutcomeError, why, exempt[ref])
 		}
 	}
 	if err != nil {
@@ -554,11 +591,7 @@ func (r *runner) results(c *Check, out string, err error) {
 			all(fmt.Sprintf("%s is %s, not a count", k, v))
 			return
 		}
-		ok := false
-		for _, d := range c.Decides {
-			ok = ok || Matches(d, k)
-		}
-		if !ok || !r.covered(k) {
+		if !matchesAny(patterns, k) || !r.covered(k) {
 			all(fmt.Sprintf("printed %s, which the check does not decide", k))
 			return
 		}
@@ -568,11 +601,11 @@ func (r *runner) results(c *Check, out string, err error) {
 		n, ok := counts[ref]
 		switch {
 		case !ok:
-			r.verdict(ref, ref, temper.OutcomeError, "the results leave it out")
+			r.verdictAs(ref, ref, temper.OutcomeError, "the results leave it out", exempt[ref])
 		case n == 0:
-			r.verdict(ref, ref, temper.OutcomePass, "")
+			r.verdictAs(ref, ref, temper.OutcomePass, "", exempt[ref])
 		default:
-			r.verdict(ref, ref, temper.OutcomeFail, fmt.Sprintf("%d violations", n))
+			r.verdictAs(ref, ref, temper.OutcomeFail, fmt.Sprintf("%d violations", n), exempt[ref])
 		}
 	}
 }

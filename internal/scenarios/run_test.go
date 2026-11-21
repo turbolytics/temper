@@ -648,3 +648,58 @@ func TestRelease_FailedReleaseCommandStillStopsTheHold(t *testing.T) {
 		t.Errorf("the hold was never stopped: %v", f.Calls())
 	}
 }
+
+// exemptProject has subject cluster.go answering lattice l: a supported, b
+// unsupported, proven by s.faults's test for it.
+func exemptProject() *model.Project {
+	p := testProject()
+	p.Subjects = []model.Subject{{ID: "cluster.go", Kind: "cluster", Answers: map[string]map[string]model.Answer{
+		"l": {"a": {Supported: true}, "b": {Reason: "r", ProvenBy: "s.faults/cluster.go/l/b"}},
+	}}}
+	return p
+}
+
+func exemptOutcomes(vs []Verdict) map[string]string {
+	out := map[string]string{}
+	for _, v := range vs {
+		k := v.Reference
+		if v.Exempt {
+			k = "exempts " + k
+		}
+		out[k] = v.Outcome
+	}
+	return out
+}
+
+func TestRun_ExemptsCheckPasses(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := newFake()
+	f.outputs["host: refuses b"] = []string{"0"}
+	vs := run(t, f, exemptProject(), temperScenario(t, []string{"l/b"}, "- check: {exempts: l/b, host: [refuses, b]}\n"), Options{})
+	if got := exemptOutcomes(vs); !reflect.DeepEqual(got, map[string]string{"exempts l/b": "pass", "s.faults": "pass"}) {
+		t.Errorf("outcomes = %v", got)
+	}
+	if vs[0].Test != "s.faults/cluster.go/l/b" {
+		t.Errorf("test = %s", vs[0].Test)
+	}
+}
+
+func TestRun_ExemptsCheckFails(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := newFake()
+	f.outputs["host: refuses b"] = []string{"1"}
+	vs := run(t, f, exemptProject(), temperScenario(t, []string{"l/b"}, "- check: {exempts: l/b, host: [refuses, b]}\n"), Options{})
+	if got := exemptOutcomes(vs); !reflect.DeepEqual(got, map[string]string{"exempts l/b": "fail", "s.faults": "fail"}) {
+		t.Errorf("outcomes = %v", got)
+	}
+}
+
+func TestRun_ResultsChooseCoversOrExempts(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := newFake()
+	f.outputs["host: cat r"] = []string{`{"l/a": 0, "l/b": 0}`}
+	vs := run(t, f, exemptProject(), temperScenario(t, []string{"l/a", "l/b"}, "- check: {results: {host: [cat, r], decides: [l/*], exempts: [l/*]}}\n"), Options{})
+	if got := exemptOutcomes(vs); !reflect.DeepEqual(got, map[string]string{"l/a": "pass", "exempts l/b": "pass", "s.faults": "pass"}) {
+		t.Errorf("outcomes = %v", got)
+	}
+}

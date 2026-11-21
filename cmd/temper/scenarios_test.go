@@ -381,3 +381,42 @@ func TestScenariosRun_BuildFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestScenariosRun_ExemptionShowsExempt(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	useFakeEngine(t)
+	root := scenarioProject(t)
+	edit(t, root, "temper/invariants.yml", func(s string) string {
+		return s + "  - id: job.runs_once\n    claim: A job runs once.\n    applies_to: cluster\n    requires: [integration]\n"
+	})
+	for _, subj := range []string{"cluster.go", "cluster.go_js"} {
+		edit(t, root, "temper/subjects/"+subj+".yml", func(s string) string {
+			return s + "exempt:\n  - invariant: job.runs_once\n    reason: at least once by design\n    proven_by: river.faults/" + subj + "/job.runs_once\n"
+		})
+	}
+	edit(t, root, "temper/scenarios/river.yml", func(s string) string {
+		s = strings.Replace(s, "covers: [job.never_lost, queue.delivery]", "covers: [job.never_lost, queue.delivery, job.runs_once]", 1)
+		return s + "    - check: {exempts: job.runs_once, exec: [postgres, psql, runs_twice_allowed]}\n"
+	})
+	ev := filepath.Join(root, ".temper", "evidence")
+	t.Setenv("TEMPER_LEVEL", "integration")
+	t.Setenv("TEMPER_EVIDENCE", ev)
+	if code, out, errOut := cli(t, "--root", root, "scenarios", "run"); code != 0 {
+		t.Fatalf("scenarios run = %d\n%s\n%s", code, out, errOut)
+	}
+	exempts := 0
+	for _, r := range readRecords(t, ev) {
+		if r.Exempts == "job.runs_once" && r.Covers == "" {
+			exempts++
+		}
+	}
+	if exempts != 2 {
+		t.Fatalf("exempts records = %d, want one per subject", exempts)
+	}
+	t.Setenv("TEMPER_LEVEL", "")
+	t.Setenv("TEMPER_EVIDENCE", "")
+	code, out, errOut := cli(t, "--root", root, "matrix", "--json", "--all-levels")
+	if code != 0 || !strings.Contains(out, `"status": "exempt"`) && !strings.Contains(out, `"status":"exempt"`) {
+		t.Fatalf("matrix = %d, no exempt cell\n%s\n%s", code, out, errOut)
+	}
+}
