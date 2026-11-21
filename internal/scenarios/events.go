@@ -218,12 +218,23 @@ func (ps parser) parseEvent(m map[string]any) (Event, error) {
 
 // fields reads v as a mapping holding only the allowed keys.
 func (ps parser) fields(v any, what string, allowed ...string) (map[string]any, error) {
+	return ps.mapping(v, what, false, allowed)
+}
+
+// cmdFields is fields for a mapping that holds a command, so it may also
+// hold one named command.
+func (ps parser) cmdFields(v any, what string, allowed ...string) (map[string]any, error) {
+	return ps.mapping(v, what, true, allowed)
+}
+
+func (ps parser) mapping(v any, what string, named bool, allowed []string) (map[string]any, error) {
 	m, ok := v.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("%s needs a mapping", what)
 	}
 	for k := range m {
 		_, found := ps.cmds[k]
+		found = found && named
 		for _, a := range allowed {
 			found = found || a == k
 		}
@@ -335,7 +346,7 @@ func (ps parser) parseCommand(m map[string]any, what string) (Command, error) {
 }
 
 func (ps parser) parseHold(v any) (*Command, string, *Command, error) {
-	m, err := ps.fields(v, "hold", "name", "exec", "run", "host", "instance", "release")
+	m, err := ps.cmdFields(v, "hold", "name", "exec", "run", "host", "instance", "release")
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -345,9 +356,9 @@ func (ps parser) parseHold(v any) (*Command, string, *Command, error) {
 	}
 	var release *Command
 	if r, ok := m["release"]; ok {
-		rm, ok := r.(map[string]any)
-		if !ok {
-			return nil, "", nil, errors.New("hold release needs a command: {exec: [...]} or {name: arguments}")
+		rm, err := ps.cmdFields(r, "hold release", "exec", "run", "host", "instance")
+		if err != nil {
+			return nil, "", nil, err
 		}
 		rc, err := ps.parseCommand(rm, "hold release")
 		if err != nil {
@@ -366,7 +377,7 @@ func (ps parser) parseHold(v any) (*Command, string, *Command, error) {
 }
 
 func (ps parser) parseUntil(v any) (*Until, error) {
-	m, err := ps.fields(v, "wait_until", "exec", "run", "host", "instance", "equals", "at_least", "timeout")
+	m, err := ps.cmdFields(v, "wait_until", "exec", "run", "host", "instance", "equals", "at_least", "timeout")
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +440,10 @@ func (ps parser) parseDrain(v any) (*Drain, error) {
 	case []any:
 		d.Remaining, err = ps.parseCommand(map[string]any{"exec": r}, "drain remaining")
 	case map[string]any:
-		d.Remaining, err = ps.parseCommand(r, "drain remaining")
+		var rm map[string]any
+		if rm, err = ps.cmdFields(r, "drain remaining", "exec", "run", "host", "instance"); err == nil {
+			d.Remaining, err = ps.parseCommand(rm, "drain remaining")
+		}
 	default:
 		err = errors.New("drain needs remaining, a command that prints a count")
 	}
@@ -460,7 +474,7 @@ func (ps parser) parseDrain(v any) (*Drain, error) {
 }
 
 func (ps parser) parseCheck(v any) (*Check, error) {
-	m, err := ps.fields(v, "check", "covers", "exec", "run", "host", "instance", "expect", "results")
+	m, err := ps.cmdFields(v, "check", "covers", "exec", "run", "host", "instance", "expect", "results")
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +482,7 @@ func (ps parser) parseCheck(v any) (*Check, error) {
 		if len(m) != 1 {
 			return nil, errors.New("check: results stands alone")
 		}
-		rm, err := ps.fields(r, "check results", "exec", "run", "host", "instance", "decides")
+		rm, err := ps.cmdFields(r, "check results", "exec", "run", "host", "instance", "decides")
 		if err != nil {
 			return nil, err
 		}

@@ -632,3 +632,19 @@ func TestRun_SubjectPlaceholder(t *testing.T) {
 		}
 	}
 }
+
+func TestRelease_FailedReleaseCommandStillStopsTheHold(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.faults_heal", temper.Subject("cli"))
+	f := newFake()
+	f.fail["exec postgres: psql end"] = errors.New("exit status 2")
+	vs := run(t, f, testProject(), temperScenario(t, []string{"job.never_lost"}, `
+- hold: {name: lock_a, exec: [postgres, psql, lock], release: {exec: [postgres, psql, end]}}
+- release: lock_a
+- check: {covers: job.never_lost, host: [echo, "0"]}
+`), Options{})
+	wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "error"})
+	if !strings.Contains(strings.Join(f.Calls(), "\n"), "release lock_a") {
+		t.Errorf("the hold was never stopped: %v", f.Calls())
+	}
+}

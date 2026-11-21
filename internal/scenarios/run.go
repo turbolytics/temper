@@ -599,7 +599,8 @@ func (r *runner) releaseHold(name string, h hold) error {
 		return h.h.Stop()
 	}
 	if _, err := r.do(*h.release); err != nil {
-		return fmt.Errorf("release command: %w", err)
+		// The hold must still end; nothing else will end it.
+		return errors.Join(fmt.Errorf("release command: %w", err), h.h.Stop())
 	}
 	return h.h.Await(releaseGrace)
 }

@@ -221,3 +221,17 @@ func TestResolveUse(t *testing.T) {
 		t.Error("an undeclared name resolved")
 	}
 }
+
+func TestParse_NamedKeysOnlyWhereACommandGoes(t *testing.T) {
+	temper.Covers(t, "recipes.names_mean_one_thing", temper.Subject("cli"))
+	for src, want := range map[string]string{
+		`- drain: {remaining: [postgres, psql, x], sql: "SELECT 1"}`:            "unknown field sql",
+		`- drain: {remaining: {sql: "SELECT 1", timeout: 5s}}`:                  "unknown field timeout",
+		`- hold: {name: a, exec: [p, q], release: {exec: [p, r], timeout: 5s}}`: "unknown field timeout",
+		`- chaos: {duration: 1s, every: 1s, faults: [x], sql: "SELECT 1"}`:      "unknown field sql",
+	} {
+		if _, err := parseNamed(t, src); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: error %v, want %q", src, err, want)
+		}
+	}
+}

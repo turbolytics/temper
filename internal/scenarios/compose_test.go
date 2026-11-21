@@ -3,6 +3,7 @@ package scenarios
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
@@ -189,5 +190,26 @@ func TestCompose_BuildCommandLine(t *testing.T) {
 	}
 	if !reflect.DeepEqual(r.lines, []string{"docker compose -f compose.yml -p p build"}) {
 		t.Errorf("lines = %v", r.lines)
+	}
+}
+
+func TestHeld_AwaitTimeoutRunsTheStopCommand(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	r := &recorder{}
+	h := &held{name: "lock_a", proc: exec.Command("sleep", "30"), out: &lockedBuffer{}, finished: make(chan struct{}),
+		stop: []string{"docker", "compose", "exec", "-T", "postgres", "sh", "-c", "kill -TERM $(cat /tmp/temper-hold-lock_a.pid)"},
+		c:    NewCompose("compose.yml", "p", time.Second, r.run).(*compose)}
+	if err := h.proc.Start(); err != nil {
+		t.Fatal(err)
+	}
+	go func() { h.waitErr = h.proc.Wait(); close(h.finished) }()
+	if err := h.Await(100 * time.Millisecond); err == nil {
+		t.Fatal("Await of a hold that did not end returned nil")
+	}
+	if len(r.lines) != 1 || !strings.Contains(r.lines[0], "kill -TERM $(cat /tmp/temper-hold-lock_a.pid)") {
+		t.Errorf("the in-container process was not ended: %v", r.lines)
+	}
+	if !h.Exited() {
+		t.Error("the local client is still running")
 	}
 }

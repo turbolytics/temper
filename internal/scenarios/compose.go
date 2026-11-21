@@ -313,6 +313,11 @@ func (h *held) Await(d time.Duration) error {
 	case <-h.finished:
 		return nil
 	case <-time.After(d):
+		// Ending the local client does not end what it started in a
+		// container: run the hold's own stop command first, as Stop does.
+		if h.stop != nil {
+			_, _, _ = h.c.run(context.Background(), h.stop[0], h.stop[1:]...)
+		}
 		_ = h.proc.Process.Kill()
 		<-h.finished
 		return fmt.Errorf("hold %s was still running %s after its release command; killed it", h.name, d)
