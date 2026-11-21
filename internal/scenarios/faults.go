@@ -66,7 +66,7 @@ func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, 
 	}
 	roll, pick := d.rng.Float64(), d.rng.Int63()
 	if f.Do == "exec" {
-		c := Command{Service: f.Exec[0], Args: f.Exec[1:]}
+		c := Command{Service: f.Exec.List[0], Args: f.Exec.List[1:]}
 		in.Target = c.String()
 		logf("fault %s: %s", name, c)
 		_, err := Do(ctx, e, c)
@@ -119,7 +119,7 @@ func pickTargets(ctx context.Context, e Engine, roll float64, pick int64, f mode
 			chance = *t.Chance
 		}
 		if roll < chance {
-			value, err := Do(ctx, e, Command{Service: t.Exec[0], Args: t.Exec[1:]})
+			value, err := Do(ctx, e, Command{Service: t.Exec.List[0], Args: t.Exec.List[1:]})
 			if err != nil {
 				logf("target_from failed, using %s: %v", t.Fallback, err)
 			} else if value = strings.TrimSpace(value); value != "" {

@@ -505,7 +505,7 @@ func TestRun_LiveAnswersDoNotShiftTheSeed(t *testing.T) {
 	temper.Covers(t, "scenarios.seed_replays", temper.Subject("cli"))
 	p := testProject()
 	p.Faults["leader_pause"] = model.Fault{
-		TargetFrom: &model.TargetFrom{Exec: []string{"postgres", "psql", "leader"}, Map: "worker-{value}", Fallback: "worker-*"},
+		TargetFrom: &model.TargetFrom{Exec: model.CommandUse{List: []string{"postgres", "psql", "leader"}}, Map: "worker-{value}", Fallback: "worker-*"},
 		Do:         "pause", For: "1s-3s",
 	}
 	sc := temperScenario(t, []string{"job.never_lost"}, `

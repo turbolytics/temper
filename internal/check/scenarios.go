@@ -173,7 +173,7 @@ func checkFaults(p *model.Project) diag.List {
 		case !faultActions[f.Do]:
 			add(fmt.Sprintf("does %s, which is not an action (kill, stop, start, restart, pause, unpause, disconnect, connect, exec)", f.Do))
 			continue
-		case f.Do == "exec" && len(f.Exec) < 2:
+		case f.Do == "exec" && len(f.Exec.List) < 2 && f.Exec.Name == "":
 			add("does exec but names no exec command: [service, command, ...]")
 		case f.Do != "exec" && f.Target == "" && f.TargetFrom == nil:
 			add("names no target or target_from")
@@ -196,7 +196,7 @@ func checkFaults(p *model.Project) diag.List {
 			add(fmt.Sprintf("then %s, which is not start or restart", f.Then))
 		}
 		if t := f.TargetFrom; t != nil {
-			if len(t.Exec) < 2 {
+			if len(t.Exec.List) < 2 && t.Exec.Name == "" {
 				add("target_from needs exec: [service, command, ...]")
 			}
 			if !strings.Contains(t.Map, "{value}") {

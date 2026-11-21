@@ -115,6 +115,14 @@ func Load(root string) (*model.Project, diag.List) {
 	if p.Faults == nil {
 		p.Faults = map[string]model.Fault{}
 	}
+	var commands struct {
+		Commands map[string]model.Command `yaml:"commands"`
+	}
+	l.decode(path.Join(dir, "commands.yml"), &commands)
+	p.Commands = commands.Commands
+	if p.Commands == nil {
+		p.Commands = map[string]model.Command{}
+	}
 	return p, l.errs
 }
 

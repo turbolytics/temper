@@ -347,7 +347,7 @@ func TestLoad_FaultsAndRunnerFields(t *testing.T) {
 	want := map[string]model.Fault{
 		"worker_pause": {Target: "worker-*", Do: "pause", For: "3s-9s"},
 		"leader_pause": {
-			TargetFrom: &model.TargetFrom{Exec: []string{"postgres", "psql", "-Atc", "SELECT leader_id FROM river_leader"}, Map: "worker-{value}", Chance: &half, Fallback: "worker-*"},
+			TargetFrom: &model.TargetFrom{Exec: model.CommandUse{List: []string{"postgres", "psql", "-Atc", "SELECT leader_id FROM river_leader"}}, Map: "worker-{value}", Chance: &half, Fallback: "worker-*"},
 			Do:         "pause", For: "3s-9s", Covers: []string{"job.never_lost"},
 		},
 	}
@@ -380,5 +380,60 @@ func TestLoad_NoFaultsFileIsEmpty(t *testing.T) {
 	p, errs := Load(writeProject(t, map[string]string{"temper.yml": minimalConfig}))
 	if len(errs) != 0 || p.Faults == nil || len(p.Faults) != 0 {
 		t.Fatalf("faults = %v, errors = %v", p.Faults, errs)
+	}
+}
+
+func TestLoad_CommandsAndPacks(t *testing.T) {
+	temper.Covers(t, "declarations.recipe_packs")
+	root := writeProject(t, map[string]string{
+		"temper.yml":          minimalConfig + "packs:\n  - pack: postgres\n    with: {db: river}\n  - pack: service\n    as: worker\n    with: {target: \"worker-*\"}\n",
+		"temper/commands.yml": "commands:\n  sql: {doc: d, exec: [postgres, psql, -Atc]}\n  migrate: {run: [tool, rivercheck, migrate]}\n",
+	})
+	p, errs := Load(root)
+	if len(errs) != 0 {
+		t.Fatalf("errors: %v", errs)
+	}
+	want := []model.PackRef{{Pack: "postgres", With: map[string]string{"db": "river"}}, {Pack: "service", As: "worker", With: map[string]string{"target": "worker-*"}}}
+	if !reflect.DeepEqual(p.Config.Packs, want) {
+		t.Errorf("packs = %+v", p.Config.Packs)
+	}
+	if got := p.Commands["sql"]; got.Doc != "d" || !reflect.DeepEqual(got.Exec, []string{"postgres", "psql", "-Atc"}) {
+		t.Errorf("sql = %+v", got)
+	}
+	if got := p.Commands["migrate"]; !reflect.DeepEqual(got.Run, []string{"tool", "rivercheck", "migrate"}) {
+		t.Errorf("migrate = %+v", got)
+	}
+}
+
+func TestLoad_FaultExecForms(t *testing.T) {
+	temper.Covers(t, "declarations.recipe_packs")
+	root := writeProject(t, map[string]string{
+		"temper.yml": minimalConfig,
+		"temper/faults.yml": `faults:
+  listed: {do: exec, exec: [pg, psql, -c, x]}
+  named: {do: exec, exec: {postgres.statement: "SELECT 1"}}
+  many: {do: exec, exec: {end_session: [a, b]}}
+  dynamic: {do: pause, for: 1s, target_from: {exec: {sql: "SELECT id"}, map: "w-{value}"}}
+`,
+	})
+	p, errs := Load(root)
+	if len(errs) != 0 {
+		t.Fatalf("errors: %v", errs)
+	}
+	for name, want := range map[string]model.CommandUse{
+		"listed": {List: []string{"pg", "psql", "-c", "x"}},
+		"named":  {Name: "postgres.statement", Args: []string{"SELECT 1"}},
+		"many":   {Name: "end_session", Args: []string{"a", "b"}},
+	} {
+		if got := p.Faults[name].Exec; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s exec = %+v, want %+v", name, got, want)
+		}
+	}
+	if got := p.Faults["dynamic"].TargetFrom.Exec; !reflect.DeepEqual(got, model.CommandUse{Name: "sql", Args: []string{"SELECT id"}}) {
+		t.Errorf("target_from exec = %+v", got)
+	}
+	_, errs = Load(writeProject(t, map[string]string{"temper.yml": minimalConfig, "temper/faults.yml": "faults:\n  bad: {do: exec, exec: {a: x, b: y}}\n"}))
+	if len(errs) != 1 || !strings.Contains(errs[0].Message, "one command") {
+		t.Errorf("two names in one exec: errors = %v", errs)
 	}
 }

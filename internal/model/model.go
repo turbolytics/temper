@@ -23,6 +23,61 @@ type Config struct {
 	Evidence string  `yaml:"evidence"`
 	Dir      string  `yaml:"dir"`
 	Matrix   string  `yaml:"matrix"`
+	// Packs are the built-in recipe packs the project includes (§6).
+	Packs []PackRef `yaml:"packs"`
+}
+
+// PackRef includes one recipe pack. Its names are used as <As>.<name>; As
+// defaults to the pack's name.
+type PackRef struct {
+	Pack string            `yaml:"pack"`
+	As   string            `yaml:"as"`
+	With map[string]string `yaml:"with"`
+}
+
+// Command is a named command: exactly one of Exec ([service, cmd, ...] in a
+// running container), Run ([service, cmd, ...] in a one-shot container) or
+// Host ([cmd, ...]).
+type Command struct {
+	Doc  string   `yaml:"doc"`
+	Exec []string `yaml:"exec"`
+	Run  []string `yaml:"run"`
+	Host []string `yaml:"host"`
+}
+
+// CommandUse is a command written in a fault: a list ([service, cmd, ...],
+// run with exec), or a named command with its arguments ({name: args}).
+type CommandUse struct {
+	List []string
+	Name string
+	Args []string
+}
+
+// IsZero reports whether no command is written.
+func (u CommandUse) IsZero() bool { return len(u.List) == 0 && u.Name == "" }
+
+// UnmarshalYAML reads either form.
+func (u *CommandUse) UnmarshalYAML(n *yaml.Node) error {
+	switch n.Kind {
+	case yaml.SequenceNode:
+		return n.Decode(&u.List)
+	case yaml.MappingNode:
+		if len(n.Content) != 2 {
+			return fmt.Errorf("line %d: a command use names one command, as {name: arguments}", n.Line)
+		}
+		u.Name = n.Content[0].Value
+		v := n.Content[1]
+		switch v.Kind {
+		case yaml.ScalarNode:
+			u.Args = []string{v.Value}
+		case yaml.SequenceNode:
+			return v.Decode(&u.Args)
+		default:
+			return fmt.Errorf("line %d: %s's arguments are a string or a list", v.Line, u.Name)
+		}
+		return nil
+	}
+	return fmt.Errorf("line %d: a command is a list or {name: arguments}", n.Line)
 }
 
 // LevelNames returns the level names in matrix-column order.
@@ -209,7 +264,7 @@ type Fault struct {
 	Then       string      `yaml:"then"`
 	After      string      `yaml:"after"`
 	For        string      `yaml:"for"`
-	Exec       []string    `yaml:"exec"`
+	Exec       CommandUse  `yaml:"exec"`
 	Network    string      `yaml:"network"`
 	All        bool        `yaml:"all"`
 	// Covers lists the references that fail when the fault cannot heal.
@@ -219,8 +274,8 @@ type Fault struct {
 // TargetFrom picks a fault's target at run time: a command prints a value,
 // and Map names the instance it means.
 type TargetFrom struct {
-	Exec []string `yaml:"exec"`
-	Map  string   `yaml:"map"`
+	Exec CommandUse `yaml:"exec"`
+	Map  string     `yaml:"map"`
 	// Chance is how often to use the printed target; nil means always.
 	Chance   *float64 `yaml:"chance"`
 	Fallback string   `yaml:"fallback"`
@@ -235,8 +290,10 @@ type Project struct {
 	Lattices   []Lattice
 	Subjects   []Subject
 	Scenarios  []Scenario
-	// Faults are the named faults from faults.yml.
+	// Faults are the named faults from faults.yml and the included packs.
 	Faults map[string]Fault
+	// Commands are the named commands from commands.yml and the included packs.
+	Commands map[string]Command
 }
 
 // ConfigFile is temper.yml, relative to the root.

@@ -95,7 +95,7 @@ func TestFault_TargetFromUsesMappedInstance(t *testing.T) {
 		f := fakeWith(map[string][]string{"worker-go": {"worker-go-1", "worker-go-2", "worker-go-3"}})
 		f.outputs["exec postgres: psql -Atc SELECT leader_id"] = []string{"go-2"}
 		in, err := Inject(context.Background(), f, NewDraw(3), "leader_pause", model.Fault{
-			TargetFrom: &model.TargetFrom{Exec: []string{"postgres", "psql", "-Atc", "SELECT leader_id"}, Map: "worker-{value}", Chance: c.chance, Fallback: "worker-*"},
+			TargetFrom: &model.TargetFrom{Exec: model.CommandUse{List: []string{"postgres", "psql", "-Atc", "SELECT leader_id"}}, Map: "worker-{value}", Chance: c.chance, Fallback: "worker-*"},
 			Do:         "pause", For: "1s",
 		}, t.Logf)
 		if err != nil || in == nil {
@@ -150,7 +150,7 @@ func TestFault_ExecAndRestartHaveNothingToHeal(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
 	f := fakeWith(map[string][]string{"postgres": {"postgres-1"}})
 	for name, flt := range map[string]model.Fault{
-		"pg_terminate": {Do: "exec", Exec: []string{"postgres", "psql", "-c", "SELECT 1"}},
+		"pg_terminate": {Do: "exec", Exec: model.CommandUse{List: []string{"postgres", "psql", "-c", "SELECT 1"}}},
 		"pg_restart":   {Target: "postgres", Do: "restart"},
 		"worker_kill":  {Target: "postgres", Do: "kill"},
 	} {

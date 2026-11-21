@@ -184,8 +184,8 @@ func TestScenarios_UnknownFaultActionIsReported(t *testing.T) {
 		"bad_range":  {model.Fault{Target: "a", Do: "pause", For: "9s-3s"}, "for"},
 		"bad_then":   {model.Fault{Target: "a", Do: "kill", Then: "explode"}, "then explode"},
 		"no_net":     {model.Fault{Target: "a", Do: "disconnect", For: "1s"}, "names no network"},
-		"bad_map":    {model.Fault{TargetFrom: &model.TargetFrom{Exec: []string{"pg", "x"}, Map: "worker"}, Do: "kill"}, "map"},
-		"bad_chance": {model.Fault{TargetFrom: &model.TargetFrom{Exec: []string{"pg", "x"}, Map: "w-{value}", Chance: &two}, Do: "kill"}, "chance"},
+		"bad_map":    {model.Fault{TargetFrom: &model.TargetFrom{Exec: model.CommandUse{List: []string{"pg", "x"}}, Map: "worker"}, Do: "kill"}, "map"},
+		"bad_chance": {model.Fault{TargetFrom: &model.TargetFrom{Exec: model.CommandUse{List: []string{"pg", "x"}}, Map: "w-{value}", Chance: &two}, Do: "kill"}, "chance"},
 	} {
 		p := project(ok)
 		p.Faults[name] = c.f

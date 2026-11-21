@@ -194,3 +194,12 @@ invariants:
     class: safety
     family: honesty
     requires: [unit, integration]
+
+  - id: recipes.names_mean_one_thing
+    claim: >
+      A command or fault name in a scenario resolves to exactly one
+      definition; a pack never overrides or shadows a project definition.
+    applies_to: cli
+    class: safety
+    family: honesty
+    requires: [unit]
