@@ -1,0 +1,7 @@
+temper: "0.1"
+project: counter
+levels:
+  - name: unit
+    description: none
+  - name: integration
+    description: temper scenarios run against Docker Compose

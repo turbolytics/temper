@@ -1,0 +1,25 @@
+invariants:
+  - id: counter.keeps_counting
+    claim: After pauses and kills, the count still grows.
+    applies_to: counter
+    requires: [integration]
+  - id: counter.never_negative
+    claim: The count is never negative.
+    applies_to: counter
+    requires: [integration]
+  - id: counter.never_skips
+    claim: Deliberately undecidable; its check expects -1, so it always fails.
+    applies_to: counter
+    requires: [integration]
+  - id: http.never_loses_acked
+    claim: Every increment the server acknowledged is in the count.
+    applies_to: http_counter
+    requires: [integration]
+  - id: http.counts_once
+    claim: No increment is counted twice; 1000 increments never count more than 1000.
+    applies_to: http_counter
+    requires: [integration]
+  - id: http.answers_every_request
+    claim: A pause delays requests but never drops them; all 1000 are acknowledged.
+    applies_to: http_counter
+    requires: [integration]

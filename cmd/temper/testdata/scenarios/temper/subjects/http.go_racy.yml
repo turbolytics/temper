@@ -1,0 +1,3 @@
+id: http.go_racy
+kind: http_counter
+feature: http.counter

@@ -1,0 +1,4 @@
+faults:
+  counter_pause: {target: counter, do: pause, for: 300ms-800ms}
+  counter_kill: {target: counter, do: kill, then: start, after: 200ms-500ms}
+  http_pause: {target: "http*", do: pause, for: 300ms-700ms}

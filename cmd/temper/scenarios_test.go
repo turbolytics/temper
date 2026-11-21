@@ -94,9 +94,12 @@ func (f *cliEngine) Background(ctx context.Context, name string, c scenarios.Com
 func (f *cliEngine) Teardown(ctx context.Context) error { return f.rec("down -v") }
 
 // useFakeEngine makes temper scenarios run use a fake engine, and returns
-// it.
+// it. It clears the runner's environment, because these tests themselves run
+// under temper run: a test that wants evidence sets its own.
 func useFakeEngine(t *testing.T) *cliEngine {
 	t.Helper()
+	t.Setenv("TEMPER_LEVEL", "")
+	t.Setenv("TEMPER_EVIDENCE", "")
 	f := &cliEngine{running: map[string][]string{}}
 	old := newEngine
 	newEngine = func(file, project string) scenarios.Engine {

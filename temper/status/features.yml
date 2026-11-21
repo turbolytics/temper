@@ -9,6 +9,7 @@ cli.matrix_check: {unit: covered, integration: covered}
 cli.matrix_json: {unit: not_required, integration: covered}
 cli.render: {unit: covered, integration: not_required}
 cli.run: {unit: covered, integration: covered}
+cli.scenarios_run: {unit: covered, integration: covered}
 cli.version: {unit: covered, integration: covered}
 declarations.extension_fields: {unit: covered, integration: not_required}
 declarations.load: {unit: covered, integration: not_required}
