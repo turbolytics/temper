@@ -213,9 +213,14 @@ temper/features.yml: cart.checkout is missing at unit
 summary: 1 covered, 0 exempt, 0 failing, 1 missing, 0 unenforced
 ```
 
-`temper matrix` exits with code 1 and writes `MATRIX.md`:
+`temper matrix` exits with code 1 and writes `MATRIX.md`. It opens with what
+needs attention, then lists every feature:
 
-| Feature | What it does | unit |
+| Status | Kind | Item | Subject | Level | Note |
+| --- | --- | --- | --- | --- | --- |
+| ⬜ missing | feature | `cart.checkout` |  | `unit` |  |
+
+| Feature | What it does | `unit` |
 | --- | --- | --- |
 | `cart.total` | Totals a cart, applying the best discount. | ✅ |
 | `cart.checkout` | Charges the card and empties the cart. | ⬜ |
@@ -564,11 +569,11 @@ passing test at one of the listed levels.
   requires_any: [unit, integration]
 ```
 
-| Invariant | Subject | unit | integration |
-| --- | --- | --- | --- |
-| `store.restock.adds_exactly` | `store.file` | — | ✅ |
-| `store.restock.adds_exactly` | `store.memory` | ✅ | — |
+| Invariant | Family | Levels | `file` | `memory` |
+| --- | --- | --- | --- | --- |
+| `store.restock.adds_exactly` | correctness | any of `unit`, `integration` | — ✅ | ✅ — |
 
+Each cell shows one mark per level, in the order the Levels column lists.
 When one level proves the claim, the other levels show —. If no level proves
 it, Temper reports one gap for the subject:
 

@@ -401,10 +401,10 @@ func TestContactOnEveryPage(t *testing.T) {
 func TestMatrixPageNamesTemperSpecification(t *testing.T) {
 	temper.Covers(t, "site.findings")
 	page := read(t, filepath.Join(build(t, false), "tutorial/index.html"))
-	if strings.Contains(page, "Every row is a claim this project declares") {
+	if strings.Contains(page, "Each cell is one claim in <code>temper/</code> at one level.") {
 		t.Error("the generic MATRIX.md sentence is still on the page")
 	}
-	want := `Every row in the tables below is part of Temper's specification. Temper declares each one in its own <a href="https://github.com/turbolytics/temper/tree/main/temper"><code>temper/</code></a> directory.`
+	want := `Each cell is one claim in Temper's own specification, declared in its <a href="https://github.com/turbolytics/temper/tree/main/temper"><code>temper/</code></a> directory, at one level.`
 	if !strings.Contains(page, want) {
 		t.Error("the matrix page lacks the specification sentence")
 	}

@@ -376,8 +376,8 @@ func group(rows []findings.Finding, projects []findings.Project) []project {
 // The sentence every MATRIX.md opens with, as Markdown renders it, and what
 // the site says in its place.
 const (
-	matrixOpening = "Every row is a claim this project declares in <code>temper/</code>."
-	matrixOnSite  = `Every row in the tables below is part of Temper's specification. Temper declares each one in its own <a href="https://github.com/turbolytics/temper/tree/main/temper"><code>temper/</code></a> directory.`
+	matrixOpening = "Each cell is one claim in <code>temper/</code> at one level."
+	matrixOnSite  = `Each cell is one claim in Temper's own specification, declared in its <a href="https://github.com/turbolytics/temper/tree/main/temper"><code>temper/</code></a> directory, at one level.`
 )
 
 // matrixDoc renders MATRIX.md for the site. It replaces the generic opening
