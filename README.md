@@ -635,6 +635,24 @@ Docker Compose owns the topology. Temper drives it with the `docker compose`
 command, one fault at a time, from the seed, so any run replays. A scenario
 that cannot run records `error`, never a pass.
 
+Recipe packs carry what an audit learns, so the next one starts with it.
+Include one in `temper.yml` and use its names as `<pack>.<name>`:
+
+```yaml
+packs:
+  - pack: postgres
+    with: {db: queue}
+  - pack: service
+    as: worker
+    with: {target: "worker-*"}
+```
+
+`postgres.sql` runs a query for a check, `postgres.hold_lock` and
+`postgres.end_session` pin an interleaving with a row lock, and
+`worker.pause` freezes a worker. `temper recipes list` lists the packs, and
+`temper recipes show postgres` prints one. Name your own commands once in
+`temper/commands.yml`.
+
 ### Gate it in CI
 
 CI is the source of truth. It starts with no evidence, runs every level, and
@@ -707,7 +725,8 @@ proven.
 | `temper matrix --json` | Prints every cell, error, and count as JSON. |
 | `temper render` | Rewrites `MATRIX.md` from the committed `temper/status/`. Use it after a merge conflict. |
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE`, and `TEMPER_RUN` set. Adds evidence and never deletes it. |
-| `temper scenarios run [--scenario ID] [--subject ID] [--seed N]` | Runs the `runner: temper` scenarios against Docker Compose under faults, and records one verdict per check. Exits with code 1 when a check fails or errors. |
+| `temper scenarios run [--scenario ID] [--subject ID] [--seed N] [--build]` | Runs the `runner: temper` scenarios against Docker Compose under faults, and records one verdict per check. Exits with code 1 when a check fails or errors. `--build` rebuilds the images first. |
+| `temper recipes list` / `temper recipes show PACK` | Lists the built-in recipe packs, or prints one. |
 | `temper clean` | Deletes all evidence. |
 | `temper guide` | Prints the guide to working in a Temper project. The guide matches the installed version. |
 | `temper version` | Prints the name and version. |
@@ -788,6 +807,7 @@ temper/
   subjects/<id>.yml
   scenarios/<group>.yml
   faults.yml         # named faults for runner: temper scenarios
+  commands.yml       # named commands for runner: temper scenarios
   status/            # generated, committed
 MATRIX.md            # generated, committed
 .temper/evidence/    # generated, ignored

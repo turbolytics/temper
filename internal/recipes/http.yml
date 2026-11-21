@@ -1,0 +1,14 @@
+pack: http
+doc: >
+  An HTTP service a scenario drives and reads: GET and POST from a client
+  container. The client service needs wget (busybox or alpine has it).
+params:
+  from: {doc: the Compose service the requests are sent from}
+  base: {doc: "the base URL, such as http://api:8080"}
+commands:
+  get:
+    doc: GET base + path {1} and print the body. Fails on an HTTP error.
+    exec: ["{from}", wget, -q, -O-, "{base}{1}"]
+  post:
+    doc: POST an empty body to base + path {1} and print the response.
+    exec: ["{from}", wget, -q, -O-, --post-data=, "{base}{1}"]

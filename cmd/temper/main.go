@@ -6,6 +6,7 @@
 //	temper render                    rewrite MATRIX.md from the committed statuses
 //	temper run --level L -- CMD...   run CMD with the level and evidence directory set
 //	temper scenarios run             run runner: temper scenarios under faults
+//	temper recipes list|show PACK    the built-in recipe packs
 //	temper clean                     delete all evidence
 //	temper guide                     print the guide for working in a Temper project
 //	temper version
@@ -72,8 +73,9 @@ commands:
   render                             rewrite MATRIX.md from the committed statuses
   run --level LEVEL [--run ID] -- COMMAND [ARGS...]
                                      run COMMAND with TEMPER_LEVEL and TEMPER_EVIDENCE set
-  scenarios run [--scenario ID] [--subject ID] [--seed N] [--compose FILE]
+  scenarios run [--scenario ID] [--subject ID] [--seed N] [--compose FILE] [--build]
                                      run runner: temper scenarios against Docker Compose
+  recipes list | recipes show PACK   list the built-in recipe packs, or print one
   clean                              delete all evidence
   guide                              print the guide for working in a Temper project
   version                            print the version
@@ -115,6 +117,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdClean(*root, cmdArgs, stdout, stderr)
 	case "scenarios":
 		return cmdScenarios(*root, cmdArgs, stdout, stderr)
+	case "recipes":
+		return cmdRecipes(cmdArgs, stdout, stderr)
 	case "guide":
 		if len(cmdArgs) != 0 {
 			fmt.Fprintf(stderr, "temper: guide takes no arguments\n\n%s", usage)

@@ -9,8 +9,8 @@
     counter.two: {counter: 2}
   events:
     - up: {$subject: true}
-    - wait_until: {run: [reader, sh, -c, "wc -l < /data/count"], at_least: 5, timeout: 30s}
-    - chaos: {duration: 5s, every: 200ms-500ms, faults: [counter_pause, counter_kill]}
+    - wait_until: {lines: [], at_least: 5, timeout: 30s}
+    - chaos: {duration: 5s, every: 200ms-500ms, faults: [counter.pause, counter.kill]}   # from the service pack
     - check:
         covers: counter.keeps_counting
         run: [reader, sh, -c, "a=$(wc -l < /data/count); sleep 1; b=$(wc -l < /data/count); if [ $b -gt $a ]; then echo 0; else echo 1; fi"]
@@ -33,13 +33,13 @@
     - up: {$subject: true}
     - hold: {name: load, run: [load, /counter, load, -n, "1000", -url, "http://counter:8080/inc", -out, /data/acked]}
     - chaos: {duration: 4s, every: 200ms-400ms, faults: [http_pause]}
-    - wait_until: {run: [load, sh, -c, "test -f /data/acked && echo done || echo waiting"], equals: done, timeout: 2m}
+    - wait_until: {http_data: "test -f /data/acked && echo done || echo waiting", equals: done, timeout: 2m}
     - check:
         covers: http.never_loses_acked
-        run: [load, sh, -c, "a=$(cat /data/acked); c=$(cat /data/count); if [ $a -gt $c ]; then echo $((a - c)); else echo 0; fi"]
+        http_data: "a=$(cat /data/acked); c=$(cat /data/count); if [ $a -gt $c ]; then echo $((a - c)); else echo 0; fi"
     - check:
         covers: http.counts_once
-        run: [load, sh, -c, "c=$(cat /data/count); if [ $c -gt 1000 ]; then echo $((c - 1000)); else echo 0; fi"]
+        http_data: "c=$(cat /data/count); if [ $c -gt 1000 ]; then echo $((c - 1000)); else echo 0; fi"
     - check:
         covers: http.answers_every_request
-        run: [load, sh, -c, "echo $((1000 - $(cat /data/acked)))"]
+        http_data: "echo $((1000 - $(cat /data/acked)))"

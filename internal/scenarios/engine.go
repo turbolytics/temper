@@ -3,7 +3,23 @@ package scenarios
 import (
 	"context"
 	"fmt"
+	"time"
 )
+
+// Output is what a command printed: stdout, trimmed, is its result; stderr
+// is its explanation, which the run log keeps.
+type Output struct{ Stdout, Stderr string }
+
+// Held is a command kept running in the background.
+type Held interface {
+	// Exited reports whether the command has already ended.
+	Exited() bool
+	// Stop ends the command. It is an error if it had already exited.
+	Stop() error
+	// Await waits up to d for the command to end on its own, after a release
+	// command; past d it kills it and returns an error.
+	Await(d time.Duration) error
+}
 
 // Engine runs a scenario's topology. Compose drives Docker Compose by
 // command line; the tests use a fake.
@@ -25,21 +41,23 @@ type Engine interface {
 	Connect(ctx context.Context, container, network string) error
 	// Exec runs cmd in a running replica of service (0 means the first) and
 	// returns its trimmed stdout.
-	Exec(ctx context.Context, service string, instance int, cmd []string) (string, error)
+	Exec(ctx context.Context, service string, instance int, cmd []string) (Output, error)
 	// Run runs cmd in a one-shot container of service, without starting its
 	// dependencies.
-	Run(ctx context.Context, service string, cmd []string) (string, error)
+	Run(ctx context.Context, service string, cmd []string) (Output, error)
 	// Host runs cmd on the host.
-	Host(ctx context.Context, cmd []string) (string, error)
-	// Background starts c and keeps it running until stop is called.
-	Background(ctx context.Context, name string, c Command) (stop func() error, err error)
+	Host(ctx context.Context, cmd []string) (Output, error)
+	// Background starts c and keeps it running.
+	Background(ctx context.Context, name string, c Command) (Held, error)
+	// Build builds every image the topology builds.
+	Build(ctx context.Context) error
 	// Teardown removes the whole topology, volumes included.
 	Teardown(ctx context.Context) error
 }
 
 // Do runs c with whichever of Exec, Run or Host it names.
-func Do(ctx context.Context, e Engine, c Command) (string, error) {
-	var out string
+func Do(ctx context.Context, e Engine, c Command) (Output, error) {
+	var out Output
 	var err error
 	switch {
 	case c.Host:

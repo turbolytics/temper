@@ -44,7 +44,7 @@ type Logf func(format string, args ...any)
 
 // Inject performs fault name now. It returns nil, nil when the fault's
 // target has no running instance, and logs why.
-func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, logf Logf) (*Injected, error) {
+func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, cmds map[string]model.Command, logf Logf) (*Injected, error) {
 	in := &Injected{Name: name}
 	// Draw every value this fault may use first, in a fixed order, so what
 	// the system answers never changes which values come out of the draw.
@@ -66,13 +66,19 @@ func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, 
 	}
 	roll, pick := d.rng.Float64(), d.rng.Int63()
 	if f.Do == "exec" {
-		c := Command{Service: f.Exec[0], Args: f.Exec[1:]}
+		c, err := ResolveUse(cmds, f.Exec)
+		if err != nil {
+			return nil, fmt.Errorf("fault %s: %w", name, err)
+		}
 		in.Target = c.String()
 		logf("fault %s: %s", name, c)
-		_, err := Do(ctx, e, c)
+		out, err := Do(ctx, e, c)
+		if out.Stderr != "" {
+			logf("stderr: %s", out.Stderr)
+		}
 		return in, err
 	}
-	targets, err := pickTargets(ctx, e, roll, pick, f, logf)
+	targets, err := pickTargets(ctx, e, roll, pick, f, cmds, logf)
 	if err != nil {
 		return nil, fmt.Errorf("fault %s: %w", name, err)
 	}
@@ -110,7 +116,7 @@ func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, 
 
 // pickTargets resolves a fault's target to running containers. roll decides
 // target_from's chance, and pick chooses among a glob's instances.
-func pickTargets(ctx context.Context, e Engine, roll float64, pick int64, f model.Fault, logf Logf) ([]string, error) {
+func pickTargets(ctx context.Context, e Engine, roll float64, pick int64, f model.Fault, cmds map[string]model.Command, logf Logf) ([]string, error) {
 	pattern := f.Target
 	if t := f.TargetFrom; t != nil {
 		pattern = t.Fallback
@@ -119,10 +125,17 @@ func pickTargets(ctx context.Context, e Engine, roll float64, pick int64, f mode
 			chance = *t.Chance
 		}
 		if roll < chance {
-			value, err := Do(ctx, e, Command{Service: t.Exec[0], Args: t.Exec[1:]})
+			c, err := ResolveUse(cmds, t.Exec)
 			if err != nil {
+				return nil, fmt.Errorf("target_from: %w", err)
+			}
+			printed, err := Do(ctx, e, c)
+			if printed.Stderr != "" {
+				logf("target_from stderr: %s", printed.Stderr)
+			}
+			if value := strings.TrimSpace(printed.Stdout); err != nil {
 				logf("target_from failed, using %s: %v", t.Fallback, err)
-			} else if value = strings.TrimSpace(value); value != "" {
+			} else if value != "" {
 				want := strings.ReplaceAll(t.Map, "{value}", value)
 				all, err := e.Instances(ctx, "*")
 				if err != nil {

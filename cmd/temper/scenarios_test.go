@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/turbolytics/temper"
 	"github.com/turbolytics/temper/internal/scenarios"
@@ -79,19 +80,30 @@ func (f *cliEngine) Disconnect(ctx context.Context, c, n string) error {
 	return f.rec("disconnect " + c)
 }
 func (f *cliEngine) Connect(ctx context.Context, c, n string) error { return f.rec("connect " + c) }
-func (f *cliEngine) Exec(ctx context.Context, s string, i int, cmd []string) (string, error) {
-	return "0", f.rec("exec " + s + " " + strings.Join(cmd, " "))
+func (f *cliEngine) Exec(ctx context.Context, s string, i int, cmd []string) (scenarios.Output, error) {
+	return scenarios.Output{Stdout: "0"}, f.rec("exec " + s + " " + strings.Join(cmd, " "))
 }
-func (f *cliEngine) Run(ctx context.Context, s string, cmd []string) (string, error) {
-	return "0", f.rec("run " + s)
+func (f *cliEngine) Run(ctx context.Context, s string, cmd []string) (scenarios.Output, error) {
+	return scenarios.Output{Stdout: "0"}, f.rec("run " + s)
 }
-func (f *cliEngine) Host(ctx context.Context, cmd []string) (string, error) {
-	return "0", f.rec("host " + strings.Join(cmd, " "))
+func (f *cliEngine) Host(ctx context.Context, cmd []string) (scenarios.Output, error) {
+	return scenarios.Output{Stdout: "0"}, f.rec("host " + strings.Join(cmd, " "))
 }
-func (f *cliEngine) Background(ctx context.Context, name string, c scenarios.Command) (func() error, error) {
-	return func() error { return f.rec("release " + name) }, f.rec("hold " + name)
+
+type cliHeld struct {
+	f    *cliEngine
+	name string
+}
+
+func (h cliHeld) Exited() bool                { return false }
+func (h cliHeld) Stop() error                 { return h.f.rec("release " + h.name) }
+func (h cliHeld) Await(d time.Duration) error { return h.f.rec("await " + h.name) }
+
+func (f *cliEngine) Background(ctx context.Context, name string, c scenarios.Command) (scenarios.Held, error) {
+	return cliHeld{f: f, name: name}, f.rec("hold " + name)
 }
 func (f *cliEngine) Teardown(ctx context.Context) error { return f.rec("down -v") }
+func (f *cliEngine) Build(ctx context.Context) error    { return f.rec("build") }
 
 // useFakeEngine makes temper scenarios run use a fake engine, and returns
 // it. It clears the runner's environment, because these tests themselves run
@@ -348,5 +360,24 @@ func TestScenariosRun_Usage(t *testing.T) {
 	edit(t, root, "temper/scenarios/river.yml", func(s string) string { return strings.Replace(s, "worker_pause]", "nope]", 1) })
 	if code, _, errOut := cli(t, "--root", root, "scenarios", "run"); code != 2 || !strings.Contains(errOut, "nope") {
 		t.Errorf("a scenario that fails temper check ran: %d %s", code, errOut)
+	}
+}
+
+func TestScenariosRun_BuildFlag(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := useFakeEngine(t)
+	root := scenarioProject(t)
+	if code, out, errOut := cli(t, "--root", root, "scenarios", "run", "--build"); code != 0 {
+		t.Fatalf("scenarios run --build = %d\n%s\n%s", code, out, errOut)
+	}
+	if calls := f.Calls(); len(calls) == 0 || calls[0] != "build" {
+		t.Errorf("calls = %v, want build first", calls)
+	}
+	f2 := useFakeEngine(t)
+	cli(t, "--root", root, "scenarios", "run")
+	for _, c := range f2.Calls() {
+		if c == "build" {
+			t.Error("built without --build")
+		}
 	}
 }

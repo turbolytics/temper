@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // fakeEngine records every call as a line ("pause worker-go-1"), answers
@@ -21,6 +22,10 @@ type fakeEngine struct {
 	// outputs maps a command line ("exec postgres: psql ...", "run setup: x",
 	// "host: sh -c y") to the outputs it returns in turn; the last repeats.
 	outputs map[string][]string
+	// stderr maps a command line to the stderr it prints.
+	stderr map[string]string
+	// holdExits names holds whose command has already exited.
+	holdExits map[string]bool
 	// fail maps a call line, or a prefix of one, to the error it returns.
 	fail map[string]error
 	// onCall runs after each call is recorded, outside the lock.
@@ -28,7 +33,7 @@ type fakeEngine struct {
 }
 
 func newFake() *fakeEngine {
-	return &fakeEngine{running: map[string][]string{}, outputs: map[string][]string{}, fail: map[string]error{}}
+	return &fakeEngine{running: map[string][]string{}, outputs: map[string][]string{}, stderr: map[string]string{}, holdExits: map[string]bool{}, fail: map[string]error{}}
 }
 
 func (f *fakeEngine) record(line string) error {
@@ -55,21 +60,22 @@ func (f *fakeEngine) Calls() []string {
 	return append([]string(nil), f.calls...)
 }
 
-func (f *fakeEngine) output(line string) (string, error) {
+func (f *fakeEngine) output(line string) (Output, error) {
 	if err := f.record(line); err != nil {
-		return "", err
+		return Output{}, err
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	o := Output{Stderr: f.stderr[line]}
 	outs := f.outputs[line]
 	if len(outs) == 0 {
-		return "", nil
+		return o, nil
 	}
-	out := outs[0]
+	o.Stdout = outs[0]
 	if len(outs) > 1 {
 		f.outputs[line] = outs[1:]
 	}
-	return out, nil
+	return o, nil
 }
 
 func (f *fakeEngine) Up(ctx context.Context, service string, n int) error {
@@ -123,24 +129,47 @@ func (f *fakeEngine) Connect(ctx context.Context, c, n string) error {
 	return f.record("connect " + c + " " + n)
 }
 
-func (f *fakeEngine) Exec(ctx context.Context, service string, instance int, cmd []string) (string, error) {
+func (f *fakeEngine) Exec(ctx context.Context, service string, instance int, cmd []string) (Output, error) {
 	return f.output(Command{Service: service, Instance: instance, Args: cmd}.String())
 }
 
-func (f *fakeEngine) Run(ctx context.Context, service string, cmd []string) (string, error) {
+func (f *fakeEngine) Run(ctx context.Context, service string, cmd []string) (Output, error) {
 	return f.output(Command{Service: service, Run: true, Args: cmd}.String())
 }
 
-func (f *fakeEngine) Host(ctx context.Context, cmd []string) (string, error) {
+func (f *fakeEngine) Host(ctx context.Context, cmd []string) (Output, error) {
 	return f.output(Command{Host: true, Args: cmd}.String())
 }
 
-func (f *fakeEngine) Background(ctx context.Context, name string, c Command) (func() error, error) {
+// fakeHeld records how a hold ends: "release <name>" when stopped, "await
+// <name>" when awaited after a release command.
+type fakeHeld struct {
+	f      *fakeEngine
+	name   string
+	exited bool
+}
+
+func (h *fakeHeld) Exited() bool { return h.exited }
+
+func (h *fakeHeld) Stop() error {
+	if h.exited {
+		return fmt.Errorf("hold %s exited before release", h.name)
+	}
+	return h.f.record("release " + h.name)
+}
+
+func (h *fakeHeld) Await(time.Duration) error { return h.f.record("await " + h.name) }
+
+func (f *fakeEngine) Background(ctx context.Context, name string, c Command) (Held, error) {
 	if err := f.record("hold " + name); err != nil {
 		return nil, err
 	}
-	return func() error { return f.record("release " + name) }, nil
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return &fakeHeld{f: f, name: name, exited: f.holdExits[name]}, nil
 }
+
+func (f *fakeEngine) Build(ctx context.Context) error { return f.record("build") }
 
 func (f *fakeEngine) Teardown(ctx context.Context) error {
 	if err := f.record("teardown"); err != nil {

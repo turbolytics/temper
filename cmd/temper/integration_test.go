@@ -267,7 +267,7 @@ func TestIntegration_ScenariosRun(t *testing.T) {
 		t.Fatalf("the integration level needs Docker for temper scenarios run: %v", err)
 	}
 	root := fixture(t, "scenarios")
-	code, out := temperBin(t, root, "run", "--level", "integration", "--", bin, "scenarios", "run")
+	code, out := temperBin(t, root, "run", "--level", "integration", "--", bin, "scenarios", "run", "--build")
 	if code != 1 {
 		t.Fatalf("scenarios run = %d, want 1 for the deliberate failure\n%s", code, out)
 	}
@@ -309,9 +309,16 @@ func TestIntegration_ScenariosRun(t *testing.T) {
 			t.Errorf("%s left containers behind: %s", project, s)
 		}
 	}
+	for _, args := range [][]string{{"recipes", "list"}, {"recipes", "show", "postgres"}} {
+		temper.Covers(t, "cli.recipes")
+		if code, out := temperBin(t, root, args...); code != 0 || !strings.Contains(out, "postgres") {
+			t.Errorf("%v = %d\n%s", args, code, out)
+		}
+	}
+	temper.Covers(t, "declarations.recipe_packs")
 	for _, sub := range []string{"counter.one", "counter.two"} {
 		log, err := os.ReadFile(filepath.Join(root, ".temper", "scenarios", "counter.faults", sub, "run.log"))
-		if err != nil || !strings.Contains(string(log), "fault counter_") {
+		if err != nil || !strings.Contains(string(log), "fault counter.") {
 			t.Errorf("%s run log has no faults: %v", sub, err)
 		}
 	}

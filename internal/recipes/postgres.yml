@@ -1,0 +1,64 @@
+pack: postgres
+doc: >
+  PostgreSQL as a scenario's database: queries for checks, held locks that
+  release cleanly, and crash, pause, restart and session faults.
+params:
+  service: {default: postgres, doc: the Compose service running PostgreSQL}
+  user: {default: postgres, doc: the role psql connects as}
+  db: {default: postgres, doc: the database psql connects to}
+  app_like:
+    default: "%"
+    doc: a LIKE pattern on application_name, choosing the sessions terminate ends
+commands:
+  sql:
+    doc: >
+      Run one query and print its rows unaligned, without headers, one per
+      line. A check's query prints a single count.
+    exec: ["{service}", psql, -U, "{user}", -d, "{db}", -Atc]
+  statement:
+    doc: Run statements that print nothing, such as DDL or an UPDATE.
+    exec: ["{service}", psql, -U, "{user}", -d, "{db}", -qc]
+  hold_lock:
+    doc: >
+      Hold a transaction open as session {1}, after running {2} in it, for
+      example SELECT ... FOR UPDATE to lock rows. Release it with
+      end_session; a held lock is how a scenario pins one interleaving.
+    exec: ["{service}", psql, -U, "{user}", -d, "{db}", -c,
+           "SET application_name = '{1}'; BEGIN; {2}; SELECT pg_sleep(86400)"]
+  end_session:
+    doc: >
+      End session {1} on the server, rolling back its transaction and
+      releasing its locks. Ending psql is not enough: PostgreSQL does not
+      notice a vanished client while the backend is busy, so the backend
+      keeps its locks until its statement ends.
+    exec: ["{service}", psql, -U, "{user}", -d, "{db}", -Atc,
+           "SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE application_name = '{1}'"]
+faults:
+  crash:
+    doc: >
+      SIGKILL PostgreSQL, as a power loss or an OOM kill does, and start it
+      again after 0-2 s. Committed transactions must survive; connections
+      must recover.
+    target: "{service}"
+    do: kill
+    then: start
+    after: 0s-2s
+  pause:
+    doc: >
+      Freeze PostgreSQL for 2-8 s, as a stalled disk or host does. Clients
+      see slow queries, not errors, and must not double up work meanwhile.
+    target: "{service}"
+    do: pause
+    for: 2s-8s
+  restart:
+    doc: Restart PostgreSQL gracefully; every client connection drops.
+    target: "{service}"
+    do: restart
+  terminate:
+    doc: >
+      End the sessions whose application_name matches app_like, as a
+      connection pooler or an operator killing queries does. Clients must
+      reconnect and retry.
+    do: exec
+    exec: ["{service}", psql, -U, "{user}", -d, "{db}", -Atc,
+           "SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE application_name LIKE '{app_like}' AND pid <> pg_backend_pid()"]

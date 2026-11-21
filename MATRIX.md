@@ -2,9 +2,9 @@
 <!-- temper matrix format: 2 -->
 # temper matrix
 
-**15 features and 22 invariants on 2 subjects, at levels `unit` and `integration`.**
+**17 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
 
-✅ 54 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
+✅ 59 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
 
 Each cell is one claim in `temper/` at one level. It is covered when a test that ran
 at that level passed and none failed: a skip proves nothing, and a pass never hides
@@ -39,6 +39,8 @@ What the system does. Each feature is proven at the levels it requires.
 | `site.findings` | Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it. | ✅ | — |
 | `site.case_studies` | Builds the Case Studies pages, audits written up with the project's approval, linked from the top-level nav and from each project's findings. | ✅ | — |
 | `cli.scenarios_run` | Runs runner-temper scenarios against a Docker Compose topology, injecting named faults on a seeded schedule, and records one verdict per check as evidence. | ✅ | ✅ |
+| `declarations.recipe_packs` | Includes Temper's recipe packs from temper.yml and the project's named commands from commands.yml, so a scenario names each command once. | ✅ | ✅ |
+| `cli.recipes` | Lists the built-in recipe packs and prints any one of them. | ✅ | ✅ |
 
 ## Invariants
 
@@ -79,6 +81,7 @@ Where a row names several levels, each cell shows one mark per level, in that or
 | [`matrix.stale_output_detected`](#inv-matrix.stale_output_detected) | output | `unit`, `integration` | ✅ ✅ |
 | [`matrix.test_only_credits_nothing`](#inv-matrix.test_only_credits_nothing) | honesty | `unit` | ✅ |
 | [`matrix.unknown_reference_fails`](#inv-matrix.unknown_reference_fails) | honesty | `unit`, `integration` | ✅ ✅ |
+| [`recipes.names_mean_one_thing`](#inv-recipes.names_mean_one_thing) | honesty | `unit` | ✅ |
 | [`scenarios.check_decides_its_own_claim`](#inv-scenarios.check_decides_its_own_claim) | honesty | `unit` | ✅ |
 | [`scenarios.faults_heal`](#inv-scenarios.faults_heal) | honesty | `unit`, `integration` | ✅ ✅ |
 | [`scenarios.seed_replays`](#inv-scenarios.seed_replays) | honesty | `unit` | ✅ |
@@ -97,6 +100,7 @@ Where a row names several levels, each cell shows one mark per level, in that or
 - <a id="inv-matrix.stale_output_detected"></a>**`matrix.stale_output_detected`** · safety · output — matrix --check exits 3 whenever the committed statuses or MATRIX.md differ from what the evidence produces.
 - <a id="inv-matrix.test_only_credits_nothing"></a>**`matrix.test_only_credits_nothing`** · safety · honesty — Evidence for a test-only subject credits no cell.
 - <a id="inv-matrix.unknown_reference_fails"></a>**`matrix.unknown_reference_fails`** · safety · honesty — Evidence or a declaration that names an id Temper does not know is an error that exits 2; it is never ignored and never creates a row.
+- <a id="inv-recipes.names_mean_one_thing"></a>**`recipes.names_mean_one_thing`** · safety · honesty — A command or fault name in a scenario resolves to exactly one definition; a pack never overrides or shadows a project definition.
 - <a id="inv-scenarios.check_decides_its_own_claim"></a>**`scenarios.check_decides_its_own_claim`** · safety · honesty — Each check's outcome lands only on the reference that check decides; a failing check never fails another reference, and a passing one never covers another.
 - <a id="inv-scenarios.faults_heal"></a>**`scenarios.faults_heal`** · safety · honesty — Every fault the runner injects is healed before the run ends, including when the run is interrupted; no container is left paused, stopped or disconnected.
 - <a id="inv-scenarios.seed_replays"></a>**`scenarios.seed_replays`** · safety · honesty — The same scenario and seed draw the same fault sequence, targets and durations, so any run can be replayed.

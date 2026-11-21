@@ -46,6 +46,7 @@ func cmdScenarios(root string, args []string, stdout, stderr io.Writer) int {
 	subject := fs.String("subject", "", "run only this subject of an expanded scenario")
 	seedFlag := fs.String("seed", "", "replay this seed")
 	composeFlag := fs.String("compose", "", "Compose file, replacing each scenario's compose")
+	build := fs.Bool("build", false, "build the images first, so the run uses this checkout's code")
 	if err := fs.Parse(args[1:]); err != nil {
 		return exitError
 	}
@@ -106,7 +107,7 @@ func cmdScenarios(root string, args []string, stdout, stderr io.Writer) int {
 		}
 		e := newEngine(file, composeProject(sc.ID))
 		vs, err := scenarios.RunScenario(ctx, e, p, sc, scenarios.Options{
-			Seed: seed, Subject: *subject, Log: stderr, LogDir: filepath.Join(p.Root, ".temper", "scenarios"),
+			Seed: seed, Subject: *subject, Log: stderr, Build: *build, LogDir: filepath.Join(p.Root, ".temper", "scenarios"),
 		})
 		if err != nil {
 			fmt.Fprintf(stderr, "temper: %v\n", err)

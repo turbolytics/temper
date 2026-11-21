@@ -505,7 +505,7 @@ func TestRun_LiveAnswersDoNotShiftTheSeed(t *testing.T) {
 	temper.Covers(t, "scenarios.seed_replays", temper.Subject("cli"))
 	p := testProject()
 	p.Faults["leader_pause"] = model.Fault{
-		TargetFrom: &model.TargetFrom{Exec: []string{"postgres", "psql", "leader"}, Map: "worker-{value}", Fallback: "worker-*"},
+		TargetFrom: &model.TargetFrom{Exec: model.CommandUse{List: []string{"postgres", "psql", "leader"}}, Map: "worker-{value}", Fallback: "worker-*"},
 		Do:         "pause", For: "1s-3s",
 	}
 	sc := temperScenario(t, []string{"job.never_lost"}, `
@@ -523,5 +523,128 @@ func TestRun_LiveAnswersDoNotShiftTheSeed(t *testing.T) {
 	a, b := faultNames(logs[0].String()), faultNames(logs[1].String())
 	if len(a) < 10 || !reflect.DeepEqual(a, b) {
 		t.Fatalf("the leader's answer changed the fault sequence:\n%v\n%v", a, b)
+	}
+}
+
+func TestRun_FaultExecByName(t *testing.T) {
+	temper.Covers(t, "declarations.recipe_packs")
+	p := testProject()
+	p.Commands = map[string]model.Command{"postgres.end_session": {Exec: []string{"postgres", "psql", "-Atc", "end '{1}'"}}}
+	p.Faults["end_probe"] = model.Fault{Do: "exec", Exec: model.CommandUse{Name: "postgres.end_session", Args: []string{"probe"}}}
+	f := newFake()
+	f.outputs["exec postgres: psql lost"] = []string{"0"}
+	run(t, f, p, temperScenario(t, []string{"job.never_lost"}, "- fault: end_probe\n- check: {covers: job.never_lost, exec: [postgres, psql, lost]}\n"), Options{})
+	if !strings.Contains(strings.Join(f.Calls(), "\n"), "exec postgres: psql -Atc end 'probe'") {
+		t.Errorf("calls = %v", f.Calls())
+	}
+}
+
+func TestRun_StderrIsLogged(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := newFake()
+	f.outputs["exec postgres: psql dup"] = []string{"2"}
+	f.stderr["exec postgres: psql dup"] = "why: job 7 ran twice\njob 9 ran twice"
+	var log strings.Builder
+	run(t, f, testProject(), temperScenario(t, []string{"complete_tx.effect_once"}, "- check: {covers: complete_tx.effect_once, exec: [postgres, psql, dup]}\n"), Options{Log: &log})
+	for _, want := range []string{"stderr: why: job 7 ran twice", "stderr: job 9 ran twice"} {
+		if !strings.Contains(log.String(), want) {
+			t.Errorf("log lacks %q:\n%s", want, log.String())
+		}
+	}
+}
+
+func TestRun_HoldReleasedByCommand(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	p := testProject()
+	p.Commands = map[string]model.Command{"end": {Exec: []string{"postgres", "psql", "-Atc", "end '{1}'"}}}
+	f := newFake()
+	run(t, f, p, temperScenario(t, []string{"job.never_lost"}, `
+- hold: {name: lock_a, exec: [postgres, psql, lock], release: {end: lock_a}}
+- release: lock_a
+- check: {covers: job.never_lost, host: [echo, "0"]}
+`), Options{})
+	calls := strings.Join(f.Calls(), "\n")
+	if !strings.Contains(calls, "hold lock_a\nexec postgres: psql -Atc end 'lock_a'\nawait lock_a") || strings.Contains(calls, "stop lock_a") {
+		t.Errorf("calls:\n%s", calls)
+	}
+}
+
+func TestRelease_HeldExitedEarlyIsError(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.setup_failure_is_error", temper.Subject("cli"))
+	f := newFake()
+	f.holdExits["lock_a"] = true
+	vs := run(t, f, testProject(), temperScenario(t, []string{"job.never_lost"}, `
+- hold: {name: lock_a, exec: [postgres, psql, lock], release: {exec: [postgres, psql, end]}}
+- release: lock_a
+- check: {covers: job.never_lost, host: [echo, "0"]}
+`), Options{})
+	wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "error"})
+	if strings.Contains(strings.Join(f.Calls(), "\n"), "psql end") {
+		t.Error("ran the release command for a hold that had already exited")
+	}
+}
+
+func TestRun_BuildFailureIsError(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.setup_failure_is_error", temper.Subject("cli"))
+	sc := temperScenario(t, []string{"job.never_lost"}, "- up: {$subject: true}\n- check: {covers: job.never_lost, host: [echo, '0']}\n")
+	sc.Subject = ""
+	sc.Subjects = map[string]map[string]int{"cluster.go": {"worker-go": 1}, "cluster.go_js": {"worker-js": 1}}
+	f := newFake()
+	f.fail["build"] = errors.New("failed to solve: Dockerfile:3: COPY failed")
+	vs := run(t, f, testProject(), sc, Options{Build: true})
+	wantOutcomes(t, vs, map[string]string{
+		"cluster.go job.never_lost": "error", "cluster.go s.faults": "error",
+		"cluster.go_js job.never_lost": "error", "cluster.go_js s.faults": "error",
+	})
+	builds := 0
+	for _, c := range f.Calls() {
+		if strings.HasPrefix(c, "up ") {
+			t.Fatalf("started services after the build failed: %v", f.Calls())
+		}
+		if c == "build" {
+			builds++
+		}
+	}
+	if builds != 1 || !strings.Contains(vs[0].Detail, "COPY failed") {
+		t.Errorf("builds = %d, detail = %q", builds, vs[0].Detail)
+	}
+}
+
+func TestRun_SubjectPlaceholder(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	sc := temperScenario(t, []string{"job.never_lost"}, "- run: [oracle, check, --subject, \"{subject}\"]\n- check: {covers: job.never_lost, run: [oracle, verdict, \"{subject}\"]}\n")
+	sc.Subject = ""
+	sc.Subjects = map[string]map[string]int{"cluster.go": {}, "cluster.go_js": {}}
+	f := newFake()
+	f.outputs["run oracle: verdict cluster.go"] = []string{"0"}
+	f.outputs["run oracle: verdict cluster.go_js"] = []string{"0"}
+	vs := run(t, f, testProject(), sc, Options{})
+	wantOutcomes(t, vs, map[string]string{
+		"cluster.go job.never_lost": "pass", "cluster.go s.faults": "pass",
+		"cluster.go_js job.never_lost": "pass", "cluster.go_js s.faults": "pass",
+	})
+	calls := strings.Join(f.Calls(), "\n")
+	for _, want := range []string{"run oracle: check --subject cluster.go\n", "run oracle: check --subject cluster.go_js\n"} {
+		if !strings.Contains(calls+"\n", want) {
+			t.Errorf("calls lack %q:\n%s", want, calls)
+		}
+	}
+}
+
+func TestRelease_FailedReleaseCommandStillStopsTheHold(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.faults_heal", temper.Subject("cli"))
+	f := newFake()
+	f.fail["exec postgres: psql end"] = errors.New("exit status 2")
+	vs := run(t, f, testProject(), temperScenario(t, []string{"job.never_lost"}, `
+- hold: {name: lock_a, exec: [postgres, psql, lock], release: {exec: [postgres, psql, end]}}
+- release: lock_a
+- check: {covers: job.never_lost, host: [echo, "0"]}
+`), Options{})
+	wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "error"})
+	if !strings.Contains(strings.Join(f.Calls(), "\n"), "release lock_a") {
+		t.Errorf("the hold was never stopped: %v", f.Calls())
 	}
 }
