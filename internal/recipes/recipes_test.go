@@ -115,3 +115,15 @@ func TestExpand_KeepsUseArgs(t *testing.T) {
 		t.Errorf("hold_lock lost its use arguments: %q", last)
 	}
 }
+
+func TestExpand_LeavesSubjectForTheRunner(t *testing.T) {
+	temper.Covers(t, "declarations.recipe_packs")
+	p, err := parse([]byte("pack: s\ndoc: d\ncommands:\n  check: {doc: d, run: [oracle, \"{subject}\"]}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmds, _, err := Expand(p, "", nil)
+	if err != nil || cmds["s.check"].Run[1] != "{subject}" {
+		t.Fatalf("Expand = %v, %v", cmds, err)
+	}
+}

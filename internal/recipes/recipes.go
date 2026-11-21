@@ -116,7 +116,11 @@ func Expand(p Pack, as string, with map[string]string) (map[string]model.Command
 	var bad []string
 	fill := func(s string) string {
 		return param.ReplaceAllStringFunc(s, func(m string) string {
-			v, ok := values[m[1:len(m)-1]]
+			name := m[1 : len(m)-1]
+			if name == "subject" {
+				return m // the runner fills it with the run's subject
+			}
+			v, ok := values[name]
 			if !ok {
 				bad = append(bad, m)
 				return m
