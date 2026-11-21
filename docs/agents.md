@@ -47,7 +47,8 @@ their commands are declared in `temper.yml`.
 | `temper matrix --check` | Writes nothing; exits 3 if the committed files are stale. It judges every level. |
 | `temper run --level L -- CMD` | Runs `CMD` with the level and evidence directory set. It appends evidence and never clears it. |
 | `temper clean` | Deletes all evidence. Do this before a full run, so old passes cannot count. |
-| `temper scenarios run` | Runs the `runner: temper` scenarios against Docker Compose, injecting faults, and records one verdict per check. Run it through `temper run`. |
+| `temper scenarios run` | Runs the `runner: temper` scenarios against Docker Compose, injecting faults, and records one verdict per check. Run it through `temper run`. Add `--build` to rebuild the images first. |
+| `temper recipes list` | Lists the built-in recipe packs. `temper recipes show PACK` prints one, the reference for each command and fault it provides. |
 | `temper render` | Rebuilds `MATRIX.md` from the committed statuses. |
 | `temper guide` | Prints this guide. |
 | `temper version` | Prints the installed version. |
@@ -115,6 +116,7 @@ temper/lattices/<id>.yml    one list of members per file
 temper/subjects/<id>.yml    one concrete thing per file (the file name is its id)
 temper/scenarios/<group>.yml
 temper/faults.yml     named faults for runner: temper scenarios
+temper/commands.yml   named commands for runner: temper scenarios
 ```
 
 Ids are dot-separated lowercase (`sink.flush.keeps_batch`). A feature, an
@@ -129,6 +131,10 @@ levels:                               # in the order they run; these are the mat
     description: go test ./...
   - name: integration
     description: go test -tags integration -run '^TestIntegration' ./...
+packs:                                # optional: built-in recipe packs for fault scenarios
+  - pack: service
+    as: app                           # its faults are app.kill, app.pause, ...
+    with: {target: "app-*"}
 ```
 
 ```yaml
@@ -218,8 +224,13 @@ reads your data. Your check's query decides what a violation is.
 ```yaml
 # temper/faults.yml
 faults:
-  app_kill: {target: "app-*", do: kill, then: start, after: 1s-3s}   # a glob picks one instance, from the seed
-  db_pause: {target: db, do: pause, for: 2s-6s}                      # docker pause, then unpause
+  db_pause: {target: db, do: pause, for: 2s-6s}   # docker pause, then unpause
+```
+
+```yaml
+# temper/commands.yml
+commands:
+  audit: {doc: count reservations by state, exec: [db, shop, audit]}
 ```
 
 ```yaml
@@ -233,13 +244,17 @@ faults:
   events:
     - up: {db: 1, app-a: 1, app-b: 1}       # waits until each is healthy or running
     - run: [loadgen, reserve, "500"]        # a one-shot container; must exit 0
-    - chaos: {duration: 60s, every: 1s-4s, faults: [app_kill, db_pause]}
-    - drain: {remaining: [db, count-pending], stall: 30s, max: 5m}
-    - check: {covers: store.file, exec: [db, count-lost]}   # pass when it prints 0
+    - chaos: {duration: 60s, every: 1s-4s, faults: [app.kill, db_pause]}   # app.kill comes from the service pack
+    - drain: {remaining: {audit: --pending}, stall: 30s, max: 5m}
+    - check: {covers: store.file, audit: --lost}   # a named command; pass when it prints 0
 ```
 
 - A step that cannot run (Docker missing, a service never ready, a setup
   command failing) records `error` for every reference. It is never a pass.
+- Name a command once in `commands.yml` and use it anywhere a command goes,
+  with its arguments as the value. Recipe packs (`temper recipes list`) give
+  you tested commands and faults for Postgres, any service, and HTTP; read
+  one with `temper recipes show postgres` before writing your own.
 - `subjects:` runs the scenario once per subject, each with its own services
   (`up: {$subject: true}`) and seed.
 - Replay one run locally with

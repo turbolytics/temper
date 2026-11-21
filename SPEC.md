@@ -107,6 +107,7 @@ temper/
   subjects/<id>.yml         # one file per subject
   scenarios/<group>.yml     # scenarios, grouped however suits the project
   faults.yml                # named faults for runner: temper scenarios (§11)
+  commands.yml              # named commands for runner: temper scenarios (§11)
   status/                   # GENERATED, committed: one status per cell
     features.yml            #   one row per feature
     subjects/<id>.yml       #   one row per invariant or lattice member, per subject
@@ -178,7 +179,19 @@ levels:                      # in the order they run
 evidence: .temper/evidence    # optional; this is the default
 dir: temper                   # optional; where declarations and status/ live
 matrix: MATRIX.md             # optional; where the matrix is rendered
+
+packs:                        # optional; built-in recipe packs for scenarios (§11)
+  - pack: postgres
+    with: {db: sqlflow}
+  - pack: service
+    as: worker                # its names are used as worker.<name>
+    with: {target: "worker-*"}
 ```
+
+`packs` includes Temper's built-in recipe packs (`temper recipes list`). Each
+pack's commands and faults are used as `<as>.<name>`, where `as` defaults to
+the pack's name; `with` sets the pack's parameters, and one without a
+default is required. A pack is included once per `as`.
 
 The order of `levels` is the order of matrix columns. A runner tells an
 adapter which level it is running at through `TEMPER_LEVEL`, and where to
@@ -523,6 +536,44 @@ for all of `covers`, and `temper check` requires every reference in
 
 Without `TEMPER_LEVEL` and `TEMPER_EVIDENCE`, `temper scenarios run` still
 runs and prints each verdict, but records nothing.
+
+**Named commands** live in `commands.yml`, under `commands:`. Each is one of
+`exec`, `run` or `host`, with an optional `doc`:
+
+```yaml
+commands:
+  sql: {doc: one query, its rows unaligned, exec: [postgres, psql, -U, postgres, -d, app, -Atc]}
+  migrate: {run: [tool, migrate]}
+```
+
+A scenario uses a named command, or a pack's, wherever a command goes, with
+its arguments as the value: a string, a list, or `[]` for none.
+
+```yaml
+- migrate: []                                     # an event by itself
+- check: {covers: job.never_lost, sql: "SELECT count(*) FROM lost"}
+- hold: {name: lock_a, postgres.hold_lock: [lock_a, "SELECT 1 FROM jobs WHERE id = 1 FOR UPDATE"],
+         release: {postgres.end_session: lock_a}}
+```
+
+Arguments are appended, unless the command holds placeholders `{1}`, `{2}`,
+..., which then take exactly that many arguments. A project's command names
+are lowercase, with no dot, and may not be an event kind or an event field;
+names with a dot belong to packs, so a pack never shadows a project's
+definition. A fault's `exec` and `target_from.exec` are a list or a named
+command written as a mapping: `exec: {postgres.statement: "SELECT 1"}`.
+
+**Releasing a hold.** A `hold` with `release:` ends by running that command;
+the held command must then end within 10 s, or it is killed and the release
+records error. Without `release:`, the held command is stopped.
+
+**Building.** `temper scenarios run --build` builds the Compose file's images
+before the first subject; a build that fails records error for every
+reference.
+
+**Logs.** Every command's stderr goes to the run log, prefixed `stderr:`,
+whether or not it succeeds, so a check's explanation is part of the
+evidence.
 
 ## 12. Evidence
 
