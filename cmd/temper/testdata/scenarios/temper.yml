@@ -5,3 +5,7 @@ levels:
     description: none
   - name: integration
     description: temper scenarios run against Docker Compose
+packs:
+  - pack: service
+    as: counter
+    with: {target: counter}

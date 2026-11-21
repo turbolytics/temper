@@ -1,0 +1,3 @@
+commands:
+  lines: {doc: Count the lines the busybox counter has written., run: [reader, sh, -c, "wc -l < /data/count"]}
+  http_data: {doc: Run a shell snippet over the HTTP counter's data volume., run: [load, sh, -c]}

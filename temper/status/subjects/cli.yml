@@ -13,6 +13,7 @@ matrix.skip_never_covers: {unit: covered, integration: covered}
 matrix.stale_output_detected: {unit: covered, integration: covered}
 matrix.test_only_credits_nothing: {unit: covered, integration: not_required}
 matrix.unknown_reference_fails: {unit: covered, integration: covered}
+recipes.names_mean_one_thing: {unit: covered, integration: not_required}
 scenarios.check_decides_its_own_claim: {unit: covered, integration: not_required}
 scenarios.faults_heal: {unit: covered, integration: covered}
 scenarios.seed_replays: {unit: covered, integration: not_required}
