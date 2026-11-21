@@ -254,3 +254,65 @@ func TestIntegration_MatrixNoEvidence(t *testing.T) {
 		t.Fatalf("matrix after clean = %d, %s; want 2, the no-evidence error, and no summary", code, out)
 	}
 }
+
+// TestIntegration_ScenariosRun runs two real fault scenarios through temper
+// run and reads the evidence: a busybox counter under pauses and kills, and
+// a Go HTTP counter taking 1000 concurrent increments while it is paused,
+// once with its lock (exact) and once without (it loses acknowledged
+// increments, a real finding the runner must report).
+func TestIntegration_ScenariosRun(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.faults_heal", temper.Subject("cli"))
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Fatalf("the integration level needs Docker for temper scenarios run: %v", err)
+	}
+	root := fixture(t, "scenarios")
+	code, out := temperBin(t, root, "run", "--level", "integration", "--", bin, "scenarios", "run")
+	if code != 1 {
+		t.Fatalf("scenarios run = %d, want 1 for the deliberate failure\n%s", code, out)
+	}
+	got := map[string]string{}
+	files, _ := filepath.Glob(filepath.Join(root, ".temper", "evidence", "integration-*.jsonl"))
+	for _, f := range files {
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+			var r temper.Record
+			if err := json.Unmarshal([]byte(line), &r); err != nil {
+				t.Fatalf("%s: %v", f, err)
+			}
+			got[r.Subject+" "+r.Covers] = r.Outcome
+		}
+	}
+	want := map[string]string{
+		"counter.one counter.keeps_counting": "pass", "counter.one counter.never_negative": "pass", "counter.one counter.never_skips": "fail", "counter.one counter.faults": "fail",
+		"counter.two counter.keeps_counting": "pass", "counter.two counter.never_negative": "pass", "counter.two counter.never_skips": "fail", "counter.two counter.faults": "fail",
+		"http.go http.never_loses_acked": "pass", "http.go http.counts_once": "pass", "http.go http.answers_every_request": "pass", "http.go http.faults": "pass",
+		"http.go_racy http.never_loses_acked": "fail", "http.go_racy http.counts_once": "pass", "http.go_racy http.answers_every_request": "pass", "http.go_racy http.faults": "fail",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	if t.Failed() {
+		t.Logf("evidence: %v\noutput:\n%s", got, out)
+	}
+	for _, project := range []string{"temper-counter-faults", "temper-http-faults"} {
+		left, err := exec.Command("docker", "ps", "-a", "-q", "--filter", "label=com.docker.compose.project="+project).Output()
+		if err != nil {
+			t.Fatalf("docker ps: %v", err)
+		}
+		if s := strings.TrimSpace(string(left)); s != "" {
+			t.Errorf("%s left containers behind: %s", project, s)
+		}
+	}
+	for _, sub := range []string{"counter.one", "counter.two"} {
+		log, err := os.ReadFile(filepath.Join(root, ".temper", "scenarios", "counter.faults", sub, "run.log"))
+		if err != nil || !strings.Contains(string(log), "fault counter_") {
+			t.Errorf("%s run log has no faults: %v", sub, err)
+		}
+	}
+}

@@ -1,0 +1,45 @@
+- id: counter.faults
+  runner: temper
+  name: The counter keeps counting through pauses and kills
+  description: Pausing or killing a counter never stops the count for good.
+  covers: [counter.keeps_counting, counter.never_negative, counter.never_skips]
+  seed: 7
+  subjects:
+    counter.one: {counter: 1}
+    counter.two: {counter: 2}
+  events:
+    - up: {$subject: true}
+    - wait_until: {run: [reader, sh, -c, "wc -l < /data/count"], at_least: 5, timeout: 30s}
+    - chaos: {duration: 5s, every: 200ms-500ms, faults: [counter_pause, counter_kill]}
+    - check:
+        covers: counter.keeps_counting
+        run: [reader, sh, -c, "a=$(wc -l < /data/count); sleep 1; b=$(wc -l < /data/count); if [ $b -gt $a ]; then echo 0; else echo 1; fi"]
+    - check: {results: {run: [reader, sh, -c, "echo '{\"counter.never_negative\": 0}'"], decides: [counter.never_negative]}}
+    - check: {covers: counter.never_skips, run: [reader, echo, "0"], expect: -1}
+
+- id: http.faults
+  runner: temper
+  name: A Go HTTP counter counts 1000 concurrent increments exactly, through pauses
+  description: >
+    1000 increments arrive at once while the server is paused and resumed.
+    Every acknowledged increment is in the count, none counts twice, and
+    every request is answered.
+  covers: [http.never_loses_acked, http.counts_once, http.answers_every_request]
+  subjects:
+    http.go: {http: 1}
+    http.go_racy: {http-racy: 1}   # no lock: concurrent increments clobber, so it loses acked ones
+  seed: 11
+  events:
+    - up: {$subject: true}
+    - hold: {name: load, run: [load, /counter, load, -n, "1000", -url, "http://counter:8080/inc", -out, /data/acked]}
+    - chaos: {duration: 4s, every: 200ms-400ms, faults: [http_pause]}
+    - wait_until: {run: [load, sh, -c, "test -f /data/acked && echo done || echo waiting"], equals: done, timeout: 2m}
+    - check:
+        covers: http.never_loses_acked
+        run: [load, sh, -c, "a=$(cat /data/acked); c=$(cat /data/count); if [ $a -gt $c ]; then echo $((a - c)); else echo 0; fi"]
+    - check:
+        covers: http.counts_once
+        run: [load, sh, -c, "c=$(cat /data/count); if [ $c -gt 1000 ]; then echo $((c - 1000)); else echo 0; fi"]
+    - check:
+        covers: http.answers_every_request
+        run: [load, sh, -c, "echo $((1000 - $(cat /data/acked)))"]

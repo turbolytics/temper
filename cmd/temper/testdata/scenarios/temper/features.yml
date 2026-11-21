@@ -1,0 +1,7 @@
+features:
+  - id: counter.service
+    description: Appends a line to a shared file every 100 ms.
+    requires: [integration]
+  - id: http.counter
+    description: Counts increments sent over HTTP, durably.
+    requires: [integration]

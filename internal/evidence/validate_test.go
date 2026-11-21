@@ -6,6 +6,7 @@ import (
 
 	"github.com/turbolytics/temper"
 	"github.com/turbolytics/temper/internal/diag"
+	"github.com/turbolytics/temper/internal/model"
 )
 
 func loc(r temper.Record) Located {
@@ -117,4 +118,47 @@ func TestValidate_TestOnlyDropped(t *testing.T) {
 		t.Fatalf("test-only evidence: kept %v, errors %v; want valid and dropped", kept, errs)
 	}
 	wantError(t, temper.Record{Covers: "nope", Subject: "sink.double"}, "does not resolve")
+}
+
+// expanded adds s.exp, a runner: temper scenario expanded over sink.kafka
+// and source.kafka, and sink.other, a subject it does not run on.
+func expanded(t *testing.T) *model.Project {
+	p := project(t)
+	p.Subjects = append(p.Subjects, model.Subject{ID: "sink.other", Kind: "sink", Feature: "sink.kafka", File: "temper/subjects/sink.other.yml"})
+	p.Scenarios = append(p.Scenarios, model.Scenario{
+		ID: "s.exp", Runner: "temper", Name: "n", Description: "d",
+		Covers:   []string{"sink.flush.keeps_batch", "sink.kafka"},
+		Subjects: map[string]map[string]int{"sink.kafka": {"worker": 1}, "source.kafka": {"worker": 2}},
+		File:     "temper/scenarios/b.yml",
+	})
+	return p
+}
+
+func TestValidate_ExpandedScenarioAcceptsEachSubject(t *testing.T) {
+	temper.Covers(t, "cli.matrix")
+	temper.Covers(t, "matrix.scenario_needs_declaration", temper.Subject("cli"))
+	for _, r := range []temper.Record{
+		{Covers: "sink.flush.keeps_batch", Subject: "sink.kafka", Scenario: "s.exp", Test: "s.exp/sink.kafka/sink.flush.keeps_batch"},
+		{Covers: "s.exp", Subject: "source.kafka", Scenario: "s.exp", Test: "s.exp/source.kafka/s.exp"},
+		{Covers: "sink.kafka", Subject: "source.kafka", Scenario: "s.exp", Test: "s.exp/source.kafka/sink.kafka"},
+	} {
+		kept, errs := Validate(expanded(t), []Located{loc(r)})
+		if len(kept) != 1 || len(errs) != 0 {
+			t.Errorf("Validate(%+v) = kept %v, errors %v; want it kept", r, kept, errs)
+		}
+	}
+}
+
+func TestValidate_ExpandedScenarioRejectsOtherSubjects(t *testing.T) {
+	temper.Covers(t, "cli.matrix")
+	temper.Covers(t, "matrix.scenario_needs_declaration", temper.Subject("cli"))
+	for _, r := range []temper.Record{
+		{Covers: "s.exp", Subject: "sink.other", Scenario: "s.exp"},
+		{Covers: "s.exp", Scenario: "s.exp"},
+	} {
+		kept, errs := Validate(expanded(t), []Located{loc(r)})
+		if len(kept) != 0 || len(errs) != 1 || errs[0].Rule != "R7" || !strings.Contains(errs[0].Message, "s.exp") {
+			t.Errorf("Validate(%+v) = kept %v, errors %v; want one R7 error naming s.exp", r, kept, errs)
+		}
+	}
 }

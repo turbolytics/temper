@@ -2,9 +2,13 @@ package check
 
 import (
 	"fmt"
+	"path"
+	"sort"
+	"strings"
 
 	"github.com/turbolytics/temper/internal/diag"
 	"github.com/turbolytics/temper/internal/model"
+	"github.com/turbolytics/temper/internal/scenarios"
 )
 
 func checkScenarios(p *model.Project) diag.List {
@@ -25,20 +29,37 @@ func checkScenarios(p *model.Project) diag.List {
 		if len(sc.Events) == 0 {
 			add("§11", "has no events")
 		}
-		for i, e := range sc.Events {
-			if _, ok := e["at"]; !ok {
-				add("§11", fmt.Sprintf("event %d has no at", i+1))
+		if sc.Runner == "temper" {
+			checkTemperEvents(p, sc, add)
+		} else {
+			for i, e := range sc.Events {
+				if _, ok := e["at"]; !ok {
+					add("§11", fmt.Sprintf("event %d has no at", i+1))
+				}
 			}
 		}
 
-		var subj model.Subject
-		hasSubject := false
+		// subjs are the subjects the scenario runs on: its subject, or every
+		// key of subjects. Undeclared ones are reported and left out.
+		var subjs []model.Subject
+		names := []string{}
 		if sc.Subject != "" {
-			s, ok := p.Subject(sc.Subject)
-			if !ok {
-				add("R7", fmt.Sprintf("names subject %q, which is not declared", sc.Subject))
+			names = append(names, sc.Subject)
+		}
+		if len(sc.Subjects) > 0 {
+			if sc.Subject != "" {
+				add("§11", "names both subject and subjects; an expanded scenario uses subjects only")
+			}
+			for k := range sc.Subjects {
+				names = append(names, k)
+			}
+			sort.Strings(names)
+		}
+		for _, n := range names {
+			if s, ok := p.Subject(n); ok {
+				subjs = append(subjs, s)
 			} else {
-				subj, hasSubject = s, true
+				add("R7", fmt.Sprintf("names subject %q, which is not declared", n))
 			}
 		}
 
@@ -54,11 +75,13 @@ func checkScenarios(p *model.Project) diag.List {
 			if !PerSubject(p, c) {
 				continue
 			}
-			switch {
-			case sc.Subject == "":
+			if len(names) == 0 {
 				add("§11", fmt.Sprintf("covers %s, which is proven per subject, but names no subject", c))
-			case hasSubject && !AppliesToSubject(p, c, subj):
-				add("§11", fmt.Sprintf("covers %s, which does not apply to its subject %s", c, subj.ID))
+			}
+			for _, subj := range subjs {
+				if !AppliesToSubject(p, c, subj) {
+					add("§11", fmt.Sprintf("covers %s, which does not apply to its subject %s", c, subj.ID))
+				}
 			}
 		}
 	}
@@ -82,6 +105,110 @@ func checkScenarioLattices(p *model.Project) diag.List {
 		for _, m := range l.Members {
 			if r := l.ID + "/" + m.Key; !listed[r] {
 				out = append(out, diag.Error{File: l.File, ID: l.ID, Message: "no scenario covers " + r, Rule: "R6 gap"})
+			}
+		}
+	}
+	return out
+}
+
+// checkTemperEvents validates a runner: temper scenario's events without
+// running them: each parses, each fault is declared, every reference the
+// scenario covers is decided by some check, and every check decides a
+// reference the scenario covers.
+func checkTemperEvents(p *model.Project, sc model.Scenario, add func(rule, msg string)) {
+	events, err := scenarios.ParseEvents(sc.Events)
+	if err != nil {
+		add("§11", err.Error())
+		return
+	}
+	for _, f := range scenarios.FaultNames(events) {
+		if _, ok := p.Faults[f]; !ok {
+			add("§11", fmt.Sprintf("names fault %s, which faults.yml does not declare", f))
+		}
+	}
+	for _, e := range events {
+		if e.UpSubject && len(sc.Subjects) == 0 {
+			add("§11", "starts $subject but has no subjects to expand")
+		}
+	}
+	decided := scenarios.Decided(events)
+	covered := map[string]bool{}
+	for _, c := range sc.Covers {
+		covered[c] = true
+		found := false
+		for _, d := range decided {
+			found = found || scenarios.Matches(d, c)
+		}
+		if !found {
+			add("§11", fmt.Sprintf("covers %s, which no check decides", c))
+		}
+	}
+	for _, d := range decided {
+		if !strings.HasSuffix(d, "/*") && !covered[d] {
+			add("§11", fmt.Sprintf("decides %s, which the scenario does not cover", d))
+		}
+	}
+}
+
+var faultActions = map[string]bool{
+	"kill": true, "stop": true, "start": true, "restart": true, "pause": true,
+	"unpause": true, "disconnect": true, "connect": true, "exec": true,
+}
+
+// checkFaults validates faults.yml.
+func checkFaults(p *model.Project) diag.List {
+	var out diag.List
+	file := path.Join(p.Config.Dir, "faults.yml")
+	names := make([]string, 0, len(p.Faults))
+	for n := range p.Faults {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		f := p.Faults[n]
+		add := func(msg string) {
+			out = append(out, diag.Error{File: file, ID: n, Message: msg, Rule: "§11"})
+		}
+		switch {
+		case !faultActions[f.Do]:
+			add(fmt.Sprintf("does %s, which is not an action (kill, stop, start, restart, pause, unpause, disconnect, connect, exec)", f.Do))
+			continue
+		case f.Do == "exec" && len(f.Exec) < 2:
+			add("does exec but names no exec command: [service, command, ...]")
+		case f.Do != "exec" && f.Target == "" && f.TargetFrom == nil:
+			add("names no target or target_from")
+		}
+		if (f.Do == "pause" || f.Do == "disconnect") && f.For == "" {
+			add(fmt.Sprintf("does %s but has no for, so it would never heal", f.Do))
+		}
+		if (f.Do == "disconnect" || f.Do == "connect") && f.Network == "" {
+			add(fmt.Sprintf("does %s but names no network", f.Do))
+		}
+		for k, v := range map[string]string{"for": f.For, "after": f.After} {
+			if v == "" {
+				continue
+			}
+			if _, err := scenarios.ParseRange(v); err != nil {
+				add(fmt.Sprintf("%s: %v", k, err))
+			}
+		}
+		if f.Then != "" && f.Then != "start" && f.Then != "restart" {
+			add(fmt.Sprintf("then %s, which is not start or restart", f.Then))
+		}
+		if t := f.TargetFrom; t != nil {
+			if len(t.Exec) < 2 {
+				add("target_from needs exec: [service, command, ...]")
+			}
+			if !strings.Contains(t.Map, "{value}") {
+				add("target_from map must contain {value}, where the printed value goes")
+			}
+			if t.Chance != nil && (*t.Chance < 0 || *t.Chance > 1) {
+				add("target_from chance must be between 0 and 1")
+			}
+		}
+		for _, c := range f.Covers {
+			if _, ok := ResolveRef(p, c); !ok {
+				out = append(out, diag.Error{File: file, ID: n, Message: fmt.Sprintf("covers %s, which does not resolve", c), Rule: "§14.8"})
 			}
 		}
 	}

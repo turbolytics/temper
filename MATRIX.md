@@ -2,9 +2,9 @@
 <!-- temper matrix format: 2 -->
 # temper matrix
 
-**14 features and 18 invariants on 2 subjects, at levels `unit` and `integration`.**
+**15 features and 22 invariants on 2 subjects, at levels `unit` and `integration`.**
 
-✅ 47 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
+✅ 54 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
 
 Each cell is one claim in `temper/` at one level. It is covered when a test that ran
 at that level passed and none failed: a skip proves nothing, and a pass never hides
@@ -38,6 +38,7 @@ What the system does. Each feature is proven at the levels it requires.
 | `cli.version` | Prints the name, Temper by Turbolytics, and the version the binary was built as, whether stamped at release or installed with go install. | ✅ | ✅ |
 | `site.findings` | Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it. | ✅ | — |
 | `site.case_studies` | Builds the Case Studies pages, audits written up with the project's approval, linked from the top-level nav and from each project's findings. | ✅ | — |
+| `cli.scenarios_run` | Runs runner-temper scenarios against a Docker Compose topology, injecting named faults on a seeded schedule, and records one verdict per check as evidence. | ✅ | ✅ |
 
 ## Invariants
 
@@ -78,6 +79,10 @@ Where a row names several levels, each cell shows one mark per level, in that or
 | [`matrix.stale_output_detected`](#inv-matrix.stale_output_detected) | output | `unit`, `integration` | ✅ ✅ |
 | [`matrix.test_only_credits_nothing`](#inv-matrix.test_only_credits_nothing) | honesty | `unit` | ✅ |
 | [`matrix.unknown_reference_fails`](#inv-matrix.unknown_reference_fails) | honesty | `unit`, `integration` | ✅ ✅ |
+| [`scenarios.check_decides_its_own_claim`](#inv-scenarios.check_decides_its_own_claim) | honesty | `unit` | ✅ |
+| [`scenarios.faults_heal`](#inv-scenarios.faults_heal) | honesty | `unit`, `integration` | ✅ ✅ |
+| [`scenarios.seed_replays`](#inv-scenarios.seed_replays) | honesty | `unit` | ✅ |
+| [`scenarios.setup_failure_is_error`](#inv-scenarios.setup_failure_is_error) | honesty | `unit` | ✅ |
 
 - <a id="inv-declarations.ambiguous_answer_rejected"></a>**`declarations.ambiguous_answer_rejected`** · safety · honesty — A lattice answer map that does not say exactly one of supported: true and unsupported: true is an error; it is never read as supported.
 - <a id="inv-matrix.exact_reference_only"></a>**`matrix.exact_reference_only`** · safety · honesty — Evidence credits only the item its reference names exactly; never by test name, id prefix, file path or level.
@@ -92,6 +97,10 @@ Where a row names several levels, each cell shows one mark per level, in that or
 - <a id="inv-matrix.stale_output_detected"></a>**`matrix.stale_output_detected`** · safety · output — matrix --check exits 3 whenever the committed statuses or MATRIX.md differ from what the evidence produces.
 - <a id="inv-matrix.test_only_credits_nothing"></a>**`matrix.test_only_credits_nothing`** · safety · honesty — Evidence for a test-only subject credits no cell.
 - <a id="inv-matrix.unknown_reference_fails"></a>**`matrix.unknown_reference_fails`** · safety · honesty — Evidence or a declaration that names an id Temper does not know is an error that exits 2; it is never ignored and never creates a row.
+- <a id="inv-scenarios.check_decides_its_own_claim"></a>**`scenarios.check_decides_its_own_claim`** · safety · honesty — Each check's outcome lands only on the reference that check decides; a failing check never fails another reference, and a passing one never covers another.
+- <a id="inv-scenarios.faults_heal"></a>**`scenarios.faults_heal`** · safety · honesty — Every fault the runner injects is healed before the run ends, including when the run is interrupted; no container is left paused, stopped or disconnected.
+- <a id="inv-scenarios.seed_replays"></a>**`scenarios.seed_replays`** · safety · honesty — The same scenario and seed draw the same fault sequence, targets and durations, so any run can be replayed.
+- <a id="inv-scenarios.setup_failure_is_error"></a>**`scenarios.setup_failure_is_error`** · safety · honesty — A scenario that cannot run, because Docker is missing, a service never becomes ready or a setup step fails, records error for every reference it covers; never pass, fail or skip.
 
 ## Lattices
 

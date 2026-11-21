@@ -187,7 +187,43 @@ type Scenario struct {
 	Subject     string           `yaml:"subject"`
 	Covers      []string         `yaml:"covers"`
 	Events      []map[string]any `yaml:"events"`
-	File        string           `yaml:"-"`
+	// Runner is "temper" for a scenario that temper scenarios run executes;
+	// empty means the project's own runner does.
+	Runner string `yaml:"runner"`
+	// Compose is the Docker Compose file, relative to the root; the loader
+	// defaults it to compose.yml.
+	Compose string `yaml:"compose"`
+	// Seed starts the scenario's random draws.
+	Seed int64 `yaml:"seed"`
+	// Subjects expands the scenario: one run per subject, each starting the
+	// services it maps to replica counts. It replaces Subject.
+	Subjects map[string]map[string]int `yaml:"subjects"`
+	File     string                    `yaml:"-"`
+}
+
+// Fault is one named fault in faults.yml.
+type Fault struct {
+	Target     string      `yaml:"target"`
+	TargetFrom *TargetFrom `yaml:"target_from"`
+	Do         string      `yaml:"do"`
+	Then       string      `yaml:"then"`
+	After      string      `yaml:"after"`
+	For        string      `yaml:"for"`
+	Exec       []string    `yaml:"exec"`
+	Network    string      `yaml:"network"`
+	All        bool        `yaml:"all"`
+	// Covers lists the references that fail when the fault cannot heal.
+	Covers []string `yaml:"covers"`
+}
+
+// TargetFrom picks a fault's target at run time: a command prints a value,
+// and Map names the instance it means.
+type TargetFrom struct {
+	Exec []string `yaml:"exec"`
+	Map  string   `yaml:"map"`
+	// Chance is how often to use the printed target; nil means always.
+	Chance   *float64 `yaml:"chance"`
+	Fallback string   `yaml:"fallback"`
 }
 
 // Project is every declaration of one project.
@@ -199,6 +235,8 @@ type Project struct {
 	Lattices   []Lattice
 	Subjects   []Subject
 	Scenarios  []Scenario
+	// Faults are the named faults from faults.yml.
+	Faults map[string]Fault
 }
 
 // ConfigFile is temper.yml, relative to the root.

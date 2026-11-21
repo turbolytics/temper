@@ -100,9 +100,20 @@ func Load(root string) (*model.Project, diag.List) {
 		if l.decode(rel, &group) {
 			for i := range group {
 				group[i].File = rel
+				if group[i].Compose == "" {
+					group[i].Compose = "compose.yml"
+				}
 			}
 			p.Scenarios = append(p.Scenarios, group...)
 		}
+	}
+	var faults struct {
+		Faults map[string]model.Fault `yaml:"faults"`
+	}
+	l.decode(path.Join(dir, "faults.yml"), &faults)
+	p.Faults = faults.Faults
+	if p.Faults == nil {
+		p.Faults = map[string]model.Fault{}
 	}
 	return p, l.errs
 }

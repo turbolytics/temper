@@ -41,3 +41,6 @@ features:
   - id: site.case_studies
     description: Builds the Case Studies pages, audits written up with the project's approval, linked from the top-level nav and from each project's findings.
     requires: [unit]
+  - id: cli.scenarios_run
+    description: Runs runner-temper scenarios against a Docker Compose topology, injecting named faults on a seeded schedule, and records one verdict per check as evidence.
+    requires: [unit, integration]

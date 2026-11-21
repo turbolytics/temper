@@ -26,6 +26,7 @@ var rules = []rule{
 	checkAnswers,
 	checkScenarios,
 	checkScenarioLattices,
+	checkFaults,
 }
 
 // Check runs every rule and returns the findings, sorted.
