@@ -47,6 +47,7 @@ their commands are declared in `temper.yml`.
 | `temper matrix --check` | Writes nothing; exits 3 if the committed files are stale. It judges every level. |
 | `temper run --level L -- CMD` | Runs `CMD` with the level and evidence directory set. It appends evidence and never clears it. |
 | `temper clean` | Deletes all evidence. Do this before a full run, so old passes cannot count. |
+| `temper scenarios run` | Runs the `runner: temper` scenarios against Docker Compose, injecting faults, and records one verdict per check. Run it through `temper run`. |
 | `temper render` | Rebuilds `MATRIX.md` from the committed statuses. |
 | `temper guide` | Prints this guide. |
 | `temper version` | Prints the installed version. |
@@ -113,6 +114,7 @@ temper/invariants.yml what must never happen
 temper/lattices/<id>.yml    one list of members per file
 temper/subjects/<id>.yml    one concrete thing per file (the file name is its id)
 temper/scenarios/<group>.yml
+temper/faults.yml     named faults for runner: temper scenarios
 ```
 
 Ids are dot-separated lowercase (`sink.flush.keeps_batch`). A feature, an
@@ -205,6 +207,45 @@ Things that are easy to get wrong:
 - Unknown fields are errors, which catches typos. A field starting with `x-`
   is your own metadata and is ignored.
 - A lattice member key may hold spaces and slashes (`decimal(*, *)`).
+
+## Testing a system under faults
+
+A scenario with `runner: temper` is run by `temper scenarios run`. It starts
+the services in `compose.yml`, injects named faults, and decides each
+reference it covers with a check: a command that prints a count. Temper never
+reads your data. Your check's query decides what a violation is.
+
+```yaml
+# temper/faults.yml
+faults:
+  app_kill: {target: "app-*", do: kill, then: start, after: 1s-3s}   # a glob picks one instance, from the seed
+  db_pause: {target: db, do: pause, for: 2s-6s}                      # docker pause, then unpause
+```
+
+```yaml
+# temper/scenarios/faults.yml
+- id: store.file.survives_crashes
+  runner: temper
+  name: the file store keeps every acknowledged reservation through crashes
+  covers: [store.file]                # every reference needs a check that decides it
+  description: A reservation the app acknowledged is in the file after kills and pauses.
+  seed: 7                             # the same seed replays the same faults
+  events:
+    - up: {db: 1, app-a: 1, app-b: 1}       # waits until each is healthy or running
+    - run: [loadgen, reserve, "500"]        # a one-shot container; must exit 0
+    - chaos: {duration: 60s, every: 1s-4s, faults: [app_kill, db_pause]}
+    - drain: {remaining: [db, count-pending], stall: 30s, max: 5m}
+    - check: {covers: store.file, exec: [db, count-lost]}   # pass when it prints 0
+```
+
+- A step that cannot run (Docker missing, a service never ready, a setup
+  command failing) records `error` for every reference. It is never a pass.
+- `subjects:` runs the scenario once per subject, each with its own services
+  (`up: {$subject: true}`) and seed.
+- Replay one run locally with
+  `temper scenarios run --scenario ID --subject ID --seed N`. Without
+  `temper run`, it prints the verdicts and records nothing. Each run's log is
+  in `.temper/scenarios/`.
 
 ## Writing tests in Go
 

@@ -598,6 +598,43 @@ The gap shows as ⏳. It does not fail the build. When a test proves the
 claim, the cell shows ✅ while `tracked_by` is still set. This tells you the
 invariant is ready to enforce. To enforce it, remove `tracked_by`.
 
+### Test a system under faults
+
+Temper can run a system's own topology under faults. Declare the faults once,
+then write a scenario with `runner: temper`. Each check is a command that
+prints a count of violations, and each one decides one guarantee.
+
+```yaml
+# temper/faults.yml
+faults:
+  worker_kill: {target: "worker-*", do: kill, then: start, after: 0.5s-2.5s}
+  pg_pause:    {target: postgres, do: pause, for: 2s-8s}
+
+# temper/scenarios/queue.yml
+- id: queue.faults
+  runner: temper
+  name: Jobs survive worker crashes and database stalls
+  description: An inserted job is never lost, and runs exactly once.
+  covers: [job.never_lost, job.runs_once]
+  subjects: {cluster.go: {worker-go: 3}, cluster.mixed: {worker-go: 2, worker-js: 2}}
+  seed: 70
+  events:
+    - up: {$subject: true, postgres: 1, inserter: 1}
+    - chaos: {duration: 150s, every: 2s-6s, faults: [worker_kill, pg_pause]}
+    - drain: {remaining: [postgres, psql, -Atc, "SELECT count(*) FROM pending"], stall: 60s}
+    - check: {covers: job.never_lost, exec: [postgres, psql, -Atc, "SELECT count(*) FROM lost"]}
+    - check: {covers: job.runs_once, exec: [postgres, psql, -Atc, "SELECT count(*) FROM ran_twice"]}
+```
+
+```sh
+temper run --level faults -- temper scenarios run
+temper scenarios run --scenario queue.faults --subject cluster.go --seed 70   # replay one run
+```
+
+Docker Compose owns the topology. Temper drives it with the `docker compose`
+command, one fault at a time, from the seed, so any run replays. A scenario
+that cannot run records `error`, never a pass.
+
 ### Gate it in CI
 
 CI is the source of truth. It starts with no evidence, runs every level, and
@@ -670,6 +707,7 @@ proven.
 | `temper matrix --json` | Prints every cell, error, and count as JSON. |
 | `temper render` | Rewrites `MATRIX.md` from the committed `temper/status/`. Use it after a merge conflict. |
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE`, and `TEMPER_RUN` set. Adds evidence and never deletes it. |
+| `temper scenarios run [--scenario ID] [--subject ID] [--seed N]` | Runs the `runner: temper` scenarios against Docker Compose under faults, and records one verdict per check. Exits with code 1 when a check fails or errors. |
 | `temper clean` | Deletes all evidence. |
 | `temper guide` | Prints the guide to working in a Temper project. The guide matches the installed version. |
 | `temper version` | Prints the name and version. |
@@ -749,9 +787,11 @@ temper/
   lattices/<id>.yml
   subjects/<id>.yml
   scenarios/<group>.yml
+  faults.yml         # named faults for runner: temper scenarios
   status/            # generated, committed
 MATRIX.md            # generated, committed
 .temper/evidence/    # generated, ignored
+.temper/scenarios/   # run logs, generated, ignored
 ```
 
 Each status file has one row per line. Two branches that change different
