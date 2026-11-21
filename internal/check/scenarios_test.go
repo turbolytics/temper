@@ -253,3 +253,47 @@ func TestCheck_FaultUsesNamedCommand(t *testing.T) {
 	expect(t, errs, "temper/faults.yml", "§11", "unknown", "nope")
 	expect(t, errs, "temper/faults.yml", "§11", "count", "takes 1")
 }
+
+// withExemptLattice adds lattice l (members a, b) on sinks; sink.kafka
+// answers a supported and b unsupported, proven by provenBy.
+func withExemptLattice(provenBy string) func(*model.Project) {
+	return func(p *model.Project) {
+		p.Lattices = append(p.Lattices, model.Lattice{ID: "l", Description: "d", AppliesTo: "sink", Requires: []string{"unit"},
+			Members: []model.Member{{Key: "a"}, {Key: "b"}}, File: "temper/lattices/l.yml"})
+		for i := range p.Subjects {
+			if p.Subjects[i].ID == "sink.kafka" {
+				if p.Subjects[i].Answers == nil {
+					p.Subjects[i].Answers = map[string]map[string]model.Answer{}
+				}
+				p.Subjects[i].Answers["l"] = map[string]model.Answer{"a": {Supported: true}, "b": {Reason: "r", ProvenBy: provenBy}}
+			}
+		}
+	}
+}
+
+func exemptScenario(events string) func(*model.Project) {
+	return func(p *model.Project) {
+		withTemperScenario([]string{"l/a", "l/b"}, events)(p)
+		p.Scenarios[len(p.Scenarios)-1].Subject = "sink.kafka"
+	}
+}
+
+func TestScenarios_ExemptionProvenByMustMatch(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	ev := "- check: {covers: l/a, host: [echo, '0']}\n- check: {exempts: l/b, host: [echo, '0']}\n"
+	if errs := Check(project(withExemptLattice("s.faults/sink.kafka/l/b"), exemptScenario(ev))); len(errs) != 0 {
+		t.Fatalf("a matching proven_by is reported:\n%s", render(errs))
+	}
+	expect(t, Check(project(withExemptLattice("other_test"), exemptScenario(ev))),
+		"temper/scenarios/faults.yml", "§11", "s.faults", "s.faults/sink.kafka/l/b")
+	expect(t, Check(project(withExemptLattice("s.faults/sink.kafka/l/b"), exemptScenario("- check: {covers: l/b, host: [echo, '0']}\n- check: {exempts: l/a, host: [echo, '0']}\n"))),
+		"temper/scenarios/faults.yml", "§11", "s.faults", "declares no exemption")
+}
+
+func TestScenarios_ExemptedCountsAsDecided(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	ev := "- check: {results: {host: [cat, r], decides: [l/*], exempts: [l/*]}}\n"
+	if errs := Check(project(withExemptLattice("s.faults/sink.kafka/l/b"), exemptScenario(ev))); len(errs) != 0 {
+		t.Fatalf("errors:\n%s", render(errs))
+	}
+}

@@ -132,7 +132,8 @@ func checkTemperEvents(p *model.Project, sc model.Scenario, add func(rule, msg s
 			add("§11", "starts $subject but has no subjects to expand")
 		}
 	}
-	decided := scenarios.Decided(events)
+	exempted := scenarios.Exempted(events)
+	decided := append(scenarios.Decided(events), exempted...)
 	covered := map[string]bool{}
 	for _, c := range sc.Covers {
 		covered[c] = true
@@ -147,6 +148,50 @@ func checkTemperEvents(p *model.Project, sc model.Scenario, add func(rule, msg s
 	for _, d := range decided {
 		if !strings.HasSuffix(d, "/*") && !covered[d] {
 			add("§11", fmt.Sprintf("decides %s, which the scenario does not cover", d))
+		}
+	}
+	checkExemptionProofs(p, sc, events, add)
+}
+
+// checkExemptionProofs holds each exemption a scenario proves to its
+// declaration: an exempts check needs the subject to declare the exemption,
+// and every declared exemption it proves must name this scenario's test in
+// proven_by (§10, R5), for every subject it runs on.
+func checkExemptionProofs(p *model.Project, sc model.Scenario, events []scenarios.Event, add func(rule, msg string)) {
+	subjects := []string{sc.Subject}
+	if len(sc.Subjects) > 0 {
+		subjects = subjects[:0]
+		for s := range sc.Subjects {
+			subjects = append(subjects, s)
+		}
+		sort.Strings(subjects)
+	}
+	for _, sid := range subjects {
+		subj, _ := p.Subject(sid)
+		proves := func(ref string, mustDeclare bool) {
+			test, ok := subj.ProvenBy(ref)
+			want := scenarios.TestID(sc.ID, sid, ref)
+			switch {
+			case !ok && mustDeclare:
+				add("§11", fmt.Sprintf("proves an exemption for %s, but %s declares no exemption for it", ref, sid))
+			case ok && test != want:
+				add("§11", fmt.Sprintf("proves the exemption for %s on %s, whose proven_by is %s; it must be %s", ref, sid, test, want))
+			}
+		}
+		for _, e := range events {
+			if e.Check == nil {
+				continue
+			}
+			if e.Check.Exempts != "" {
+				proves(e.Check.Exempts, true)
+			}
+			for _, pat := range e.Check.ExemptPatterns {
+				for _, c := range sc.Covers {
+					if scenarios.Matches(pat, c) {
+						proves(c, false)
+					}
+				}
+			}
 		}
 	}
 }

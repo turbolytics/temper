@@ -235,3 +235,25 @@ func TestParse_NamedKeysOnlyWhereACommandGoes(t *testing.T) {
 		}
 	}
 }
+
+func TestParse_ExemptsCheck(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	got, err := parse(t, "- check: {exempts: types.operators/row, host: [echo, \"0\"]}\n")
+	if err != nil || got[0].Check.Exempts != "types.operators/row" || got[0].Check.Covers != "" {
+		t.Fatalf("exempts check = %+v, %v", got, err)
+	}
+	if !reflect.DeepEqual(Exempted(got), []string{"types.operators/row"}) {
+		t.Errorf("Exempted = %v", Exempted(got))
+	}
+	if _, err := parse(t, "- check: {covers: a, exempts: b, host: [echo, \"0\"]}\n"); err == nil || !strings.Contains(err.Error(), "covers or exempts") {
+		t.Errorf("both = %v", err)
+	}
+}
+
+func TestParse_ResultsExempts(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	got, err := parse(t, "- check: {results: {host: [cat, r], decides: [l/*], exempts: [l/*]}}\n")
+	if err != nil || !reflect.DeepEqual(got[0].Check.ExemptPatterns, []string{"l/*"}) || !reflect.DeepEqual(Exempted(got), []string{"l/*"}) {
+		t.Fatalf("results exempts = %+v, %v", got, err)
+	}
+}
