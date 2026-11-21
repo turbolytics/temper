@@ -297,3 +297,17 @@ func TestScenarios_ExemptedCountsAsDecided(t *testing.T) {
 		t.Fatalf("errors:\n%s", render(errs))
 	}
 }
+
+func TestScenarios_ExemptedRefNotDecidedByDrainOrFault(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	ev := "- drain: {remaining: [pg, x], covers: l/b}\n- check: {covers: l/a, host: [echo, '0']}\n- check: {exempts: l/b, host: [echo, '0']}\n"
+	expect(t, Check(project(withExemptLattice("s.faults/sink.kafka/l/b"), exemptScenario(ev))),
+		"temper/scenarios/faults.yml", "§11", "s.faults", "l/b")
+}
+
+func TestScenarios_ExemptsOnlyKeyMustBeDeclared(t *testing.T) {
+	temper.Covers(t, "cli.check")
+	ev := "- check: {results: {host: [cat, r], decides: [l/b], exempts: [l/a]}}\n"
+	expect(t, Check(project(withExemptLattice("s.faults/sink.kafka/l/b"), exemptScenario(ev))),
+		"temper/scenarios/faults.yml", "§11", "s.faults", "declares no exemption")
+}

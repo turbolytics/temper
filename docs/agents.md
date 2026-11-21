@@ -251,6 +251,9 @@ commands:
 
 - A step that cannot run (Docker missing, a service never ready, a setup
   command failing) records `error` for every reference. It is never a pass.
+- A subject excused from a claim is proven by a check too:
+  `check: {exempts: <ref>, ...}` passes when the refusal happened, and the
+  subject's `proven_by` names the scenario's test, `<scenario>/<subject>/<ref>`.
 - Name a command once in `commands.yml` and use it anywhere a command goes,
   with its arguments as the value. Recipe packs (`temper recipes list`) give
   you tested commands and faults for Postgres, any service, and HTTP; read

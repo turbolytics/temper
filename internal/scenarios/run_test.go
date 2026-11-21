@@ -703,3 +703,25 @@ func TestRun_ResultsChooseCoversOrExempts(t *testing.T) {
 		t.Errorf("outcomes = %v", got)
 	}
 }
+
+func TestRun_StoppedRunErrorsTheExemptionProof(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.setup_failure_is_error", temper.Subject("cli"))
+	f := newFake()
+	f.fail["run setup: boom"] = errors.New("exit status 1")
+	vs := run(t, f, exemptProject(), temperScenario(t, []string{"l/a", "l/b"},
+		"- run: [setup, boom]\n- check: {results: {host: [cat, r], decides: [l/*], exempts: [l/*]}}\n"), Options{})
+	if got := exemptOutcomes(vs); !reflect.DeepEqual(got, map[string]string{"l/a": "error", "exempts l/b": "error", "s.faults": "error"}) {
+		t.Errorf("outcomes = %v", got)
+	}
+}
+
+func TestRun_ExemptsOnlyKeyUndeclaredIsError(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := newFake()
+	f.outputs["host: cat r"] = []string{`{"l/a": 0, "l/b": 0}`}
+	vs := run(t, f, exemptProject(), temperScenario(t, []string{"l/a", "l/b"}, "- check: {results: {host: [cat, r], decides: [l/b], exempts: [l/a]}}\n"), Options{})
+	if got := exemptOutcomes(vs); got["l/a"] != "error" {
+		t.Errorf("an exempts-only key the subject does not declare = %v, want l/a error", got)
+	}
+}

@@ -172,6 +172,8 @@ func checkExemptionProofs(p *model.Project, sc model.Scenario, events []scenario
 			test, ok := subj.ProvenBy(ref)
 			want := scenarios.TestID(sc.ID, sid, ref)
 			switch {
+			case !ok && mustDeclare && sid == "":
+				add("§11", fmt.Sprintf("proves an exemption for %s, but the scenario names no subject", ref))
 			case !ok && mustDeclare:
 				add("§11", fmt.Sprintf("proves an exemption for %s, but %s declares no exemption for it", ref, sid))
 			case ok && test != want:
@@ -187,10 +189,48 @@ func checkExemptionProofs(p *model.Project, sc model.Scenario, events []scenario
 			}
 			for _, pat := range e.Check.ExemptPatterns {
 				for _, c := range sc.Covers {
-					if scenarios.Matches(pat, c) {
-						proves(c, false)
+					if !scenarios.Matches(pat, c) {
+						continue
 					}
+					// A key only exempts: decides is always a proof, so it
+					// must be declared; one decides also matches is decided by
+					// the declaration.
+					alsoDecided := false
+					for _, d := range e.Check.Decides {
+						alsoDecided = alsoDecided || scenarios.Matches(d, c)
+					}
+					proves(c, !alsoDecided)
 				}
+			}
+		}
+	}
+	// The matrix judges an exempt cell by exempts records alone, so a drain
+	// or fault that decides a reference this scenario proves exempt would
+	// fail unseen.
+	proved := map[string]bool{}
+	for _, sid := range subjects {
+		subj, _ := p.Subject(sid)
+		for _, c := range sc.Covers {
+			if test, ok := subj.ProvenBy(c); ok && test == scenarios.TestID(sc.ID, sid, c) {
+				proved[c] = true
+			}
+		}
+	}
+	for _, e := range events {
+		var covers []string
+		switch {
+		case e.Drain != nil:
+			covers = e.Drain.Covers
+		case e.Fault != "":
+			covers = p.Faults[e.Fault].Covers
+		case e.Chaos != nil:
+			for _, f := range e.Chaos.Faults {
+				covers = append(covers, p.Faults[f].Covers...)
+			}
+		}
+		for _, c := range covers {
+			if proved[c] {
+				add("§11", fmt.Sprintf("proves the exemption for %s, so no drain or fault may decide it", c))
 			}
 		}
 	}

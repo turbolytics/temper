@@ -577,8 +577,11 @@ invariant in `exempt` or a lattice member answered `unsupported`, with
 `proven_by` naming that test; §10's rules then apply unchanged. A `results`
 check may also list `exempts:` patterns: a key they match is an exemption
 proof where the subject declares the exemption, and a claim it covers
-otherwise, so one object decides a whole lattice row. An exempted reference
-is listed in `covers`, and counts as decided.
+otherwise, so one object decides a whole lattice row; a key only `exempts:`
+matches must be declared. An exempted reference is listed in `covers`, and
+counts as decided. No drain or fault may decide a reference the scenario
+proves exempt, and when a run stops early, an exemption it would have proved
+records `error` as an exemption proof, so the cell shows failing.
 
 **The subject.** `{subject}` in any command an event runs is replaced with
 the subject the run is for, so one expanded scenario can tell its programs

@@ -144,8 +144,9 @@ type runner struct {
 	opt      Options
 	holds    map[string]hold
 	verdicts []Verdict
-	stopped  error // why the run stopped early, if it did
-	built    error // the build's failure, when --build failed
+	stopped  error           // why the run stopped early, if it did
+	proofs   map[string]bool // references this scenario proves exempt for this subject
+	built    error           // the build's failure, when --build failed
 
 	mu      sync.Mutex
 	logFile *os.File
@@ -238,6 +239,14 @@ func (r *runner) covered(ref string) bool {
 
 // run executes the events, then the scenario's own verdict.
 func (r *runner) run(events []Event) {
+	r.proofs = map[string]bool{}
+	for _, pat := range Exempted(events) {
+		for _, c := range r.sc.Covers {
+			if Matches(pat, c) && r.declaresExemption(c) {
+				r.proofs[c] = true
+			}
+		}
+	}
 	err := r.setup(r.built, "build")
 	if err == nil {
 		err = r.setup(r.e.Teardown(r.ctx), "teardown before the run")
@@ -313,7 +322,9 @@ func (r *runner) fail(err error) error {
 	}
 	for _, c := range r.sc.Covers {
 		if !decided[c] {
-			r.verdict(c, c, temper.OutcomeError, err.Error())
+			// An exemption this run would have proved records its error as
+			// an exemption proof, so the cell shows it rather than Missing.
+			r.verdictAs(c, c, temper.OutcomeError, err.Error(), r.proofs[c])
 		}
 	}
 	return errStop
@@ -561,10 +572,15 @@ func (r *runner) results(c *Check, out string, err error) {
 	}
 	var refs []string
 	exempt := map[string]bool{}
+	undeclared := map[string]bool{}
 	for _, ref := range r.sc.Covers {
 		if matchesAny(patterns, ref) {
 			refs = append(refs, ref)
-			exempt[ref] = matchesAny(c.ExemptPatterns, ref) && r.declaresExemption(ref)
+			proof := matchesAny(c.ExemptPatterns, ref)
+			exempt[ref] = proof && r.declaresExemption(ref)
+			// A key only exempts: decides is a proof; without a declaration
+			// it must not quietly become a covered claim.
+			undeclared[ref] = proof && !exempt[ref] && !matchesAny(c.Decides, ref)
 		}
 	}
 	all := func(why string) {
@@ -600,6 +616,8 @@ func (r *runner) results(c *Check, out string, err error) {
 	for _, ref := range refs {
 		n, ok := counts[ref]
 		switch {
+		case undeclared[ref]:
+			r.verdict(ref, ref, temper.OutcomeError, fmt.Sprintf("proves an exemption for %s, which %s does not declare", ref, r.subject))
 		case !ok:
 			r.verdictAs(ref, ref, temper.OutcomeError, "the results leave it out", exempt[ref])
 		case n == 0:
