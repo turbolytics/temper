@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"html"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
 // Markdown renders the subset of Markdown that MATRIX.md uses: headings,
-// paragraphs, bullet lists, tables, inline code, bold and links. It drops HTML
-// comments. Every other line renders as an escaped paragraph, so nothing is
+// paragraphs, bullet lists, tables, inline code, bold, links and the
+// <a id="inv-..."> anchors on promises. It drops HTML comments. Every other line renders as an escaped paragraph, so nothing is
 // lost and no raw HTML passes through.
 func Markdown(src []byte) []byte {
 	var out bytes.Buffer
@@ -62,6 +63,9 @@ var (
 	separator = regexp.MustCompile(`^\|(\s*:?-+:?\s*\|)+$`)
 	bold      = regexp.MustCompile(`\*\*(.+?)\*\*`)
 	link      = regexp.MustCompile(`\[([^\]]+)\]\(([^)\s]+)\)`)
+	// anchor matches the escaped form of a promise anchor, <a id="inv-...">.
+	anchor      = regexp.MustCompile(`&lt;a id=&#34;(inv-[A-Za-z0-9._-]+)&#34;&gt;&lt;/a&gt;`)
+	placeholder = regexp.MustCompile("\x00[0-9]+\x00")
 )
 
 func cells(line string) []string {
@@ -91,30 +95,36 @@ func writeTable(out *bytes.Buffer, head []string, body [][]string) {
 	out.WriteString("</tbody>\n</table>\n")
 }
 
-// inline escapes text, then renders code spans, bold and links. Code spans
-// are split out first, so their contents stay literal.
+// inline escapes text, then renders code spans, bold, links and promise
+// anchors. Code spans become placeholders first, so their contents stay
+// literal while bold and links can still wrap them.
 func inline(s string) string {
 	parts := strings.Split(s, "`")
+	var codes []string
 	var b strings.Builder
 	for i, part := range parts {
-		if i%2 == 1 && i < len(parts)-1 {
-			b.WriteString("<code>" + html.EscapeString(part) + "</code>")
-			continue
-		}
-		if i%2 == 1 {
+		switch {
+		case i%2 == 1 && i < len(parts)-1:
+			b.WriteString("\x00" + strconv.Itoa(len(codes)) + "\x00")
+			codes = append(codes, "<code>"+html.EscapeString(part)+"</code>")
+		case i%2 == 1:
 			// An unmatched backtick stays as text.
-			b.WriteString("`")
+			b.WriteString("`" + html.EscapeString(part))
+		default:
+			b.WriteString(html.EscapeString(part))
 		}
-		text := html.EscapeString(part)
-		text = bold.ReplaceAllString(text, "<strong>$1</strong>")
-		text = link.ReplaceAllStringFunc(text, func(m string) string {
-			sub := link.FindStringSubmatch(m)
-			if !strings.HasPrefix(sub[2], "https://") && !strings.HasPrefix(sub[2], "http://") && !strings.HasPrefix(sub[2], "#") {
-				return sub[1]
-			}
-			return `<a href="` + sub[2] + `">` + sub[1] + `</a>`
-		})
-		b.WriteString(text)
 	}
-	return b.String()
+	text := anchor.ReplaceAllString(b.String(), `<a id="$1"></a>`)
+	text = bold.ReplaceAllString(text, "<strong>$1</strong>")
+	text = link.ReplaceAllStringFunc(text, func(m string) string {
+		sub := link.FindStringSubmatch(m)
+		if !strings.HasPrefix(sub[2], "https://") && !strings.HasPrefix(sub[2], "http://") && !strings.HasPrefix(sub[2], "#") {
+			return sub[1]
+		}
+		return `<a href="` + sub[2] + `">` + sub[1] + `</a>`
+	})
+	return placeholder.ReplaceAllStringFunc(text, func(m string) string {
+		n, _ := strconv.Atoi(strings.Trim(m, "\x00"))
+		return codes[n]
+	})
 }
