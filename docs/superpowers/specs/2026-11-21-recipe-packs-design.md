@@ -187,7 +187,14 @@ command is killed and the release records error.
 scenario's Compose file before its first subject. A build that fails
 records error for every reference, like any setup step.
 
-### 5. What changes
+### 5. Command stderr is evidence
+
+*Added 2026-11-21, after a Feldera check printed `1` and nothing said why.*
+Every command's stderr goes to the run log, prefixed `stderr:`, whether the
+command succeeds or fails. A check's explanation is then part of the
+evidence a filed issue links to.
+
+### 6. What changes
 
 - SPEC §4 (layout: `commands.yml`), §6 (`packs` in `temper.yml`), §11
   (named commands, packs, `release:` on `hold`, `--build`).
