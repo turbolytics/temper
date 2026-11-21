@@ -334,7 +334,7 @@ func (r *runner) step(ev Event) error {
 		return r.setup(err, ev.Kind)
 	case "hold":
 		r.logf("hold %s: %s", ev.Name, ev.Cmd)
-		stop, err := r.e.Background(r.ctx, ev.Name, *ev.Cmd)
+		stop, err := r.e.Background(r.ctx, ev.Name, r.bind(*ev.Cmd))
 		if err != nil {
 			return r.setup(err, "hold "+ev.Name)
 		}
@@ -580,7 +580,7 @@ func (r *runner) results(c *Check, out string, err error) {
 // do runs c and keeps its stderr in the log, line by line: a check's
 // explanation is part of the evidence.
 func (r *runner) do(c Command) (Output, error) {
-	out, err := Do(r.ctx, r.e, c)
+	out, err := Do(r.ctx, r.e, r.bind(c))
 	if out.Stderr != "" {
 		for _, line := range strings.Split(out.Stderr, "\n") {
 			r.logf("stderr: %s", line)
@@ -602,4 +602,17 @@ func (r *runner) releaseHold(name string, h hold) error {
 		return fmt.Errorf("release command: %w", err)
 	}
 	return h.h.Await(releaseGrace)
+}
+
+// bind fills {subject} in a command with the subject this run is for, so one
+// expanded scenario can tell its programs which subject to check.
+func (r *runner) bind(c Command) Command {
+	fill := func(s string) string { return strings.ReplaceAll(s, "{subject}", r.subject) }
+	c.Service = fill(c.Service)
+	args := make([]string, len(c.Args))
+	for i, a := range c.Args {
+		args[i] = fill(a)
+	}
+	c.Args = args
+	return c
 }

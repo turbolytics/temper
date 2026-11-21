@@ -611,3 +611,24 @@ func TestRun_BuildFailureIsError(t *testing.T) {
 		t.Errorf("builds = %d, detail = %q", builds, vs[0].Detail)
 	}
 }
+
+func TestRun_SubjectPlaceholder(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	sc := temperScenario(t, []string{"job.never_lost"}, "- run: [oracle, check, --subject, \"{subject}\"]\n- check: {covers: job.never_lost, run: [oracle, verdict, \"{subject}\"]}\n")
+	sc.Subject = ""
+	sc.Subjects = map[string]map[string]int{"cluster.go": {}, "cluster.go_js": {}}
+	f := newFake()
+	f.outputs["run oracle: verdict cluster.go"] = []string{"0"}
+	f.outputs["run oracle: verdict cluster.go_js"] = []string{"0"}
+	vs := run(t, f, testProject(), sc, Options{})
+	wantOutcomes(t, vs, map[string]string{
+		"cluster.go job.never_lost": "pass", "cluster.go s.faults": "pass",
+		"cluster.go_js job.never_lost": "pass", "cluster.go_js s.faults": "pass",
+	})
+	calls := strings.Join(f.Calls(), "\n")
+	for _, want := range []string{"run oracle: check --subject cluster.go\n", "run oracle: check --subject cluster.go_js\n"} {
+		if !strings.Contains(calls+"\n", want) {
+			t.Errorf("calls lack %q:\n%s", want, calls)
+		}
+	}
+}

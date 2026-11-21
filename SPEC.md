@@ -563,6 +563,10 @@ names with a dot belong to packs, so a pack never shadows a project's
 definition. A fault's `exec` and `target_from.exec` are a list or a named
 command written as a mapping: `exec: {postgres.statement: "SELECT 1"}`.
 
+**The subject.** `{subject}` in any command an event runs is replaced with
+the subject the run is for, so one expanded scenario can tell its programs
+which subject to check: `check: {results: {run: [oracle, check, "{subject}"], decides: [...]}}`.
+
 **Releasing a hold.** A `hold` with `release:` ends by running that command;
 the held command must then end within 10 s, or it is killed and the release
 records error. Without `release:`, the held command is stopped.
