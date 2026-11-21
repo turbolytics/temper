@@ -44,6 +44,7 @@ type Event struct {
 	Services  []string       // down
 	Service   string         // start, stop
 	Cmd       *Command       // exec (and host), run, hold
+	Release   *Command       // hold: the command that releases it
 	Name      string         // hold, release
 	Until     *Until
 	Sleep     time.Duration
@@ -202,7 +203,7 @@ func (ps parser) parseEvent(m map[string]any) (Event, error) {
 	case "sleep":
 		e.Sleep, err = duration(v, "sleep")
 	case "hold":
-		e.Cmd, e.Name, err = ps.parseHold(v)
+		e.Cmd, e.Name, e.Release, err = ps.parseHold(v)
 	case "wait_until":
 		e.Until, err = ps.parseUntil(v)
 	case "chaos":
@@ -333,17 +334,35 @@ func (ps parser) parseCommand(m map[string]any, what string) (Command, error) {
 	return c, nil
 }
 
-func (ps parser) parseHold(v any) (*Command, string, error) {
-	m, err := ps.fields(v, "hold", "name", "exec", "run", "host", "instance")
+func (ps parser) parseHold(v any) (*Command, string, *Command, error) {
+	m, err := ps.fields(v, "hold", "name", "exec", "run", "host", "instance", "release")
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 	name, _ := m["name"].(string)
 	if name == "" {
-		return nil, "", errors.New("hold needs a name")
+		return nil, "", nil, errors.New("hold needs a name")
 	}
-	c, err := ps.parseCommand(m, "hold")
-	return &c, name, err
+	var release *Command
+	if r, ok := m["release"]; ok {
+		rm, ok := r.(map[string]any)
+		if !ok {
+			return nil, "", nil, errors.New("hold release needs a command: {exec: [...]} or {name: arguments}")
+		}
+		rc, err := ps.parseCommand(rm, "hold release")
+		if err != nil {
+			return nil, "", nil, err
+		}
+		release = &rc
+	}
+	rest := map[string]any{}
+	for k, v := range m {
+		if k != "release" {
+			rest[k] = v
+		}
+	}
+	c, err := ps.parseCommand(rest, "hold")
+	return &c, name, release, err
 }
 
 func (ps parser) parseUntil(v any) (*Until, error) {

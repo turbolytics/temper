@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/turbolytics/temper"
 	"github.com/turbolytics/temper/internal/scenarios"
@@ -79,17 +80,27 @@ func (f *cliEngine) Disconnect(ctx context.Context, c, n string) error {
 	return f.rec("disconnect " + c)
 }
 func (f *cliEngine) Connect(ctx context.Context, c, n string) error { return f.rec("connect " + c) }
-func (f *cliEngine) Exec(ctx context.Context, s string, i int, cmd []string) (string, error) {
-	return "0", f.rec("exec " + s + " " + strings.Join(cmd, " "))
+func (f *cliEngine) Exec(ctx context.Context, s string, i int, cmd []string) (scenarios.Output, error) {
+	return scenarios.Output{Stdout: "0"}, f.rec("exec " + s + " " + strings.Join(cmd, " "))
 }
-func (f *cliEngine) Run(ctx context.Context, s string, cmd []string) (string, error) {
-	return "0", f.rec("run " + s)
+func (f *cliEngine) Run(ctx context.Context, s string, cmd []string) (scenarios.Output, error) {
+	return scenarios.Output{Stdout: "0"}, f.rec("run " + s)
 }
-func (f *cliEngine) Host(ctx context.Context, cmd []string) (string, error) {
-	return "0", f.rec("host " + strings.Join(cmd, " "))
+func (f *cliEngine) Host(ctx context.Context, cmd []string) (scenarios.Output, error) {
+	return scenarios.Output{Stdout: "0"}, f.rec("host " + strings.Join(cmd, " "))
 }
-func (f *cliEngine) Background(ctx context.Context, name string, c scenarios.Command) (func() error, error) {
-	return func() error { return f.rec("release " + name) }, f.rec("hold " + name)
+
+type cliHeld struct {
+	f    *cliEngine
+	name string
+}
+
+func (h cliHeld) Exited() bool                { return false }
+func (h cliHeld) Stop() error                 { return h.f.rec("release " + h.name) }
+func (h cliHeld) Await(d time.Duration) error { return h.f.rec("await " + h.name) }
+
+func (f *cliEngine) Background(ctx context.Context, name string, c scenarios.Command) (scenarios.Held, error) {
+	return cliHeld{f: f, name: name}, f.rec("hold " + name)
 }
 func (f *cliEngine) Teardown(ctx context.Context) error { return f.rec("down -v") }
 

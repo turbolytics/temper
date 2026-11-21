@@ -538,3 +538,49 @@ func TestRun_FaultExecByName(t *testing.T) {
 		t.Errorf("calls = %v", f.Calls())
 	}
 }
+
+func TestRun_StderrIsLogged(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := newFake()
+	f.outputs["exec postgres: psql dup"] = []string{"2"}
+	f.stderr["exec postgres: psql dup"] = "why: job 7 ran twice\njob 9 ran twice"
+	var log strings.Builder
+	run(t, f, testProject(), temperScenario(t, []string{"complete_tx.effect_once"}, "- check: {covers: complete_tx.effect_once, exec: [postgres, psql, dup]}\n"), Options{Log: &log})
+	for _, want := range []string{"stderr: why: job 7 ran twice", "stderr: job 9 ran twice"} {
+		if !strings.Contains(log.String(), want) {
+			t.Errorf("log lacks %q:\n%s", want, log.String())
+		}
+	}
+}
+
+func TestRun_HoldReleasedByCommand(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	p := testProject()
+	p.Commands = map[string]model.Command{"end": {Exec: []string{"postgres", "psql", "-Atc", "end '{1}'"}}}
+	f := newFake()
+	run(t, f, p, temperScenario(t, []string{"job.never_lost"}, `
+- hold: {name: lock_a, exec: [postgres, psql, lock], release: {end: lock_a}}
+- release: lock_a
+- check: {covers: job.never_lost, host: [echo, "0"]}
+`), Options{})
+	calls := strings.Join(f.Calls(), "\n")
+	if !strings.Contains(calls, "hold lock_a\nexec postgres: psql -Atc end 'lock_a'\nawait lock_a") || strings.Contains(calls, "stop lock_a") {
+		t.Errorf("calls:\n%s", calls)
+	}
+}
+
+func TestRelease_HeldExitedEarlyIsError(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	temper.Covers(t, "scenarios.setup_failure_is_error", temper.Subject("cli"))
+	f := newFake()
+	f.holdExits["lock_a"] = true
+	vs := run(t, f, testProject(), temperScenario(t, []string{"job.never_lost"}, `
+- hold: {name: lock_a, exec: [postgres, psql, lock], release: {exec: [postgres, psql, end]}}
+- release: lock_a
+- check: {covers: job.never_lost, host: [echo, "0"]}
+`), Options{})
+	wantOutcomes(t, vs, map[string]string{"cluster.go job.never_lost": "error", "cluster.go s.faults": "error"})
+	if strings.Contains(strings.Join(f.Calls(), "\n"), "psql end") {
+		t.Error("ran the release command for a hold that had already exited")
+	}
+}

@@ -72,7 +72,10 @@ func Inject(ctx context.Context, e Engine, d *Draw, name string, f model.Fault, 
 		}
 		in.Target = c.String()
 		logf("fault %s: %s", name, c)
-		_, err = Do(ctx, e, c)
+		out, err := Do(ctx, e, c)
+		if out.Stderr != "" {
+			logf("stderr: %s", out.Stderr)
+		}
 		return in, err
 	}
 	targets, err := pickTargets(ctx, e, roll, pick, f, cmds, logf)
@@ -126,10 +129,13 @@ func pickTargets(ctx context.Context, e Engine, roll float64, pick int64, f mode
 			if err != nil {
 				return nil, fmt.Errorf("target_from: %w", err)
 			}
-			value, err := Do(ctx, e, c)
-			if err != nil {
+			printed, err := Do(ctx, e, c)
+			if printed.Stderr != "" {
+				logf("target_from stderr: %s", printed.Stderr)
+			}
+			if value := strings.TrimSpace(printed.Stdout); err != nil {
 				logf("target_from failed, using %s: %v", t.Fallback, err)
-			} else if value = strings.TrimSpace(value); value != "" {
+			} else if value != "" {
 				want := strings.ReplaceAll(t.Map, "{value}", value)
 				all, err := e.Instances(ctx, "*")
 				if err != nil {

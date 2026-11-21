@@ -19,16 +19,16 @@ type recorder struct {
 	ps    string
 }
 
-func (r *recorder) run(ctx context.Context, name string, args ...string) ([]byte, error) {
+func (r *recorder) run(ctx context.Context, name string, args ...string) ([]byte, []byte, error) {
 	line := name + " " + strings.Join(args, " ")
 	r.lines = append(r.lines, line)
 	if r.fail != nil {
-		return nil, r.fail
+		return nil, nil, r.fail
 	}
 	if strings.Contains(line, " ps ") {
-		return []byte(r.ps), nil
+		return []byte(r.ps), nil, nil
 	}
-	return []byte(" out \n"), nil
+	return []byte(" out \n"), nil, nil
 }
 
 func TestCompose_CommandLines(t *testing.T) {
@@ -50,7 +50,7 @@ func TestCompose_CommandLines(t *testing.T) {
 	must(e.Disconnect(ctx, "p-worker-go-1", "default"))
 	out, err := e.Exec(ctx, "postgres", 2, []string{"psql", "-c", "SELECT 1"})
 	must(err)
-	if out != "out" {
+	if out.Stdout != "out" {
 		t.Errorf("Exec output = %q, want trimmed", out)
 	}
 	_, err = e.Run(ctx, "setup", []string{"probe", "migrate"})
@@ -133,20 +133,50 @@ func TestCompose_HoldThatDiesIsAnError(t *testing.T) {
 		t.Fatalf("Background of a command that dies = %v, want an error with its output", err)
 	}
 	// Exits after the grace period, before release: release reports it.
-	stop, err := e.Background(ctx, "short", Command{Host: true, Args: []string{"sh", "-c", "sleep 0.6; echo lock lost >&2; exit 1"}})
+	short, err := e.Background(ctx, "short", Command{Host: true, Args: []string{"sh", "-c", "sleep 0.6; echo lock lost >&2; exit 1"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(time.Second)
-	if err := stop(); err == nil || !strings.Contains(err.Error(), "exited before release") || !strings.Contains(err.Error(), "lock lost") {
+	if err := short.Stop(); err == nil || !strings.Contains(err.Error(), "exited before release") || !strings.Contains(err.Error(), "lock lost") {
 		t.Fatalf("release of a hold that exited = %v", err)
 	}
 	// Still running at release: release stops it cleanly.
-	stop, err = e.Background(ctx, "held", Command{Host: true, Args: []string{"sleep", "30"}})
+	held, err := e.Background(ctx, "held", Command{Host: true, Args: []string{"sleep", "30"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := stop(); err != nil {
+	if err := held.Stop(); err != nil {
 		t.Fatalf("release of a running hold = %v", err)
+	}
+}
+
+func TestRelease_CommandThatDoesNotEndHoldIsError(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	e := NewCompose("compose.yml", "p", time.Second, ExecRun)
+	h, err := e.Background(context.Background(), "stubborn", Command{Host: true, Args: []string{"sleep", "30"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	err = h.Await(300 * time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "stubborn") || !strings.Contains(err.Error(), "still running") {
+		t.Fatalf("Await = %v", err)
+	}
+	if time.Since(start) > 5*time.Second || !h.Exited() {
+		t.Fatalf("the held process was not killed promptly (exited %v after %s)", h.Exited(), time.Since(start))
+	}
+	ok, _ := e.Background(context.Background(), "quick", Command{Host: true, Args: []string{"sh", "-c", "sleep 0.5; exit 3"}})
+	if err := ok.Await(5 * time.Second); err != nil {
+		t.Fatalf("a hold that ends after its release = %v", err)
+	}
+}
+
+func TestCompose_OutputCarriesStderr(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	e := NewCompose("compose.yml", "p", time.Second, ExecRun)
+	out, err := e.Host(context.Background(), []string{"sh", "-c", "echo 2; echo why >&2"})
+	if err != nil || out.Stdout != "2" || out.Stderr != "why" {
+		t.Fatalf("Host = %+v, %v", out, err)
 	}
 }

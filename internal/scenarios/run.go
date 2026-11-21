@@ -96,7 +96,7 @@ func RunScenario(ctx context.Context, e Engine, p *model.Project, sc model.Scena
 		case opt.Seed != nil:
 			seed = *opt.Seed + int64(i)
 		}
-		r := &runner{ctx: ctx, e: e, p: p, sc: sc, subject: subj, counts: sc.Subjects[subj], draw: NewDraw(seed), opt: opt, holds: map[string]func() error{}}
+		r := &runner{ctx: ctx, e: e, p: p, sc: sc, subject: subj, counts: sc.Subjects[subj], draw: NewDraw(seed), opt: opt, holds: map[string]hold{}}
 		r.openLog()
 		r.logf("%s seed %d", r.label(), seed)
 		r.run(events)
@@ -107,6 +107,16 @@ func RunScenario(ctx context.Context, e Engine, p *model.Project, sc model.Scena
 		}
 	}
 	return out, nil
+}
+
+// releaseGrace is how long a held command has to end after its release
+// command before it is killed and the release records error.
+var releaseGrace = 10 * time.Second
+
+// hold is a command the scenario holds, and how to release it.
+type hold struct {
+	h       Held
+	release *Command
 }
 
 // errStop ends a subject's run: the step that failed is already recorded.
@@ -121,7 +131,7 @@ type runner struct {
 	counts   map[string]int
 	draw     *Draw
 	opt      Options
-	holds    map[string]func() error
+	holds    map[string]hold
 	verdicts []Verdict
 	stopped  error // why the run stopped early, if it did
 
@@ -203,8 +213,8 @@ func (r *runner) run(events []Event) {
 			err = r.fail(fmt.Errorf("interrupted: %w", r.ctx.Err()))
 		}
 	}
-	for name, stop := range r.holds {
-		if err := stop(); err != nil {
+	for name, h := range r.holds {
+		if err := r.releaseHold(name, h); err != nil {
 			r.logf("release %s: %v", name, err)
 		}
 	}
@@ -307,8 +317,8 @@ func (r *runner) step(ev Event) error {
 		r.logf("stop %s", ev.Service)
 		return r.setup(r.e.Down(r.ctx, []string{ev.Service}), "stop "+ev.Service)
 	case "exec", "run":
-		out, err := Do(r.ctx, r.e, *ev.Cmd)
-		r.logf("%s -> %s", ev.Cmd, out)
+		out, err := r.do(*ev.Cmd)
+		r.logf("%s -> %s", ev.Cmd, out.Stdout)
 		return r.setup(err, ev.Kind)
 	case "hold":
 		r.logf("hold %s: %s", ev.Name, ev.Cmd)
@@ -316,15 +326,15 @@ func (r *runner) step(ev Event) error {
 		if err != nil {
 			return r.setup(err, "hold "+ev.Name)
 		}
-		r.holds[ev.Name] = stop
+		r.holds[ev.Name] = hold{h: stop, release: ev.Release}
 	case "release":
-		stop, ok := r.holds[ev.Name]
+		h, ok := r.holds[ev.Name]
 		if !ok {
 			return r.setup(fmt.Errorf("nothing named %s is held", ev.Name), "release")
 		}
 		delete(r.holds, ev.Name)
 		r.logf("release %s", ev.Name)
-		return r.setup(stop(), "release "+ev.Name)
+		return r.setup(r.releaseHold(ev.Name, h), "release "+ev.Name)
 	case "wait_until":
 		return r.waitUntil(ev.Until)
 	case "sleep":
@@ -347,7 +357,8 @@ func (r *runner) step(ev Event) error {
 func (r *runner) waitUntil(u *Until) error {
 	deadline := r.opt.Now().Add(u.Timeout)
 	for {
-		out, err := Do(r.ctx, r.e, u.Cmd)
+		printed, err := r.do(u.Cmd)
+		out := printed.Stdout
 		r.logf("wait_until %s -> %s", u.Cmd, out)
 		if err == nil {
 			if u.AtLeast != nil {
@@ -434,7 +445,8 @@ func (r *runner) drain(d *Drain) {
 	progress := start
 	last := -1
 	for {
-		out, err := Do(r.ctx, r.e, d.Remaining)
+		printed, err := r.do(d.Remaining)
+		out := printed.Stdout
 		n, perr := strconv.Atoi(strings.TrimSpace(out))
 		r.logf("drain %s -> %q", d.Remaining, out)
 		switch {
@@ -474,7 +486,8 @@ func (r *runner) drain(d *Drain) {
 }
 
 func (r *runner) check(c *Check) {
-	out, err := Do(r.ctx, r.e, c.Cmd)
+	printed, err := r.do(c.Cmd)
+	out := printed.Stdout
 	if c.Results {
 		r.results(c, out, err)
 		return
@@ -550,4 +563,31 @@ func (r *runner) results(c *Check, out string, err error) {
 			r.verdict(ref, ref, temper.OutcomeFail, fmt.Sprintf("%d violations", n))
 		}
 	}
+}
+
+// do runs c and keeps its stderr in the log, line by line: a check's
+// explanation is part of the evidence.
+func (r *runner) do(c Command) (Output, error) {
+	out, err := Do(r.ctx, r.e, c)
+	if out.Stderr != "" {
+		for _, line := range strings.Split(out.Stderr, "\n") {
+			r.logf("stderr: %s", line)
+		}
+	}
+	return out, err
+}
+
+// releaseHold ends a held command: by its release command when it has one,
+// then waiting for it to end; otherwise by stopping it.
+func (r *runner) releaseHold(name string, h hold) error {
+	if h.release == nil {
+		return h.h.Stop()
+	}
+	if h.h.Exited() {
+		return h.h.Stop()
+	}
+	if _, err := r.do(*h.release); err != nil {
+		return fmt.Errorf("release command: %w", err)
+	}
+	return h.h.Await(releaseGrace)
 }

@@ -16,23 +16,22 @@ import (
 	"time"
 )
 
-// RunFunc runs a command to completion and returns its stdout.
-type RunFunc func(ctx context.Context, name string, args ...string) ([]byte, error)
+// RunFunc runs a command to completion and returns its stdout and stderr.
+type RunFunc func(ctx context.Context, name string, args ...string) (stdout, stderr []byte, err error)
 
-// ExecRun is the RunFunc for real commands. A failure carries the
-// command's stderr.
-func ExecRun(ctx context.Context, name string, args ...string) ([]byte, error) {
+// ExecRun is the RunFunc for real commands. A failure also carries the
+// command's stderr in its message.
+func ExecRun(ctx context.Context, name string, args ...string) ([]byte, []byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
 		if msg := strings.TrimSpace(stderr.String()); msg != "" {
-			return out, fmt.Errorf("%w: %s", err, msg)
+			return out, stderr.Bytes(), fmt.Errorf("%w: %s", err, msg)
 		}
-		return out, err
 	}
-	return out, nil
+	return out, stderr.Bytes(), err
 }
 
 type compose struct {
@@ -54,12 +53,19 @@ func (c *compose) args(rest ...string) []string {
 	return append([]string{"compose", "-f", c.file, "-p", c.project}, rest...)
 }
 
-func (c *compose) docker(ctx context.Context, args ...string) (string, error) {
-	out, err := c.run(ctx, "docker", args...)
+// dockerOut runs docker and returns what it printed.
+func (c *compose) dockerOut(ctx context.Context, args ...string) (Output, error) {
+	out, errOut, err := c.run(ctx, "docker", args...)
+	o := Output{Stdout: strings.TrimSpace(string(out)), Stderr: strings.TrimSpace(string(errOut))}
 	if err != nil {
-		return "", fmt.Errorf("docker %s: %w", strings.Join(args, " "), err)
+		return o, fmt.Errorf("docker %s: %w", strings.Join(args, " "), err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return o, nil
+}
+
+func (c *compose) docker(ctx context.Context, args ...string) (string, error) {
+	o, err := c.dockerOut(ctx, args...)
+	return o.Stdout, err
 }
 
 func (c *compose) compose(ctx context.Context, rest ...string) (string, error) {
@@ -190,27 +196,24 @@ func (c *compose) Connect(ctx context.Context, n, network string) error {
 	return c.container(ctx, "network", "connect", c.network(network), n)
 }
 
-func (c *compose) Exec(ctx context.Context, service string, instance int, cmd []string) (string, error) {
+func (c *compose) Exec(ctx context.Context, service string, instance int, cmd []string) (Output, error) {
 	args := []string{"exec", "-T"}
 	if instance > 0 {
 		args = append(args, "--index", strconv.Itoa(instance))
 	}
-	return c.compose(ctx, append(append(args, service), cmd...)...)
+	return c.dockerOut(ctx, c.args(append(append(args, service), cmd...)...)...)
 }
 
-func (c *compose) Run(ctx context.Context, service string, cmd []string) (string, error) {
-	return c.compose(ctx, append([]string{"run", "--rm", "--no-deps", "-T", service}, cmd...)...)
+func (c *compose) Run(ctx context.Context, service string, cmd []string) (Output, error) {
+	return c.dockerOut(ctx, c.args(append([]string{"run", "--rm", "--no-deps", "-T", service}, cmd...)...)...)
 }
 
-func (c *compose) Host(ctx context.Context, cmd []string) (string, error) {
+func (c *compose) Host(ctx context.Context, cmd []string) (Output, error) {
 	if len(cmd) == 0 {
-		return "", errors.New("host command is empty")
+		return Output{}, errors.New("host command is empty")
 	}
-	out, err := c.run(ctx, cmd[0], cmd[1:]...)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
+	out, errOut, err := c.run(ctx, cmd[0], cmd[1:]...)
+	return Output{Stdout: strings.TrimSpace(string(out)), Stderr: strings.TrimSpace(string(errOut))}, err
 }
 
 // holdArgs builds the command lines that start and stop a held command. An
@@ -257,50 +260,86 @@ func (l *lockedBuffer) String() string {
 	return strings.TrimSpace(l.b.String())
 }
 
-func (c *compose) Background(ctx context.Context, name string, cmd Command) (func() error, error) {
+// held is a background command started by Background.
+type held struct {
+	name     string
+	proc     *exec.Cmd
+	out      *lockedBuffer
+	stop     []string // the command that ends it, nil to signal the process
+	c        *compose
+	finished chan struct{}
+	waitErr  error
+}
+
+func (h *held) Exited() bool {
+	select {
+	case <-h.finished:
+		return true
+	default:
+		return false
+	}
+}
+
+func (h *held) exitedEarly() error {
+	err := h.waitErr
+	if err == nil {
+		err = errors.New("exit status 0")
+	}
+	return fmt.Errorf("hold %s exited before release (%v): %s", h.name, err, h.out.String())
+}
+
+func (h *held) Stop() error {
+	if h.Exited() {
+		return h.exitedEarly()
+	}
+	if h.stop != nil {
+		if _, _, err := h.c.run(context.Background(), h.stop[0], h.stop[1:]...); err != nil {
+			_ = h.proc.Process.Signal(syscall.SIGTERM)
+		}
+	} else {
+		_ = h.proc.Process.Signal(syscall.SIGTERM)
+	}
+	select {
+	case <-h.finished:
+	case <-time.After(10 * time.Second):
+		_ = h.proc.Process.Kill()
+		<-h.finished
+	}
+	return nil
+}
+
+func (h *held) Await(d time.Duration) error {
+	select {
+	case <-h.finished:
+		return nil
+	case <-time.After(d):
+		_ = h.proc.Process.Kill()
+		<-h.finished
+		return fmt.Errorf("hold %s was still running %s after its release command; killed it", h.name, d)
+	}
+}
+
+func (c *compose) Background(ctx context.Context, name string, cmd Command) (Held, error) {
 	start, stop := c.holdArgs(name, cmd)
-	proc := exec.Command(start[0], start[1:]...)
-	out := &lockedBuffer{}
-	proc.Stdout, proc.Stderr = out, out
-	if err := proc.Start(); err != nil {
+	h := &held{name: name, proc: exec.Command(start[0], start[1:]...), out: &lockedBuffer{}, stop: stop, c: c, finished: make(chan struct{})}
+	h.proc.Stdout, h.proc.Stderr = h.out, h.out
+	if err := h.proc.Start(); err != nil {
 		return nil, fmt.Errorf("hold %s: %w", name, err)
 	}
-	done := make(chan error, 1)
-	go func() { done <- proc.Wait() }()
+	go func() {
+		h.waitErr = h.proc.Wait()
+		close(h.finished)
+	}()
 	// A command that dies at once (it cannot connect, its lock fails) was
 	// never held.
 	select {
-	case err := <-done:
-		if err != nil {
-			return nil, fmt.Errorf("hold %s exited at once (%v): %s", name, err, out.String())
+	case <-h.finished:
+		if h.waitErr != nil {
+			return nil, fmt.Errorf("hold %s exited at once (%v): %s", name, h.waitErr, h.out.String())
 		}
-		done <- nil
 	case <-time.After(holdGrace):
 	}
-	return func() error {
-		select {
-		case err := <-done:
-			if err == nil {
-				err = errors.New("exit status 0")
-			}
-			return fmt.Errorf("hold %s exited before release (%v): %s", name, err, out.String())
-		default:
-		}
-		if stop != nil {
-			if _, err := c.run(context.Background(), stop[0], stop[1:]...); err != nil {
-				_ = proc.Process.Signal(syscall.SIGTERM)
-			}
-		} else {
-			_ = proc.Process.Signal(syscall.SIGTERM)
-		}
-		select {
-		case <-done:
-		case <-time.After(10 * time.Second):
-			_ = proc.Process.Kill()
-			<-done
-		}
-		return nil
-	}, nil
+	return h, nil
 }
 
 func (c *compose) Teardown(ctx context.Context) error {
