@@ -1,0 +1,15 @@
+{{define "content"}}
+<p class="eyebrow">Case Studies</p>
+<h1>Audits, written up</h1>
+<p class="lead">We audit open-source systems against their own documented guarantees. Each case study says what held up and what didn't, and is published with the project's approval.</p>
+
+<section class="studies">
+{{range .CaseStudies}}<article class="study">
+<h2><a href="{{.Slug}}/">{{.Title}}</a></h2>
+<p>{{.Summary}}</p>
+<p><a href="{{.Slug}}/">Read the case study</a></p>
+</article>
+{{end}}</section>
+
+{{template "cta" .}}
+{{end}}

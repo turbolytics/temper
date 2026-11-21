@@ -38,3 +38,6 @@ features:
   - id: site.findings
     description: Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it.
     requires: [unit]
+  - id: site.case_studies
+    description: Builds the Case Studies pages, audits written up with the project's approval, linked from the top-level nav and from each project's findings.
+    requires: [unit]

@@ -1,0 +1,66 @@
+{{define "content"}}
+<p class="eyebrow">Case study · November 2026</p>
+<h1>Feldera's incremental views under an outside audit</h1>
+
+<section class="study-body">
+<h2>Summary</h2>
+<p>Feldera keeps SQL views up to date as data changes. It doesn't rerun the whole query each time. Instead, it updates the result with just the change. Feldera's promise is that the result always matches running the full query from scratch.</p>
+<p>We tested that promise on the open-source edition, version 0.383.0.</p>
+<p>It held up. We found two edge cases. The Feldera team asked us to file both as issues. One already has a fix in review.</p>
+
+<h2>What we checked</h2>
+<p>We changed the data in many ways and checked every view after each change. Each time, we asked one question: does the view match the same query run from scratch?</p>
+<p>We tried:</p>
+<ul>
+<li><strong>Many kinds of change.</strong> Inserts, deletes, updates, and emptying a table completely.</li>
+<li><strong>Different thread counts.</strong> 1, 4 and 8 workers.</li>
+<li><strong>Every SQL type.</strong> All 29, including numbers, text, dates, timestamps, UUIDs, arrays, rows and maps.</li>
+</ul>
+<p>To get the right answer, we ran each query from scratch in DuckDB. To check the types, we followed Feldera's own docs on how each type compares and sorts. For the empty-table case, we checked what PostgreSQL and DuckDB return.</p>
+
+<h2>What held up</h2>
+<ul>
+<li><strong>65 views</strong> matched after every change. They cover joins, GROUP BY, window functions, time windows, subqueries, UNION and EXCEPT, and recursive queries.</li>
+<li><strong>All 29 types</strong> worked correctly in GROUP BY, DISTINCT, joins, MIN and MAX, ORDER BY, and SUM.</li>
+<li><strong>Worker count didn't change the results.</strong> 1, 4 and 8 workers gave the same answers.</li>
+<li><strong>Other features worked too.</strong> These include transactions, primary keys, Kafka through broker outages, and the PostgreSQL output.</li>
+</ul>
+<p>In total, 547 of 560 tests passed. All 13 failures came from the two edge cases below.</p>
+
+<h2>The two edge cases</h2>
+<h3>1. A DECIMAL SUM could crash the pipeline (<a href="https://github.com/feldera/feldera/issues/8032">#8032</a>)</h3>
+<p>When the same row arrives twice in one request, Feldera stores it once with a count of 2. To compute the SUM, it multiplies the value by 2. For a very large <code>DECIMAL(38, 10)</code> value, that multiplication went past 38 digits and crashed the pipeline. The real total still fit.</p>
+<p><strong>Status:</strong> Ben Pfaff, who wrote Feldera's decimal code, asked to take it.</p>
+
+<h3>2. ROLLUP returned nothing on an empty table (<a href="https://github.com/feldera/feldera/issues/8033">#8033</a>)</h3>
+<p>On an empty table, PostgreSQL and DuckDB return one grand-total row for ROLLUP, CUBE and GROUPING SETS. Feldera returned no rows. This happened on a new table, and again after a table was emptied.</p>
+<p><strong>Status:</strong> Mihai Budiu opened a fix the same day (<a href="https://github.com/feldera/feldera/pull/8034">PR #8034</a>).</p>
+
+<h2>How the team responded</h2>
+<p>We first posted the results as a <a href="https://github.com/feldera/feldera/discussions/8029">discussion</a>. The maintainers replied that day and asked for the two issues. Each issue had an owner right away.</p>
+
+<h2>What we learned</h2>
+<ul>
+<li><strong>A clear promise is easy to test.</strong> "Matches the query from scratch" applies to every view.</li>
+<li><strong>Bugs hide at the edges.</strong> Both issues showed up only at extremes: the largest DECIMAL and the empty table.</li>
+<li><strong>Sharing what worked helps.</strong> Leading with what held up made the two issues easy to act on.</li>
+</ul>
+
+<h2>Out of scope</h2>
+<p>Crash recovery and graceful stop require the Enterprise edition, so we didn't test them.</p>
+
+<h2>Links</h2>
+<ul>
+<li>Discussion: <a href="https://github.com/feldera/feldera/discussions/8029">feldera/feldera#8029</a></li>
+<li>Issues: <a href="https://github.com/feldera/feldera/issues/8032">#8032</a>, <a href="https://github.com/feldera/feldera/issues/8033">#8033</a></li>
+<li>Fix in review: <a href="https://github.com/feldera/feldera/pull/8034">PR #8034</a></li>
+<li>Test results: <a href="https://github.com/turbolytics/feldera/blob/68df7b19a17083e9729ab46ca55da15ff1016e9e/MATRIX.md">the Temper matrix</a></li>
+<li>Tests: <a href="https://github.com/turbolytics/feldera/tree/68df7b19a17083e9729ab46ca55da15ff1016e9e/testing/temper">testing/temper in the turbolytics fork</a></li>
+<li>ROLLUP repro script: <a href="https://github.com/turbolytics/feldera/blob/68df7b19a17083e9729ab46ca55da15ff1016e9e/testing/temper/repro_rollup_empty.sh">repro_rollup_empty.sh</a></li>
+</ul>
+
+<p class="note">Found with Temper by Turbolytics. Claude Code helped run the tests and draft this post. We checked every reproduction ourselves. Published with the Feldera team's approval.</p>
+</section>
+
+{{template "cta" .}}
+{{end}}
