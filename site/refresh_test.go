@@ -28,9 +28,9 @@ func TestRefreshProjectsWritesSortedRows(t *testing.T) {
 	defer api.Close()
 
 	rows := csvHeader +
-		"Acme/db,issue,7,https://github.com/Acme/db/issues/7,A bug.,reported,,2026-11-17,\n" +
-		"turbolytics/sql-flow,temper-pr,4,https://github.com/turbolytics/sql-flow/pull/4,Adds Temper.,merged,,2026-11-17,\n" +
-		"zeta/kv,issue,3,https://github.com/zeta/kv/issues/3,Another bug.,reported,,2026-11-17,\n"
+		"Acme/db,issue,7,https://github.com/Acme/db/issues/7,A bug.,reported,,2026-11-17,,\n" +
+		"turbolytics/sql-flow,temper-pr,4,https://github.com/turbolytics/sql-flow/pull/4,Adds Temper.,merged,,2026-11-17,,\n" +
+		"zeta/kv,issue,3,https://github.com/zeta/kv/issues/3,Another bug.,reported,,2026-11-17,,\n"
 	root := fakeRoot(t, rows, `{"posthog_key": "", "posthog_host": ""}`)
 	if err := RefreshProjects(root, api.URL, "2026-11-18", api.Client()); err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func TestRefreshProjectsFailsOnAMissingRepo(t *testing.T) {
 	temper.Covers(t, "site.findings")
 	api := httptest.NewServer(http.NotFoundHandler())
 	defer api.Close()
-	rows := csvHeader + "acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,\n"
+	rows := csvHeader + "acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,,\n"
 	root := fakeRoot(t, rows, `{"posthog_key": "", "posthog_host": ""}`)
 	if err := RefreshProjects(root, api.URL, "2026-11-18", api.Client()); err == nil {
 		t.Fatal("a repo GitHub does not know should fail the refresh")

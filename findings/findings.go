@@ -19,7 +19,7 @@ import (
 
 // Header is the exact first line of findings.csv. A column that is not here,
 // such as a private note, fails the file.
-var Header = []string{"repo", "kind", "number", "url", "summary", "status", "opened", "updated", "matrix_url"}
+var Header = []string{"repo", "kind", "number", "url", "summary", "status", "opened", "updated", "matrix_url", "item"}
 
 // Finding is one issue, pull request or report.
 type Finding struct {
@@ -32,6 +32,9 @@ type Finding struct {
 	Opened    string // YYYY-MM-DD, or empty
 	Updated   string // YYYY-MM-DD
 	MatrixURL string // a commit permalink, or empty
+	// Item numbers one bug in an issue that reports several, so each can
+	// carry its own status. 0 means the row is the whole issue.
+	Item int
 }
 
 // IsIssue reports whether the finding is an issue.
@@ -97,7 +100,7 @@ func Parse(r io.Reader) ([]Finding, error) {
 	var (
 		rows    []Finding
 		errs    []string
-		seen    = map[string]int{}
+		seen    = map[string]*rowsAt{}
 		spelled = map[string]struct {
 			repo string
 			line int
@@ -124,6 +127,20 @@ func Parse(r io.Reader) ([]Finding, error) {
 		}
 		f := Finding{Repo: rec[0], Kind: rec[1], URL: rec[3], Summary: rec[4], Status: rec[5],
 			Opened: rec[6], Updated: rec[7], MatrixURL: rec[8]}
+		itemOK := true
+		if rec[9] != "" {
+			n, err := strconv.Atoi(rec[9])
+			switch {
+			case err != nil || n < 1 || strconv.Itoa(n) != rec[9]:
+				bad("item", "%q is not a positive whole number", rec[9])
+				itemOK = false
+			case f.Kind != "issue":
+				bad("item", "only an issue can be split into items, not a %s", f.Kind)
+				itemOK = false
+			default:
+				f.Item = n
+			}
+		}
 
 		if !repoPattern.MatchString(f.Repo) {
 			bad("repo", "%q is not owner/name", f.Repo)
@@ -153,10 +170,24 @@ func Parse(r io.Reader) ([]Finding, error) {
 
 		if want := wantURL(f); f.URL != want {
 			bad("url", "%q does not match repo, kind and number; want %q", f.URL, want)
-		} else if at, dup := seen[f.URL]; dup {
-			bad("url", "%q duplicates line %d", f.URL, at)
-		} else {
-			seen[f.URL] = line
+		} else if itemOK {
+			at := seen[f.URL]
+			switch {
+			case at == nil:
+				at = &rowsAt{items: map[int]int{}}
+				seen[f.URL] = at
+				at.add(f.Item, line)
+			case f.Item == 0 && at.whole > 0:
+				bad("url", "%q duplicates line %d", f.URL, at.whole)
+			case f.Item == 0:
+				bad("item", "the issue is split into items on line %d; number this row too", at.first)
+			case at.whole > 0:
+				bad("item", "line %d already records the whole issue; number every row of a split issue", at.whole)
+			case at.items[f.Item] > 0:
+				bad("item", "item %d duplicates line %d", f.Item, at.items[f.Item])
+			default:
+				at.add(f.Item, line)
+			}
 		}
 
 		switch {
@@ -236,10 +267,28 @@ func contains(list []string, s string) bool {
 	return false
 }
 
+// rowsAt records the lines that use one URL: the whole issue, or its items.
+type rowsAt struct {
+	whole, first int
+	items        map[int]int
+}
+
+func (r *rowsAt) add(item, line int) {
+	if r.first == 0 {
+		r.first = line
+	}
+	if item == 0 {
+		r.whole = line
+	} else {
+		r.items[item] = line
+	}
+}
+
 type sortKey struct {
 	repo   string
 	kind   int
 	number int
+	item   int
 }
 
 func keyOf(f Finding) sortKey {
@@ -249,7 +298,7 @@ func keyOf(f Finding) sortKey {
 			k = i
 		}
 	}
-	return sortKey{strings.ToLower(f.Repo), k, f.Number}
+	return sortKey{strings.ToLower(f.Repo), k, f.Number, f.Item}
 }
 
 func (a sortKey) less(b sortKey) bool {
@@ -259,5 +308,8 @@ func (a sortKey) less(b sortKey) bool {
 	if a.kind != b.kind {
 		return a.kind < b.kind
 	}
-	return a.number < b.number
+	if a.number != b.number {
+		return a.number < b.number
+	}
+	return a.item < b.item
 }

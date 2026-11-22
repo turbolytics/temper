@@ -19,10 +19,10 @@ func TestCommittedFindingsAreValid(t *testing.T) {
 	}
 }
 
-const header = "repo,kind,number,url,summary,status,opened,updated,matrix_url\n"
+const header = "repo,kind,number,url,summary,status,opened,updated,matrix_url,item\n"
 
-const goodIssue = "acme/db,issue,7,https://github.com/acme/db/issues/7,Reads lose a row.,reported,2026-11-16,2026-11-17,https://github.com/turbolytics/db/blob/0123456789abcdef0123456789abcdef01234567/MATRIX.md\n"
-const goodPR = "acme/db,fix-pr,8,https://github.com/acme/db/pull/8,Fixes the lost row.,open,,2026-11-17,\n"
+const goodIssue = "acme/db,issue,7,https://github.com/acme/db/issues/7,Reads lose a row.,reported,2026-11-16,2026-11-17,https://github.com/turbolytics/db/blob/0123456789abcdef0123456789abcdef01234567/MATRIX.md,\n"
+const goodPR = "acme/db,fix-pr,8,https://github.com/acme/db/pull/8,Fixes the lost row.,open,,2026-11-17,,\n"
 
 func TestParseAcceptsGoodRows(t *testing.T) {
 	temper.Covers(t, "site.findings")
@@ -40,7 +40,7 @@ func TestParseAcceptsGoodRows(t *testing.T) {
 
 func TestParseAcceptsQuotedSummary(t *testing.T) {
 	temper.Covers(t, "site.findings")
-	row := `acme/db,issue,7,https://github.com/acme/db/issues/7,"Commas, ""quotes"", and <b>tags</b> stay text.",reported,,2026-11-17,` + "\n"
+	row := `acme/db,issue,7,https://github.com/acme/db/issues/7,"Commas, ""quotes"", and <b>tags</b> stay text.",reported,,2026-11-17,,` + "\n"
 	rows, err := Parse(strings.NewReader(header + row))
 	if err != nil {
 		t.Fatal(err)
@@ -67,13 +67,30 @@ func TestParseAcceptsDeclinedIssue(t *testing.T) {
 // The record links to it, so a project that held up still shows.
 func TestParseAcceptsReport(t *testing.T) {
 	temper.Covers(t, "site.findings")
-	row := "acme/db,report,12,https://github.com/acme/db/discussions/12,The audit found no bug worth filing.,posted,2026-11-20,2026-11-20,\n"
+	row := "acme/db,report,12,https://github.com/acme/db/discussions/12,The audit found no bug worth filing.,posted,2026-11-20,2026-11-20,,\n"
 	rows, err := Parse(strings.NewReader(header + goodIssue + row))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if rows[1].Kind != "report" || rows[1].IsIssue() || !rows[1].IsReport() {
 		t.Fatalf("row = %+v", rows[1])
+	}
+}
+
+// One issue can report several bugs, and each can fare differently: one gets
+// fixed while another waits. Each bug gets a row with its own item number,
+// summary and status, all linking to the same issue.
+func TestParseSplitsOneIssueIntoItems(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	in := header +
+		"acme/db,issue,7,https://github.com/acme/db/issues/7,Reads lose a row.,fixed,,2026-11-18,,1\n" +
+		"acme/db,issue,7,https://github.com/acme/db/issues/7,Counts are off by one.,reported,,2026-11-17,,2\n"
+	rows, err := Parse(strings.NewReader(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 || rows[0].Item != 1 || rows[0].Status != "fixed" || rows[1].Item != 2 || rows[1].Status != "reported" {
+		t.Fatalf("rows = %+v", rows)
 	}
 }
 
@@ -115,9 +132,17 @@ func TestParseRejectsEachBrokenRule(t *testing.T) {
 		{"lowercase todo", header + issue(func(c []string) { c[4] = "todo: write this" }), "line 2: summary"},
 		{"same repo in two cases", header + goodIssue + strings.Replace(goodPR, "acme/db", "Acme/db", 2), "line 3: repo"},
 		{"header only", header, "no rows"},
-		{"report with an issue url", header + "acme/db,report,12,https://github.com/acme/db/issues/12,R.,posted,,2026-11-20,\n", "line 2: url"},
-		{"report cannot be merged", header + "acme/db,report,12,https://github.com/acme/db/discussions/12,R.,merged,,2026-11-20,\n", "line 2: status"},
+		{"report with an issue url", header + "acme/db,report,12,https://github.com/acme/db/issues/12,R.,posted,,2026-11-20,,\n", "line 2: url"},
+		{"report cannot be merged", header + "acme/db,report,12,https://github.com/acme/db/discussions/12,R.,merged,,2026-11-20,,\n", "line 2: status"},
 		{"issue cannot be posted", header + issue(func(c []string) { c[5] = "posted" }), "line 2: status"},
+		{"item not a number", header + issue(func(c []string) { c[9] = "two" }), "line 2: item"},
+		{"item zero", header + issue(func(c []string) { c[9] = "0" }), "line 2: item"},
+		{"item with a leading zero", header + issue(func(c []string) { c[9] = "02" }), "line 2: item"},
+		{"item on a PR", header + strings.Replace(goodPR, ",\n", ",1\n", 1), "line 2: item"},
+		{"same item twice", header + "acme/db,issue,7,https://github.com/acme/db/issues/7,A.,reported,,2026-11-17,,1\n" + "acme/db,issue,7,https://github.com/acme/db/issues/7,A.,reported,,2026-11-17,,1\n", "line 3: item"},
+		{"whole issue and an item", header + goodIssue + "acme/db,issue,7,https://github.com/acme/db/issues/7,B.,reported,,2026-11-17,,2\n", "line 3: item"},
+		{"item and then the whole issue", header + "acme/db,issue,7,https://github.com/acme/db/issues/7,A.,reported,,2026-11-17,,1\n" + strings.Replace(goodIssue, "issues/7,", "issues/7,", 1), "line 3: item"},
+		{"items out of order", header + "acme/db,issue,7,https://github.com/acme/db/issues/7,B.,reported,,2026-11-17,,2\n" + "acme/db,issue,7,https://github.com/acme/db/issues/7,A.,reported,,2026-11-17,,1\n", "line 3: order"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := Parse(strings.NewReader(tc.input))
@@ -132,8 +157,8 @@ func TestParseRejectsEachBrokenRule(t *testing.T) {
 // and zarr-developers.
 func TestParseSortsReposWithoutCase(t *testing.T) {
 	temper.Covers(t, "site.findings")
-	a := "pydata/xarray,issue,1,https://github.com/pydata/xarray/issues/1,A.,reported,,2026-11-17,\n"
-	b := "ThreeDotsLabs/watermill,issue,2,https://github.com/ThreeDotsLabs/watermill/issues/2,B.,reported,,2026-11-17,\n"
+	a := "pydata/xarray,issue,1,https://github.com/pydata/xarray/issues/1,A.,reported,,2026-11-17,,\n"
+	b := "ThreeDotsLabs/watermill,issue,2,https://github.com/ThreeDotsLabs/watermill/issues/2,B.,reported,,2026-11-17,,\n"
 	if _, err := Parse(strings.NewReader(header + a + b)); err != nil {
 		t.Fatal(err)
 	}
