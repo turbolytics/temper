@@ -362,7 +362,7 @@ func (r *runner) step(ev Event) error {
 		return r.setup(r.e.Up(r.ctx, ev.Service, 1), "start "+ev.Service)
 	case "stop":
 		r.logf("stop %s", ev.Service)
-		return r.setup(r.e.Down(r.ctx, []string{ev.Service}), "stop "+ev.Service)
+		return r.setup(r.e.StopService(r.ctx, ev.Service), "stop "+ev.Service)
 	case "exec", "run":
 		out, err := r.do(*ev.Cmd)
 		r.logf("%s -> %s", r.bind(*ev.Cmd), out.Stdout)

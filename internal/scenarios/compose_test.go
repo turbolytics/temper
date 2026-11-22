@@ -156,6 +156,17 @@ func TestExecRun_StreamsStderrAsItArrives(t *testing.T) {
 	}
 }
 
+func TestCompose_StopServiceKeepsContainers(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	r := &recorder{}
+	if err := NewCompose("compose.yml", "p", time.Second, r.run).StopService(context.Background(), "kafka1"); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"docker compose -f compose.yml -p p stop -t 5 kafka1"}; !reflect.DeepEqual(r.lines, want) {
+		t.Errorf("command lines = %q, want %q (no rm)", r.lines, want)
+	}
+}
+
 func TestCompose_InstancesMatchGlob(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
 	r := &recorder{ps: `[{"Name":"p-worker-js-1","Service":"worker-js","State":"running"},{"Name":"p-postgres-1","Service":"postgres","State":"running"},{"Name":"p-worker-go-1","Service":"worker-go","State":"running"},{"Name":"p-worker-go-2","Service":"worker-go","State":"exited"}]`}

@@ -28,6 +28,9 @@ type Engine interface {
 	Up(ctx context.Context, service string, replicas int) error
 	// Down stops services and removes their containers.
 	Down(ctx context.Context, services []string) error
+	// StopService stops a service's containers and keeps them, with their
+	// data, as a stopped server keeps its disk; Up starts them again.
+	StopService(ctx context.Context, service string) error
 	// Instances lists the running containers of every service matching the
 	// glob, sorted.
 	Instances(ctx context.Context, pattern string) ([]string, error)

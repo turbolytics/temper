@@ -94,6 +94,10 @@ func (f *fakeEngine) Up(ctx context.Context, service string, n int) error {
 	return nil
 }
 
+func (f *fakeEngine) StopService(ctx context.Context, service string) error {
+	return f.record("stop-service " + service)
+}
+
 func (f *fakeEngine) Down(ctx context.Context, services []string) error {
 	if err := f.record("down " + strings.Join(services, " ")); err != nil {
 		return err

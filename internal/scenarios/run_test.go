@@ -657,6 +657,22 @@ func TestRun_LogShowsBoundCommands(t *testing.T) {
 	}
 }
 
+// A stopped service keeps its containers and their data, as a stopped server
+// keeps its disk: start brings the same containers back. down removes them.
+func TestRun_StopKeepsTheContainer(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := newFake()
+	run(t, f, testProject(), temperScenario(t, []string{"job.never_lost"}, `
+- stop: kafka
+- start: kafka
+- check: {covers: job.never_lost, host: [echo, "0"]}
+`), Options{})
+	calls := strings.Join(f.Calls(), "\n")
+	if !strings.Contains(calls, "stop-service kafka") || strings.Contains(calls, "down kafka") {
+		t.Errorf("stop must stop the service and keep its containers; calls:\n%s", calls)
+	}
+}
+
 func TestRun_SubjectPlaceholder(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
 	sc := temperScenario(t, []string{"job.never_lost"}, "- run: [oracle, check, --subject, \"{subject}\"]\n- check: {covers: job.never_lost, run: [oracle, verdict, \"{subject}\"]}\n")
