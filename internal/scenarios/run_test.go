@@ -553,6 +553,23 @@ func TestRun_StderrIsLogged(t *testing.T) {
 	}
 }
 
+// A line the engine streamed while the command ran is in the log once, not
+// again when the command ends.
+func TestRun_StreamedStderrIsLoggedOnce(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	f := newFake()
+	f.outputs["exec postgres: psql dup"] = []string{"0"}
+	f.stderr["exec postgres: psql dup"] = "compiling\nrunning"
+	f.streams["exec postgres: psql dup"] = true
+	var log strings.Builder
+	run(t, f, testProject(), temperScenario(t, []string{"complete_tx.effect_once"}, "- check: {covers: complete_tx.effect_once, exec: [postgres, psql, dup]}\n"), Options{Log: &log})
+	for _, want := range []string{"stderr: compiling", "stderr: running"} {
+		if n := strings.Count(log.String(), want); n != 1 {
+			t.Errorf("%q is in the log %d times, want once:\n%s", want, n, log.String())
+		}
+	}
+}
+
 func TestRun_HoldReleasedByCommand(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
 	p := testProject()

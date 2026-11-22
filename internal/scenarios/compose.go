@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"path"
 	"sort"
@@ -19,13 +20,63 @@ import (
 // RunFunc runs a command to completion and returns its stdout and stderr.
 type RunFunc func(ctx context.Context, name string, args ...string) (stdout, stderr []byte, err error)
 
+type stderrKey struct{}
+
+// WithStderrLines returns ctx carrying fn. A RunFunc that supports it hands
+// fn each line of a command's stderr as the command prints it, so a long
+// command's progress and failures reach the log while it runs.
+func WithStderrLines(ctx context.Context, fn func(line string)) context.Context {
+	return context.WithValue(ctx, stderrKey{}, fn)
+}
+
+// stderrSink is the line sink ctx carries, or nil.
+func stderrSink(ctx context.Context) func(string) {
+	fn, _ := ctx.Value(stderrKey{}).(func(string))
+	return fn
+}
+
+// lineWriter hands each complete line written to it to fn; Flush hands over
+// a last line with no newline.
+type lineWriter struct {
+	fn  func(string)
+	buf []byte
+}
+
+func (w *lineWriter) Write(p []byte) (int, error) {
+	w.buf = append(w.buf, p...)
+	for {
+		i := bytes.IndexByte(w.buf, '\n')
+		if i < 0 {
+			return len(p), nil
+		}
+		w.fn(strings.TrimSuffix(string(w.buf[:i]), "\r"))
+		w.buf = w.buf[i+1:]
+	}
+}
+
+func (w *lineWriter) Flush() {
+	if len(w.buf) > 0 {
+		w.fn(strings.TrimSuffix(string(w.buf), "\r"))
+		w.buf = nil
+	}
+}
+
 // ExecRun is the RunFunc for real commands. A failure also carries the
-// command's stderr in its message.
+// command's stderr in its message. When ctx carries a line sink
+// (WithStderrLines), each stderr line also goes to it as it is printed.
 func ExecRun(ctx context.Context, name string, args ...string) ([]byte, []byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+	var lines *lineWriter
+	if fn := stderrSink(ctx); fn != nil {
+		lines = &lineWriter{fn: fn}
+		cmd.Stderr = io.MultiWriter(&stderr, lines)
+	}
 	out, err := cmd.Output()
+	if lines != nil {
+		lines.Flush()
+	}
 	if err != nil {
 		if msg := strings.TrimSpace(stderr.String()); msg != "" {
 			return out, stderr.Bytes(), fmt.Errorf("%w: %s", err, msg)

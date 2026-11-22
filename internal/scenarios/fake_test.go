@@ -24,6 +24,9 @@ type fakeEngine struct {
 	outputs map[string][]string
 	// stderr maps a command line to the stderr it prints.
 	stderr map[string]string
+	// streams names command lines whose stderr is also handed, line by line,
+	// to the context's stderr sink while the command runs, as ExecRun does.
+	streams map[string]bool
 	// holdExits names holds whose command has already exited.
 	holdExits map[string]bool
 	// fail maps a call line, or a prefix of one, to the error it returns.
@@ -33,7 +36,7 @@ type fakeEngine struct {
 }
 
 func newFake() *fakeEngine {
-	return &fakeEngine{running: map[string][]string{}, outputs: map[string][]string{}, stderr: map[string]string{}, holdExits: map[string]bool{}, fail: map[string]error{}}
+	return &fakeEngine{running: map[string][]string{}, outputs: map[string][]string{}, stderr: map[string]string{}, streams: map[string]bool{}, holdExits: map[string]bool{}, fail: map[string]error{}}
 }
 
 func (f *fakeEngine) record(line string) error {
@@ -129,16 +132,31 @@ func (f *fakeEngine) Connect(ctx context.Context, c, n string) error {
 	return f.record("connect " + c + " " + n)
 }
 
+// streamed answers line as output does, first handing its stderr to the
+// context's sink line by line when the line streams.
+func (f *fakeEngine) streamed(ctx context.Context, line string) (Output, error) {
+	o, err := f.output(line)
+	f.mu.Lock()
+	streams := f.streams[line]
+	f.mu.Unlock()
+	if sink := stderrSink(ctx); streams && sink != nil && o.Stderr != "" {
+		for _, l := range strings.Split(o.Stderr, "\n") {
+			sink(l)
+		}
+	}
+	return o, err
+}
+
 func (f *fakeEngine) Exec(ctx context.Context, service string, instance int, cmd []string) (Output, error) {
-	return f.output(Command{Service: service, Instance: instance, Args: cmd}.String())
+	return f.streamed(ctx, Command{Service: service, Instance: instance, Args: cmd}.String())
 }
 
 func (f *fakeEngine) Run(ctx context.Context, service string, cmd []string) (Output, error) {
-	return f.output(Command{Service: service, Run: true, Args: cmd}.String())
+	return f.streamed(ctx, Command{Service: service, Run: true, Args: cmd}.String())
 }
 
 func (f *fakeEngine) Host(ctx context.Context, cmd []string) (Output, error) {
-	return f.output(Command{Host: true, Args: cmd}.String())
+	return f.streamed(ctx, Command{Host: true, Args: cmd}.String())
 }
 
 // fakeHeld records how a hold ends: "release <name>" when stopped, "await

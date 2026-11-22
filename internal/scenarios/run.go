@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/turbolytics/temper"
@@ -629,10 +630,16 @@ func (r *runner) results(c *Check, out string, err error) {
 }
 
 // do runs c and keeps its stderr in the log, line by line: a check's
-// explanation is part of the evidence.
+// explanation is part of the evidence. Lines go to the log as the command
+// prints them when the engine streams; otherwise when it ends.
 func (r *runner) do(c Command) (Output, error) {
-	out, err := Do(r.ctx, r.e, r.bind(c))
-	if out.Stderr != "" {
+	var streamed atomic.Bool
+	ctx := WithStderrLines(r.ctx, func(line string) {
+		streamed.Store(true)
+		r.logf("stderr: %s", line)
+	})
+	out, err := Do(ctx, r.e, r.bind(c))
+	if out.Stderr != "" && !streamed.Load() {
 		for _, line := range strings.Split(out.Stderr, "\n") {
 			r.logf("stderr: %s", line)
 		}
