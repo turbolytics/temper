@@ -229,6 +229,11 @@ func (c *compose) lastLogs(ctx context.Context, service string) string {
 	return "; its last log lines:\n" + out
 }
 
+func (c *compose) StopService(ctx context.Context, service string) error {
+	_, err := c.compose(ctx, "stop", "-t", "5", service)
+	return err
+}
+
 func (c *compose) Down(ctx context.Context, services []string) error {
 	if _, err := c.compose(ctx, append([]string{"stop", "-t", "5"}, services...)...); err != nil {
 		return err

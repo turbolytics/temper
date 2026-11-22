@@ -476,7 +476,7 @@ Events run in order. Each list item holds exactly one event.
 |---|---|
 | `up: {service: n, $subject: true}` | Start services at these replica counts, plus this subject's when `$subject` is true, and wait until each is ready: healthy when it has a health check, otherwise running. |
 | `down: [service, ...]` | Stop these services. |
-| `start: service` / `stop: service` | Start or stop one service. |
+| `start: service` / `stop: service` | Start or stop one service. A stopped service keeps its containers and their data, as a stopped server keeps its disk, and `start` brings the same containers back. `down` removes them. |
 | `exec: [service, cmd, ...]` | Run a command in a running container, in replica `instance: n` (default 1), and require exit 0. `host: [cmd, ...]` runs it on the host. |
 | `run: [service, cmd, ...]` | Run a command in a one-shot container of a service, without starting its dependencies, and require exit 0. |
 | `hold: {name, exec \| run \| host}` | Start a command in the background and keep it running. |

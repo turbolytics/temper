@@ -55,6 +55,8 @@ func (f *cliEngine) Up(ctx context.Context, s string, n int) error {
 	f.mu.Unlock()
 	return f.rec(fmt.Sprintf("up %s %d", s, n))
 }
+func (f *cliEngine) StopService(ctx context.Context, service string) error { return nil }
+
 func (f *cliEngine) Down(ctx context.Context, s []string) error {
 	return f.rec("down " + strings.Join(s, " "))
 }
