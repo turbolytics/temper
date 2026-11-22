@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -119,6 +120,39 @@ func TestCompose_ReconnectKeepsAliases(t *testing.T) {
 	}
 	if !reflect.DeepEqual(r.lines, want) {
 		t.Errorf("command lines:\n%s\nwant:\n%s", strings.Join(r.lines, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// A long command's stderr reaches the log as it prints, not when it ends: a
+// 20-minute oracle that panics in its first minute says so then.
+func TestExecRun_StreamsStderrAsItArrives(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	var mu sync.Mutex
+	var lines []string
+	var firstAt time.Time
+	ctx := WithStderrLines(context.Background(), func(line string) {
+		mu.Lock()
+		defer mu.Unlock()
+		if len(lines) == 0 {
+			firstAt = time.Now()
+		}
+		lines = append(lines, line)
+	})
+	_, errOut, err := ExecRun(ctx, "sh", "-c", "echo one >&2; sleep 0.5; printf two >&2")
+	done := time.Now()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !reflect.DeepEqual(lines, []string{"one", "two"}) {
+		t.Fatalf("lines = %q, want one, then the unterminated two", lines)
+	}
+	if early := done.Sub(firstAt); early < 300*time.Millisecond {
+		t.Errorf("the first line arrived only %s before the command ended; want it when printed", early)
+	}
+	if string(errOut) != "one\ntwo" {
+		t.Errorf("returned stderr = %q, want all of it still", errOut)
 	}
 }
 

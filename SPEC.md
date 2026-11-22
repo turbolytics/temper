@@ -597,7 +597,8 @@ reference.
 
 **Logs.** Every command's stderr goes to the run log, prefixed `stderr:`,
 whether or not it succeeds, so a check's explanation is part of the
-evidence.
+evidence. Each line is logged as the command prints it, so a long command's
+progress, or the failure that will stop it, shows while it runs.
 
 ## 12. Evidence
 
