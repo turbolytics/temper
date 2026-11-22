@@ -6,7 +6,7 @@
 <h2>Summary</h2>
 <p><a href="https://www.feldera.com/">Feldera</a> keeps SQL views up to date as data changes. It doesn't rerun the whole query each time. Instead, it updates the result with just the change. Feldera's promise is that the result always matches running the full query from scratch.</p>
 <p>We tested that promise on the open-source edition, version 0.383.0.</p>
-<p>It held up. We found two edge cases. The Feldera team asked us to file both as issues. One already has a fix in review.</p>
+<p>It held up. We found two edge cases. The Feldera team asked us to file both as issues. One is already fixed.</p>
 
 <h2>What we checked</h2>
 <p>We changed the data in many ways and checked every view after each change. Each time, we asked one question: does the view match the same query run from scratch?</p>
@@ -35,6 +35,7 @@
 <h3>2. ROLLUP returned nothing on an empty table (<a href="https://github.com/feldera/feldera/issues/8033">#8033</a>)</h3>
 <p>On an empty table, PostgreSQL and DuckDB return one grand-total row for ROLLUP, CUBE and GROUPING SETS. Feldera returned no rows. This happened on a new table, and again after a table was emptied.</p>
 <p><strong>Status:</strong> Mihai Budiu opened a fix the same day (<a href="https://github.com/feldera/feldera/pull/8034">PR #8034</a>).</p>
+<p><strong>Update, Nov 22:</strong> fixed in <a href="https://github.com/feldera/feldera/pull/8034">PR #8034</a>.</p>
 
 <h2>How the team responded</h2>
 <p>We first posted the results as a <a href="https://github.com/feldera/feldera/discussions/8029">discussion</a>. The maintainers replied that day and asked for the two issues. Each issue had an owner right away.</p>
@@ -54,7 +55,7 @@
 <li>Feldera: <a href="https://www.feldera.com/">feldera.com</a></li>
 <li>Discussion: <a href="https://github.com/feldera/feldera/discussions/8029">feldera/feldera#8029</a></li>
 <li>Issues: <a href="https://github.com/feldera/feldera/issues/8032">#8032</a>, <a href="https://github.com/feldera/feldera/issues/8033">#8033</a></li>
-<li>Fix in review: <a href="https://github.com/feldera/feldera/pull/8034">PR #8034</a></li>
+<li>Fix: <a href="https://github.com/feldera/feldera/pull/8034">PR #8034</a>, merged Nov 22</li>
 <li>Test results: <a href="https://github.com/turbolytics/feldera/blob/68df7b19a17083e9729ab46ca55da15ff1016e9e/MATRIX.md">the Temper matrix</a></li>
 <li>Tests: <a href="https://github.com/turbolytics/feldera/tree/68df7b19a17083e9729ab46ca55da15ff1016e9e/testing/temper">testing/temper in the turbolytics fork</a></li>
 <li>ROLLUP repro script: <a href="https://github.com/turbolytics/feldera/blob/68df7b19a17083e9729ab46ca55da15ff1016e9e/testing/temper/repro_rollup_empty.sh">repro_rollup_empty.sh</a></li>
