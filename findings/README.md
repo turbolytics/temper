@@ -11,7 +11,8 @@ column.
 
 ## Columns
 
-One row per issue, pull request or report.
+One row per issue, pull request or report. An issue that reports several bugs
+can instead take one row per bug, so each bug carries its own status.
 
 | Column | Required | Values |
 |---|---|---|
@@ -24,6 +25,7 @@ One row per issue, pull request or report.
 | `opened` | no | `YYYY-MM-DD`, in UTC |
 | `updated` | yes | `YYYY-MM-DD` |
 | `matrix_url` | no | a commit permalink to the Temper matrix for that project |
+| `item` | no | for an issue split into one row per bug: the bug's number, `1`, `2`, … Empty for a row that is the whole issue |
 
 ## Rules
 
@@ -32,9 +34,13 @@ One row per issue, pull request or report.
 - A report is a GitHub Discussion that shows a project held up against its
   own docs. Use it only when the audit found no bug worth filing.
 - `url` must match `repo`, `kind` and `number`.
-- No two rows share a `url`.
+- No two rows share a `url`, except the rows of one split issue, which share
+  the issue's `url` and differ in `item`. A split issue numbers every row: no
+  row records the whole issue beside its items.
+- Only an issue can be split. `item` is a positive whole number with no
+  leading zero.
 - Rows sort by `repo` (ignoring case), then by kind in the order above, then
-  by `number`.
+  by `number`, then by `item`.
 - A `summary` never says `TODO`, in any case.
 - `opened` is never after `updated`.
 - A repo has one spelling. `Acme/db` and `acme/db` cannot both appear.

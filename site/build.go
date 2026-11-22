@@ -354,7 +354,11 @@ func group(rows []findings.Finding, projects []findings.Project) []project {
 		case f.IsReport():
 			ph = "finding-report"
 		}
-		p.Items = append(p.Items, item{Finding: f, Label: labels[f.Kind], Ref: fmt.Sprintf("%s#%d", f.Repo, f.Number), PH: ph})
+		ref := fmt.Sprintf("%s#%d", f.Repo, f.Number)
+		if f.Item > 0 {
+			ref += fmt.Sprintf(", item %d", f.Item)
+		}
+		p.Items = append(p.Items, item{Finding: f, Label: labels[f.Kind], Ref: ref, PH: ph})
 	}
 	sort.SliceStable(order, func(i, j int) bool {
 		a, b := byRepo[order[i]], byRepo[order[j]]

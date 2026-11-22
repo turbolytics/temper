@@ -96,7 +96,7 @@ func fakeRoot(t *testing.T, csv, config string) string {
 	return root
 }
 
-const csvHeader = "repo,kind,number,url,summary,status,opened,updated,matrix_url\n"
+const csvHeader = "repo,kind,number,url,summary,status,opened,updated,matrix_url,item\n"
 
 func TestBuildWritesEveryPageWithFooter(t *testing.T) {
 	temper.Covers(t, "site.findings")
@@ -178,7 +178,7 @@ func TestLinksAreRelative(t *testing.T) {
 
 func TestSummaryRendersAsText(t *testing.T) {
 	temper.Covers(t, "site.findings")
-	row := `acme/db,issue,7,https://github.com/acme/db/issues/7,"Rows vanish <script>alert(1)</script> & more.",reported,,2026-11-17,` + "\n"
+	row := `acme/db,issue,7,https://github.com/acme/db/issues/7,"Rows vanish <script>alert(1)</script> & more.",reported,,2026-11-17,,` + "\n"
 	root := fakeRoot(t, csvHeader+row, `{"posthog_key": "", "posthog_host": ""}`)
 	out := t.TempDir()
 	if err := Build(Options{Root: root, Out: out}); err != nil {
@@ -196,9 +196,28 @@ func TestSummaryRendersAsText(t *testing.T) {
 	}
 }
 
+// A split issue shows one row per bug, each named by its item, each with its
+// own status.
+func TestSplitIssueNamesEachItem(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	rows := "acme/db,issue,7,https://github.com/acme/db/issues/7,Reads lose a row.,fixed,,2026-11-18,,1\n" +
+		"acme/db,issue,7,https://github.com/acme/db/issues/7,Counts are off by one.,reported,,2026-11-17,,2\n"
+	root := fakeRoot(t, csvHeader+rows, `{"posthog_key": "", "posthog_host": ""}`)
+	out := t.TempDir()
+	if err := Build(Options{Root: root, Out: out}); err != nil {
+		t.Fatal(err)
+	}
+	page := read(t, filepath.Join(out, "findings/index.html"))
+	for _, want := range []string{"acme/db#7, item 1</a>", "acme/db#7, item 2</a>", "status-fixed", "status-reported"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the findings page lacks %q", want)
+		}
+	}
+}
+
 func TestAnalyticsOnlyWithKeyAndFlag(t *testing.T) {
 	temper.Covers(t, "site.findings")
-	row := "acme/db,issue,7,https://github.com/acme/db/issues/7,Rows vanish.,reported,,2026-11-17,\n"
+	row := "acme/db,issue,7,https://github.com/acme/db/issues/7,Rows vanish.,reported,,2026-11-17,,\n"
 	withKey := fakeRoot(t, csvHeader+row, `{"posthog_key": "phc_test123", "posthog_host": "https://us.i.posthog.com"}`)
 	noKey := fakeRoot(t, csvHeader+row, `{"posthog_key": "", "posthog_host": "https://us.i.posthog.com"}`)
 	for _, tc := range []struct {
@@ -300,9 +319,9 @@ func TestMarkdownRendersTheRealMatrix(t *testing.T) {
 func TestBreadthLeavesOutOurProjects(t *testing.T) {
 	temper.Covers(t, "site.findings")
 	rows := csvHeader +
-		"acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,\n" +
-		"beta/kv,fix-pr,3,https://github.com/beta/kv/pull/3,A fix.,open,,2026-11-17,\n" +
-		"turbolytics/sql-flow,temper-pr,4,https://github.com/turbolytics/sql-flow/pull/4,Adds Temper.,merged,,2026-11-17,\n"
+		"acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,,\n" +
+		"beta/kv,fix-pr,3,https://github.com/beta/kv/pull/3,A fix.,open,,2026-11-17,,\n" +
+		"turbolytics/sql-flow,temper-pr,4,https://github.com/turbolytics/sql-flow/pull/4,Adds Temper.,merged,,2026-11-17,,\n"
 	root := fakeRoot(t, rows, `{"posthog_key": "", "posthog_host": ""}`)
 	out := t.TempDir()
 	if err := Build(Options{Root: root, Out: out}); err != nil {
@@ -325,8 +344,8 @@ func TestBreadthLeavesOutOurProjects(t *testing.T) {
 func TestBreadthCountsReports(t *testing.T) {
 	temper.Covers(t, "site.findings")
 	rows := csvHeader +
-		"acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,\n" +
-		"beta/kv,report,9,https://github.com/beta/kv/discussions/9,Held up.,posted,,2026-11-20,\n"
+		"acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,,\n" +
+		"beta/kv,report,9,https://github.com/beta/kv/discussions/9,Held up.,posted,,2026-11-20,,\n"
 	root := fakeRoot(t, rows, `{"posthog_key": "", "posthog_host": ""}`)
 	out := t.TempDir()
 	if err := Build(Options{Root: root, Out: out}); err != nil {
@@ -552,7 +571,7 @@ func TestSitemapListsEveryPage(t *testing.T) {
 
 func TestGoogleVerificationOnlyWithCode(t *testing.T) {
 	temper.Covers(t, "site.findings")
-	row := "acme/db,issue,7,https://github.com/acme/db/issues/7,Rows vanish.,reported,,2026-11-17,\n"
+	row := "acme/db,issue,7,https://github.com/acme/db/issues/7,Rows vanish.,reported,,2026-11-17,,\n"
 	for _, tc := range []struct {
 		config string
 		want   int
