@@ -365,10 +365,10 @@ func (r *runner) step(ev Event) error {
 		return r.setup(r.e.Down(r.ctx, []string{ev.Service}), "stop "+ev.Service)
 	case "exec", "run":
 		out, err := r.do(*ev.Cmd)
-		r.logf("%s -> %s", ev.Cmd, out.Stdout)
+		r.logf("%s -> %s", r.bind(*ev.Cmd), out.Stdout)
 		return r.setup(err, ev.Kind)
 	case "hold":
-		r.logf("hold %s: %s", ev.Name, ev.Cmd)
+		r.logf("hold %s: %s", ev.Name, r.bind(*ev.Cmd))
 		stop, err := r.e.Background(r.ctx, ev.Name, r.bind(*ev.Cmd))
 		if err != nil {
 			return r.setup(err, "hold "+ev.Name)
@@ -406,7 +406,7 @@ func (r *runner) waitUntil(u *Until) error {
 	for {
 		printed, err := r.do(u.Cmd)
 		out := printed.Stdout
-		r.logf("wait_until %s -> %s", u.Cmd, out)
+		r.logf("wait_until %s -> %s", r.bind(u.Cmd), out)
 		if err == nil {
 			if u.AtLeast != nil {
 				if n, perr := strconv.Atoi(strings.TrimSpace(out)); perr == nil && n >= *u.AtLeast {
@@ -495,7 +495,7 @@ func (r *runner) drain(d *Drain) {
 		printed, err := r.do(d.Remaining)
 		out := printed.Stdout
 		n, perr := strconv.Atoi(strings.TrimSpace(out))
-		r.logf("drain %s -> %q", d.Remaining, out)
+		r.logf("drain %s -> %q", r.bind(d.Remaining), out)
 		switch {
 		case err != nil || perr != nil:
 			// No count: no progress.
@@ -593,7 +593,7 @@ func (r *runner) results(c *Check, out string, err error) {
 		all(err.Error())
 		return
 	}
-	r.logf("results %s -> %s", c.Cmd, out)
+	r.logf("results %s -> %s", r.bind(c.Cmd), out)
 	var got map[string]json.Number
 	dec := json.NewDecoder(strings.NewReader(out))
 	dec.UseNumber()

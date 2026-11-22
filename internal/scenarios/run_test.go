@@ -629,6 +629,34 @@ func TestRun_BuildFailureIsError(t *testing.T) {
 	}
 }
 
+// The run log is evidence: it shows each command as it ran, with the
+// subject in place of {subject}, for events, holds, waits, drains and
+// results checks alike.
+func TestRun_LogShowsBoundCommands(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	sc := temperScenario(t, []string{"job.never_lost"}, `
+- run: [oracle, setup, "{subject}"]
+- wait_until: {run: [oracle, ready, "{subject}"], equals: "1"}
+- drain: {remaining: [postgres, psql, left, "{subject}"], covers: job.never_lost}
+- check: {results: {run: [oracle, verdict, "{subject}"], decides: [job.never_lost]}}
+`)
+	sc.Subject = "cluster.go"
+	f := newFake()
+	f.outputs["run oracle: ready cluster.go"] = []string{"1"}
+	f.outputs["exec postgres: psql left cluster.go"] = []string{"0"}
+	f.outputs["run oracle: verdict cluster.go"] = []string{`{"job.never_lost": 0}`}
+	var log strings.Builder
+	run(t, f, testProject(), sc, Options{Log: &log})
+	if strings.Contains(log.String(), "{subject}") {
+		t.Errorf("the log shows {subject} where the subject ran:\n%s", log.String())
+	}
+	for _, want := range []string{"oracle: setup cluster.go", "oracle: ready cluster.go", "psql left cluster.go", "oracle: verdict cluster.go"} {
+		if !strings.Contains(log.String(), want) {
+			t.Errorf("the log lacks %q:\n%s", want, log.String())
+		}
+	}
+}
+
 func TestRun_SubjectPlaceholder(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
 	sc := temperScenario(t, []string{"job.never_lost"}, "- run: [oracle, check, --subject, \"{subject}\"]\n- check: {covers: job.never_lost, run: [oracle, verdict, \"{subject}\"]}\n")
