@@ -41,6 +41,11 @@ type compose struct {
 	// to count as ready: a container that starts and then dies is not up.
 	settle time.Duration
 	run    RunFunc
+
+	// aliases holds each disconnected container's aliases on that network,
+	// keyed by container and network, so Connect restores them.
+	mu      sync.Mutex
+	aliases map[string][]string
 }
 
 // NewCompose drives the Compose file as project. ready bounds how long Up
@@ -220,12 +225,39 @@ func (c *compose) network(name string) string {
 	return c.project + "_" + name
 }
 
+// Disconnect cuts container n from network, first recording its aliases
+// there: docker network connect alone drops them, and a Compose service's
+// name is one of them.
 func (c *compose) Disconnect(ctx context.Context, n, network string) error {
-	return c.container(ctx, "network", "disconnect", c.network(network), n)
+	net := c.network(network)
+	out, err := c.docker(ctx, "inspect", "-f", fmt.Sprintf("{{json (index .NetworkSettings.Networks %q).Aliases}}", net), n)
+	if err != nil {
+		return fmt.Errorf("read the aliases of %s on %s: %w", n, net, err)
+	}
+	var aliases []string
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &aliases); err != nil {
+		return fmt.Errorf("read the aliases of %s on %s: %q: %w", n, net, out, err)
+	}
+	c.mu.Lock()
+	if c.aliases == nil {
+		c.aliases = map[string][]string{}
+	}
+	c.aliases[n+"\x00"+net] = aliases
+	c.mu.Unlock()
+	return c.container(ctx, "network", "disconnect", net, n)
 }
 
+// Connect reconnects container n to network with the aliases it had there.
 func (c *compose) Connect(ctx context.Context, n, network string) error {
-	return c.container(ctx, "network", "connect", c.network(network), n)
+	net := c.network(network)
+	c.mu.Lock()
+	aliases := c.aliases[n+"\x00"+net]
+	c.mu.Unlock()
+	args := []string{"network", "connect"}
+	for _, a := range aliases {
+		args = append(args, "--alias", a)
+	}
+	return c.container(ctx, append(args, net, n)...)
 }
 
 func (c *compose) Exec(ctx context.Context, service string, instance int, cmd []string) (Output, error) {

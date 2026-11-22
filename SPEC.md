@@ -515,7 +515,7 @@ faults:
 | `do` | `kill`, `stop`, `start`, `restart`, `pause`, `unpause`, `disconnect`, `connect` or `exec`. |
 | `then`, `after` | For `kill` and `stop`: `start` or `restart` the instance after a drawn delay. |
 | `for` | For `pause` and `disconnect`: heal after a drawn duration. Required. |
-| `network` | For `disconnect` and `connect`. |
+| `network` | For `disconnect` and `connect`. A `connect` restores the aliases the container had on that network when it was disconnected, so its service name resolves again. |
 | `exec` | For `exec`: `[service, cmd, ...]`. |
 | `covers` | References that fail if the fault cannot heal. |
 

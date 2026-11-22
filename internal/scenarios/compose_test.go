@@ -21,6 +21,8 @@ type recorder struct {
 	// psSeq, when set, answers successive ps calls in turn; the last repeats.
 	psSeq []string
 	logs  string
+	// aliases answers docker inspect for a container's network aliases.
+	aliases string
 }
 
 func (r *recorder) run(ctx context.Context, name string, args ...string) ([]byte, []byte, error) {
@@ -42,12 +44,15 @@ func (r *recorder) run(ctx context.Context, name string, args ...string) ([]byte
 	if strings.Contains(line, " logs ") {
 		return []byte(r.logs), nil, nil
 	}
+	if strings.Contains(line, " inspect ") {
+		return []byte(r.aliases), nil, nil
+	}
 	return []byte(" out \n"), nil, nil
 }
 
 func TestCompose_CommandLines(t *testing.T) {
 	temper.Covers(t, "cli.scenarios_run")
-	r := &recorder{ps: `{"Name":"p-worker-go-1","Service":"worker-go","State":"running","Health":""}
+	r := &recorder{aliases: "null\n", ps: `{"Name":"p-worker-go-1","Service":"worker-go","State":"running","Health":""}
 {"Name":"p-worker-go-2","Service":"worker-go","State":"running","Health":"healthy"}
 {"Name":"p-worker-go-3","Service":"worker-go","State":"running","Health":""}
 `}
@@ -79,6 +84,7 @@ func TestCompose_CommandLines(t *testing.T) {
 		"docker compose -f compose.yml -p p up -d --no-recreate --scale worker-go=3 worker-go",
 		"docker compose -f compose.yml -p p ps -a --format json worker-go",
 		"docker pause p-worker-go-1",
+		`docker inspect -f {{json (index .NetworkSettings.Networks "p_default").Aliases}} p-worker-go-1`,
 		"docker network disconnect p_default p-worker-go-1",
 		"docker compose -f compose.yml -p p exec -T --index 2 postgres psql -c SELECT 1",
 		"docker compose -f compose.yml -p p run --rm --no-deps -T setup probe migrate",
@@ -86,6 +92,30 @@ func TestCompose_CommandLines(t *testing.T) {
 		"docker kill p-worker-go-1",
 		"docker restart -t 2 p-worker-go-1",
 		"docker compose -f compose.yml -p p down -v --remove-orphans",
+	}
+	if !reflect.DeepEqual(r.lines, want) {
+		t.Errorf("command lines:\n%s\nwant:\n%s", strings.Join(r.lines, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// A reconnect brings back the aliases the container had on that network:
+// docker network connect alone drops a Compose service's alias, so its
+// service name stops resolving for every client that looks it up afresh.
+func TestCompose_ReconnectKeepsAliases(t *testing.T) {
+	temper.Covers(t, "cli.scenarios_run")
+	r := &recorder{aliases: `["p-kafka-1","kafka"]` + "\n"}
+	e := NewCompose("compose.yml", "p", time.Second, r.run)
+	ctx := context.Background()
+	if err := e.Disconnect(ctx, "p-kafka-1", "default"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Connect(ctx, "p-kafka-1", "default"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		`docker inspect -f {{json (index .NetworkSettings.Networks "p_default").Aliases}} p-kafka-1`,
+		"docker network disconnect p_default p-kafka-1",
+		"docker network connect --alias p-kafka-1 --alias kafka p_default p-kafka-1",
 	}
 	if !reflect.DeepEqual(r.lines, want) {
 		t.Errorf("command lines:\n%s\nwant:\n%s", strings.Join(r.lines, "\n"), strings.Join(want, "\n"))
