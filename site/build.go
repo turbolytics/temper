@@ -72,7 +72,7 @@ var caseStudies = []caseStudy{
 		Slug:    "feldera",
 		Repo:    "feldera/feldera",
 		Title:   "Feldera's incremental views under an outside audit",
-		Summary: "Feldera's incremental views matched a full recompute under churn, at 1, 4 and 8 workers, for all 29 SQL types. The audit found two edge cases, and the team took both the same day.",
+		Summary: "Feldera's incremental views matched a full recompute under churn, at 1, 4 and 8 workers, for all 29 SQL types. The audit found one bug, and the team fixed it in two days. A second report turned out to be designed behavior.",
 	},
 }
 

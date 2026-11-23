@@ -6,7 +6,7 @@
 <h2>Summary</h2>
 <p><a href="https://www.feldera.com/">Feldera</a> keeps SQL views up to date as data changes. It doesn't rerun the whole query each time. Instead, it updates the result with just the change. Feldera's promise is that the result always matches running the full query from scratch.</p>
 <p>We tested that promise on the open-source edition, version 0.383.0.</p>
-<p>It held up. We found two edge cases. The Feldera team asked us to file both as issues. One is already fixed.</p>
+<p>It held up. We found one bug, and the Feldera team fixed it in two days. We reported a second case, and it turned out to be designed behavior, not a bug.</p>
 
 <h2>What we checked</h2>
 <p>We changed the data in many ways and checked every view after each change. Each time, we asked one question: does the view match the same query run from scratch?</p>
@@ -21,21 +21,21 @@
 <h2>What held up</h2>
 <ul>
 <li><strong>65 views</strong> matched after every change. They cover joins, GROUP BY, window functions, time windows, subqueries, UNION and EXCEPT, and recursive queries.</li>
-<li><strong>All 29 types</strong> worked correctly in GROUP BY, DISTINCT, joins, MIN and MAX, and ORDER BY. SUM gave the right totals for every numeric type. Its one failure was the DECIMAL overflow below.</li>
+<li><strong>All 29 types</strong> worked correctly in GROUP BY, DISTINCT, joins, MIN and MAX, and ORDER BY. SUM gave the right totals for every numeric type. Its one failure was the DECIMAL overflow below, which is designed behavior.</li>
 <li><strong>Worker count didn't change the results.</strong> 1, 4 and 8 workers gave the same answers.</li>
 <li><strong>Other features worked too.</strong> These include transactions, primary keys, Kafka through broker outages, and the PostgreSQL output.</li>
 </ul>
-<p>In total, 547 of 560 tests passed. All 13 failures came from the two edge cases below.</p>
+<p>In total, 547 of 560 tests passed. All 13 failures came from the two cases below: one bug, and one designed behavior.</p>
 
-<h2>The two edge cases</h2>
-<h3>1. A DECIMAL SUM could crash the pipeline (<a href="https://github.com/feldera/feldera/issues/8032">#8032</a>)</h3>
-<p>When the same row arrives twice in one request, Feldera stores it once with a count of 2. To compute the SUM, it multiplies the value by 2. For a very large <code>DECIMAL(38, 10)</code> value, that multiplication went past 38 digits and crashed the pipeline. The real total still fit.</p>
-<p><strong>Status:</strong> Ben Pfaff, the main author of Feldera's fixed-point decimal library, asked to take it.</p>
-
-<h3>2. ROLLUP returned nothing on an empty table (<a href="https://github.com/feldera/feldera/issues/8033">#8033</a>)</h3>
+<h2>One bug, and one designed behavior</h2>
+<h3>The bug: ROLLUP returned nothing on an empty table (<a href="https://github.com/feldera/feldera/issues/8033">#8033</a>)</h3>
 <p>On an empty table, PostgreSQL and DuckDB return one grand-total row for ROLLUP, CUBE and GROUPING SETS. Feldera returned no rows. This happened on a new table, and again after a table was emptied.</p>
 <p><strong>Status:</strong> Mihai Budiu opened a fix the same day (<a href="https://github.com/feldera/feldera/pull/8034">PR #8034</a>).</p>
 <p><strong>Update, Nov 22:</strong> fixed in <a href="https://github.com/feldera/feldera/pull/8034">PR #8034</a>.</p>
+
+<h3>Designed behavior: a DECIMAL SUM overflow stops the pipeline (<a href="https://github.com/feldera/feldera/issues/8032">#8032</a>)</h3>
+<p>When the same row arrives twice in one request, Feldera stores it once with a count of 2. To compute the SUM, it multiplies the value by 2. For a very large <code>DECIMAL(38, 10)</code> value, that multiplication went past 38 digits and stopped the pipeline, even though the real total still fit. Our test counted the stop as a failure.</p>
+<p><strong>Update, Nov 23:</strong> the maintainers confirmed that an overflow in SUM is meant to stop the pipeline. This is designed behavior, not a bug.</p>
 
 <h2>How the team responded</h2>
 <p>We first posted the results as a <a href="https://github.com/feldera/feldera/discussions/8029">discussion</a>. The maintainers replied that day and asked for the two issues. Each issue had an owner right away.</p>
@@ -43,7 +43,8 @@
 <h2>What we learned</h2>
 <ul>
 <li><strong>A clear promise is easy to test.</strong> "Matches the query from scratch" applies to every view.</li>
-<li><strong>Bugs hide at the edges.</strong> Both issues showed up only at extremes: the largest DECIMAL and the empty table.</li>
+<li><strong>Bugs hide at the edges.</strong> The bug showed up only at an extreme: the empty table.</li>
+<li><strong>Check intent before calling it a bug.</strong> A test can show what a system does. Only its maintainers can say whether that is what they meant. The DECIMAL case was a design choice.</li>
 <li><strong>Sharing what worked helps.</strong> Leading with what held up made the two issues easy to act on.</li>
 </ul>
 
