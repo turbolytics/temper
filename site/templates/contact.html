@@ -1,0 +1,65 @@
+{{define "content"}}
+<p class="eyebrow">Contact</p>
+<h1>Work with us</h1>
+<p class="lead">We test data systems against what their documentation promises, and we help teams build software that proves its own promises. Book a call or email us about any of the work below.</p>
+<p class="contact-ways"><a class="button" data-ph="contact-call" href="https://calendly.com/turbolytics/turbolytics-io-intro">Book a 30-minute call</a> <a class="button quiet" data-ph="contact-email" href="mailto:danny@turbolytics.io">danny@turbolytics.io</a></p>
+
+<section class="offers">
+<h2>For vendors</h2>
+<p>For companies that sell a database, a streaming system or another data product.</p>
+<div class="studies">
+<article class="study">
+<h3>Full audit</h3>
+<p>We list every operation your users rely on and test each one three ways: against your documentation, against a reference system such as PostgreSQL or Apache Kafka, and under real failures such as crashes, network cuts and slow storage. You get a matrix of what holds and what doesn't, and a one-command reproduction for every bug.</p>
+</article>
+<article class="study">
+<h3>Compatibility report</h3>
+<p>Many products sell on a claim such as "Postgres-compatible" or "Kafka-compatible". We test the claim against the real system and deliver a matrix of what matches and what doesn't. Your sales team can use it directly.</p>
+</article>
+<article class="study">
+<h3>Conformance kit</h3>
+<p>A conformance kit is a test suite you hand to everyone who writes a client, connector or backend for your product. Each one proves it behaves the same way before it ships. The kit keeps working after our engagement ends.</p>
+</article>
+<article class="study">
+<h3>Docs accuracy check</h3>
+<p>We find the places where your documentation and your product's behavior disagree. Every audit we have run has found some. It's a small, fixed-price job.</p>
+</article>
+<article class="study">
+<h3>Release gate</h3>
+<p>Before a major version or general availability, we rerun your guarantees against the new build and check that data written by the old version still reads on the new one.</p>
+</article>
+</div>
+</section>
+
+<section class="offers">
+<h2>For teams that run or buy software</h2>
+<div class="studies">
+<article class="study">
+<h3>Vendor evaluation</h3>
+<p>Before you commit to a database or streaming vendor, we test the candidates against their own claims, on workloads shaped like yours. You decide with evidence, not datasheets.</p>
+</article>
+<article class="study">
+<h3>Incident follow-up</h3>
+<p>After an outage, we turn the postmortem into written guarantees and regression tests, so the same failure can't return unnoticed.</p>
+</article>
+<article class="study">
+<h3>Test suite audit</h3>
+<p>We find the tests that are skipped, expected to fail, or assert nothing, and show which promises your suite doesn't actually check.</p>
+</article>
+<article class="study">
+<h3>AI workflow setup</h3>
+<p>We set up your team's coding agents so every feature comes with declared guarantees, and the build fails when a guarantee has no proof.</p>
+</article>
+</div>
+</section>
+
+<section class="offers">
+<h2>For investors and acquirers</h2>
+<div class="studies">
+<article class="study">
+<h3>Technical due diligence</h3>
+<p>Before a funding round or an acquisition, we check whether the product does what its pitch deck says.</p>
+</article>
+</div>
+</section>
+{{end}}
