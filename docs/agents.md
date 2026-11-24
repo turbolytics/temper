@@ -70,7 +70,8 @@ declares only what passed hides every gap.
    ```
 
 4. Fix what it reports (see below), run again, and commit `temper/status/` and
-   `MATRIX.md` with the change. They are generated: never edit them by hand.
+   `MATRIX.md` (and `temper/matrix/`, when the matrix splits) with the change.
+   They are generated: never edit them by hand.
 
 Use the commands the project's Makefile or CI already defines; the levels and
 their commands are declared in `temper.yml`.
@@ -80,13 +81,13 @@ their commands are declared in `temper.yml`.
 | Command | What it does |
 |---|---|
 | `temper check` | Validates the declarations without running any test. |
-| `temper matrix --all-levels` | Joins the evidence to the declarations, then writes `temper/status/` and `MATRIX.md`. Add `--json` to read it as data. |
+| `temper matrix --all-levels` | Joins the evidence to the declarations, then writes `temper/status/` and `MATRIX.md`. A matrix of more than 500 cells becomes an index with one page per group in `temper/matrix/`. Add `--json` to read it as data. |
 | `temper matrix --check` | Writes nothing; exits 3 if the committed files are stale. It judges every level. |
 | `temper run --level L -- CMD` | Runs `CMD` with the level and evidence directory set. It appends evidence and never clears it. |
 | `temper clean` | Deletes all evidence. Do this before a full run, so old passes cannot count. |
 | `temper scenarios run` | Runs the `runner: temper` scenarios against Docker Compose, injecting faults, and records one verdict per check. Run it through `temper run`. Add `--build` to rebuild the images first. |
 | `temper recipes list` | Lists the built-in recipe packs. `temper recipes show PACK` prints one, the reference for each command and fault it provides. |
-| `temper render` | Rebuilds `MATRIX.md` from the committed statuses. |
+| `temper render` | Rebuilds `MATRIX.md` and any group pages from the committed statuses. |
 | `temper guide` | Prints this guide. |
 | `temper version` | Prints the installed version. |
 
@@ -141,7 +142,7 @@ For machine reading, use `temper matrix --all-levels --json`.
 - Never declare only what you tested. Declare the approved inventory, and let
   untested claims show as missing.
 - Never drop or narrow an approved claim without the operator's approval.
-- Never edit `temper/status/` or `MATRIX.md`.
+- Never edit `temper/status/`, `MATRIX.md` or `temper/matrix/`.
 - Never set a test's level. The runner (`temper run --level`) does.
 - Never rely on a test's name for coverage. A test claims what it proves.
 - Never run unit tests under another level's command: it credits them there.

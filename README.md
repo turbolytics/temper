@@ -719,7 +719,7 @@ proven.
 | Command | What it does |
 |---|---|
 | `temper check` | Validates declarations without running tests. It checks ids, files, levels, applicability, exemptions, lattice entries, and scenarios. |
-| `temper matrix` | Runs the checks, reads evidence, and writes `temper/status/` and `MATRIX.md`. If no level has evidence, it exits with code 2 and writes nothing. |
+| `temper matrix` | Runs the checks, reads evidence, and writes `temper/status/` and `MATRIX.md`. A matrix of more than 500 cells becomes an index, with one page per group of ids in `temper/matrix/`. If no level has evidence, it exits with code 2 and writes nothing. |
 | `temper matrix --all-levels` | Checks every level, including levels with no evidence. Use this in CI. |
 | `temper matrix --check` | Checks every level and writes nothing. Exits with code 3 if the committed output differs. Implies `--all-levels`. |
 | `temper matrix --json` | Prints every cell, error, and count as JSON. |
@@ -809,6 +809,7 @@ temper/
   faults.yml         # named faults for runner: temper scenarios
   commands.yml       # named commands for runner: temper scenarios
   status/            # generated, committed
+  matrix/            # generated, committed: group pages of a matrix over 500 cells
 MATRIX.md            # generated, committed
 .temper/evidence/    # generated, ignored
 .temper/scenarios/   # run logs, generated, ignored

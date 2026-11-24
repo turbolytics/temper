@@ -3,7 +3,9 @@ package render
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 
@@ -249,5 +251,127 @@ func TestMarkdown_MultiLevelLatticeHasLegend(t *testing.T) {
 	types := out[strings.Index(out, "### `sink.types`"):strings.Index(out, "### `sink.modes`")]
 	if strings.Contains(types, "Each cell shows") {
 		t.Errorf("single-level lattice should have no legend:\n%s", types)
+	}
+}
+
+// big adds 520 features in group bulk to the fixture, so the matrix passes
+// SplitAt and is written as an index and one page per group.
+func big() (*model.Project, status.Set) {
+	p, s := fixture()
+	for i := 0; i < 520; i++ {
+		id := fmt.Sprintf("bulk.f%03d", i)
+		p.Features = append(p.Features, model.Feature{ID: id, Description: "One of many.", Requires: levels("unit")})
+		s.Put("feature", id, "", "", "unit", status.Missing)
+	}
+	return p, s
+}
+
+func keys(m map[string][]byte) []string {
+	var out []string
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func TestPages_SmallMatrixIsOnePage(t *testing.T) {
+	temper.Covers(t, "cli.matrix_split")
+	p, s := fixture()
+	pages := Pages(p, s)
+	if got := keys(pages); len(got) != 1 || got[0] != "MATRIX.md" {
+		t.Fatalf("pages = %v, want only MATRIX.md", got)
+	}
+	if !bytes.Equal(pages["MATRIX.md"], Markdown(p, s)) {
+		t.Fatal("a small matrix's one page differs from Markdown")
+	}
+}
+
+func TestPages_LargeMatrixIsAnIndexAndOnePagePerGroup(t *testing.T) {
+	temper.Covers(t, "cli.matrix_split")
+	p, s := big()
+	want := []string{"MATRIX.md", "temper/matrix/bulk.md", "temper/matrix/heuristics.md", "temper/matrix/sink.md"}
+	if got := keys(Pages(p, s)); strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("pages = %v, want %v", got, want)
+	}
+}
+
+func TestPages_IndexLinksAndCountsEachGroup(t *testing.T) {
+	temper.Covers(t, "cli.matrix_split")
+	p, s := big()
+	index := string(Pages(p, s)["MATRIX.md"])
+	for _, want := range []string{
+		"[`bulk`](temper/matrix/bulk.md)",
+		"[`sink`](temper/matrix/sink.md)",
+		"| [`bulk`](temper/matrix/bulk.md) | 520 | 0 | 0 | 0 | 0 | 520 |",
+	} {
+		if !strings.Contains(index, want) {
+			t.Errorf("index lacks %q:\n%s", want, index)
+		}
+	}
+}
+
+func TestPages_IndexListsFailingCellsOnly(t *testing.T) {
+	temper.Covers(t, "cli.matrix_split")
+	p, s := big()
+	index := string(Pages(p, s)["MATRIX.md"])
+	if !strings.Contains(index, "| ❌ failing | feature | `sink.kafka` |") {
+		t.Errorf("index does not list the failing cell:\n%s", index)
+	}
+	if strings.Contains(index, "bulk.f001") {
+		t.Errorf("index lists a missing cell; missing cells belong on their group's page")
+	}
+}
+
+func TestPages_GroupPageHoldsOnlyItsGroup(t *testing.T) {
+	temper.Covers(t, "cli.matrix_split")
+	p, s := big()
+	pages := Pages(p, s)
+	bulk, sink := string(pages["temper/matrix/bulk.md"]), string(pages["temper/matrix/sink.md"])
+	if !strings.Contains(bulk, "`bulk.f001`") || strings.Contains(bulk, "sink.kafka") {
+		t.Errorf("bulk page holds the wrong items:\n%.600s", bulk)
+	}
+	for _, want := range []string{"`sink.kafka`", "`sink.flush.keeps_batch`", "### `sink.types`", "Exemptions and refusals", "[All groups](../../MATRIX.md)"} {
+		if !strings.Contains(sink, want) {
+			t.Errorf("sink page lacks %q", want)
+		}
+	}
+	if strings.Contains(sink, "bulk.f") || strings.Contains(sink, "up.working") {
+		t.Errorf("sink page holds another group's items")
+	}
+}
+
+func TestMarkdown_MissingLatticeMembersCollapseToOneRow(t *testing.T) {
+	temper.Covers(t, "cli.render")
+	temper.Covers(t, "cli.matrix_split")
+	p, s := fixture()
+	l := &p.Lattices[0] // sink.types, answered by sink.kafka
+	for _, k := range []string{"a", "b", "c"} {
+		l.Members = append(l.Members, model.Member{Key: k})
+		p.Subjects[0].Answers["sink.types"][k] = model.Answer{Supported: true}
+		s.Put("lattice", "sink.types", k, "sink.kafka", "integration", status.Missing)
+	}
+	got := string(Markdown(p, s))
+	if !strings.Contains(got, "| ⬜ missing | lattice | `sink.types` | `sink.kafka` | `integration` | 3 members; see the lattice's table |") {
+		t.Errorf("missing members are not one row:\n%s", got)
+	}
+	if strings.Contains(got, "`sink.types/a`") {
+		t.Error("a missing member still has its own attention row")
+	}
+}
+
+func TestMarkdown_RefusalsWithOneReasonShareALine(t *testing.T) {
+	temper.Covers(t, "cli.render")
+	temper.Covers(t, "cli.matrix_split")
+	p, s := fixture()
+	l := &p.Lattices[0]
+	for _, k := range []string{"x", "y"} {
+		l.Members = append(l.Members, model.Member{Key: k})
+		p.Subjects[0].Answers["sink.types"][k] = model.Answer{Reason: "Kafka rows are flat; lists are refused.", ProvenBy: "TestRejects_" + k}
+	}
+	got := string(Markdown(p, s))
+	want := "- `sink.kafka` × `sink.types`, 3 members: unsupported. Kafka rows are flat; lists are refused. Members: `list<int64>`, `x`, `y`. Each is proven by its own test (`proven_by` in the subject's file)."
+	if !strings.Contains(got, want) {
+		t.Errorf("refusals sharing a reason are not one line:\n%s", got)
 	}
 }

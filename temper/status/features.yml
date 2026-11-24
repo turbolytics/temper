@@ -7,6 +7,7 @@ cli.guide: {unit: covered, integration: covered}
 cli.matrix: {unit: covered, integration: covered}
 cli.matrix_check: {unit: covered, integration: covered}
 cli.matrix_json: {unit: not_required, integration: covered}
+cli.matrix_split: {unit: covered, integration: covered}
 cli.recipes: {unit: covered, integration: covered}
 cli.render: {unit: covered, integration: not_required}
 cli.run: {unit: covered, integration: covered}

@@ -23,6 +23,9 @@ features:
   - id: cli.render
     description: Rewrites MATRIX.md from the committed statuses alone.
     requires: [unit]
+  - id: cli.matrix_split
+    description: Writes a matrix of more than 500 cells as an index, MATRIX.md, and one page per group of ids under temper/matrix/, and removes pages no group needs.
+    requires: [unit, integration]
   - id: cli.run
     description: Runs a command with the level and evidence directory set, so no test chooses its own level.
     requires: [unit, integration]
