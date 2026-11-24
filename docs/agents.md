@@ -17,10 +17,47 @@ https://github.com/turbolytics/temper/blob/main/docs/adapters.md.
   the declarations and reports every claim that has no passing evidence.
 - Only a passing test counts. A skip, a failure and an error prove nothing.
 
+## The inventory comes first
+
+Before you declare anything in a new project, or in an audit of a system you
+did not build, take an inventory and get it approved. The inventory maps the
+system's full surface, starting from one question: what does an end user need
+this system for?
+
+1. List every functional group: each job a user needs the system for, from
+   its docs, README, API, CLI and configuration. Cite the source of each. A
+   group becomes an id prefix, such as `cli.tenant.`.
+2. List every operation in each group as a feature: `cli.tenant.create`,
+   `cli.tenant.list`. The inventory is the whole surface a user can reach, not
+   the parts you plan to test.
+3. For each group, list the claims its users rely on, such as "a deleted
+   tenant's data is gone". They become invariants.
+4. List the levels, one per kind of evaluation. Functional levels come first:
+   every operation runs and does what its docs say. For example:
+   `conformance` (one client, results match a reference), `concurrency` (many
+   clients, nothing failing), `compatibility` (real clients and drivers),
+   `security` (roles and isolation), `operations` (backup, restore, upgrade).
+5. Choose which operations also run under faults: the server down, a slow
+   network, a crash in the middle. For each, write what must happen. Creating
+   a tenant while the server is down fails with a clear error and leaves no
+   partial tenant. Under high latency, it completes or times out, and a retry
+   does not create two. Not every operation needs fault analysis. The ones
+   left out are not required at the fault levels, and the matrix shows it.
+6. List the subjects. Include a reference implementation to compare against
+   when one exists.
+7. Mark what is out of scope, and say why.
+8. Show the inventory to the human operator. Wait for approval before you
+   declare or test anything.
+
+Then declare all of it, including what you will not test yet. An untested
+claim is a missing cell, and a missing cell is the honest record. A matrix that
+declares only what passed hides every gap.
+
 ## The loop
 
 1. Declare first. New behavior gets a feature (and any invariants) in `temper/`
-   before the code.
+   before the code. In a new project or an audit, the approved inventory comes
+   before that.
 2. Write the code and tests. Each test claims what it proves.
 3. Run every level from empty evidence:
 
@@ -101,6 +138,9 @@ For machine reading, use `temper matrix --all-levels --json`.
 
 - Never make a test skip, or catch and ignore a failure, to get green.
 - Never delete an invariant, a lattice member or an exemption to pass.
+- Never declare only what you tested. Declare the approved inventory, and let
+  untested claims show as missing.
+- Never drop or narrow an approved claim without the operator's approval.
 - Never edit `temper/status/` or `MATRIX.md`.
 - Never set a test's level. The runner (`temper run --level`) does.
 - Never rely on a test's name for coverage. A test claims what it proves.
