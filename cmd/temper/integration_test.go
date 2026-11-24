@@ -323,3 +323,19 @@ func TestIntegration_ScenariosRun(t *testing.T) {
 		}
 	}
 }
+
+func TestIntegration_MatrixSplit(t *testing.T) {
+	temper.Covers(t, "cli.matrix_split")
+	root := fixture(t, "valid")
+	bulk(t, root, 520)
+	if code, out := temperBin(t, root, "matrix", "--all-levels"); code != 1 {
+		t.Fatalf("matrix = %d, want 1\n%s", code, out)
+	}
+	if code, out := temperBin(t, root, "matrix", "--check", "--all-levels"); code != 1 || strings.Contains(out, "stale:") {
+		t.Fatalf("--check on fresh pages = %d\n%s", code, out)
+	}
+	page, err := os.ReadFile(filepath.Join(root, "temper", "matrix", "bulk.md"))
+	if err != nil || !strings.Contains(string(page), "[All groups](../../MATRIX.md)") {
+		t.Fatalf("bulk page: %v\n%.400s", err, page)
+	}
+}

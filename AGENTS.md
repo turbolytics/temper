@@ -18,7 +18,8 @@ This project declares its structure in temper/. Before finishing any change:
 - Lattices are complete: every subject they apply to says whether it supports
   each member.
 - Run `make matrix` (clean, every level through `temper run`, then
-  `temper matrix --all-levels`) and commit `temper/status/` and `MATRIX.md`.
+  `temper matrix --all-levels`) and commit `temper/status/` and `MATRIX.md`
+  (and `temper/matrix/` if the matrix splits).
   `make check-matrix` must exit 0 before you finish.
 
 ## The guide

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/turbolytics/temper/internal/diag"
@@ -72,7 +73,7 @@ func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
 
 	res := matrix.Build(p, kept, committed, matrix.Options{AllLevels: *allLevels})
 	files := status.Files(res.Set, p.Config.LevelNames())
-	page := render.Markdown(p, res.Set)
+	pages := render.Pages(p, res.Set)
 
 	var stale []string
 	if *checkOnly {
@@ -83,15 +84,12 @@ func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
 		for _, rel := range diff {
 			stale = append(stale, path.Join(p.Config.Dir, "status", rel))
 		}
-		current, err := os.ReadFile(p.MatrixPath())
-		if err != nil || !bytes.Equal(current, page) {
-			stale = append(stale, p.Config.Matrix)
-		}
+		stale = append(stale, stalePages(p, pages)...)
 	} else {
 		if err := status.Write(p.StatusDir(), files); err != nil {
 			return fail(p, diag.List{{File: path.Join(p.Config.Dir, "status"), Message: err.Error()}})
 		}
-		if err := os.WriteFile(p.MatrixPath(), page, 0o644); err != nil {
+		if err := writePages(p, pages); err != nil {
 			return fail(p, diag.List{{File: p.Config.Matrix, Message: err.Error()}})
 		}
 	}
@@ -165,9 +163,61 @@ func cmdRender(root string, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s: %v; to regenerate it, run every level and `temper matrix --all-levels`\n", path.Join(p.Config.Dir, "status"), err)
 		return exitError
 	}
-	if err := os.WriteFile(p.MatrixPath(), render.Markdown(p, s), 0o644); err != nil {
+	if err := writePages(p, render.Pages(p, s)); err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", p.Config.Matrix, err)
 		return exitError
 	}
 	return exitOK
+}
+
+// pagesDir holds a split matrix's group pages, relative to the root.
+func pagesDir(p *model.Project) string { return path.Join(p.Config.Dir, "matrix") }
+
+// leftoverPages lists group pages on disk that the matrix no longer has.
+func leftoverPages(p *model.Project, pages map[string][]byte) []string {
+	found, _ := filepath.Glob(filepath.Join(p.Root, filepath.FromSlash(pagesDir(p)), "*.md"))
+	var out []string
+	for _, f := range found {
+		rel := path.Join(pagesDir(p), filepath.Base(f))
+		if _, ok := pages[rel]; !ok {
+			out = append(out, rel)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// writePages writes every page of the matrix and removes group pages it no
+// longer has, so a matrix that shrinks back to one page leaves none behind.
+func writePages(p *model.Project, pages map[string][]byte) error {
+	for _, rel := range leftoverPages(p, pages) {
+		if err := os.Remove(filepath.Join(p.Root, filepath.FromSlash(rel))); err != nil {
+			return err
+		}
+	}
+	os.Remove(filepath.Join(p.Root, filepath.FromSlash(pagesDir(p)))) // only if empty
+	for rel, page := range pages {
+		full := filepath.Join(p.Root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(full, page, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// stalePages lists every page whose committed bytes differ from the matrix,
+// and every leftover group page.
+func stalePages(p *model.Project, pages map[string][]byte) []string {
+	var out []string
+	for rel, page := range pages {
+		current, err := os.ReadFile(filepath.Join(p.Root, filepath.FromSlash(rel)))
+		if err != nil || !bytes.Equal(current, page) {
+			out = append(out, rel)
+		}
+	}
+	sort.Strings(out)
+	return append(out, leftoverPages(p, pages)...)
 }

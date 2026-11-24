@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -342,5 +343,79 @@ func TestCLI_RequiresAnyEndToEnd(t *testing.T) {
 	if !strings.Contains(out, `"item":"sink.any","member":"","subject":"sink.postgres","level":"unit","status":"not_required"`) ||
 		!strings.Contains(out, `"any":true`) {
 		t.Fatalf("JSON should show the other level not_required and the cell marked any:\n%s", out)
+	}
+}
+
+// bulk adds n features in group bulk, enough to split the matrix.
+func bulk(t *testing.T, root string, n int) {
+	t.Helper()
+	edit(t, root, "temper/features.yml", func(s string) string {
+		var b strings.Builder
+		b.WriteString(s)
+		for i := 0; i < n; i++ {
+			fmt.Fprintf(&b, "  - id: bulk.f%03d\n    description: One of many.\n    requires: [unit]\n", i)
+		}
+		return b.String()
+	})
+}
+
+func TestCLI_MatrixSplitsALargeMatrixAndRemovesUnneededPages(t *testing.T) {
+	temper.Covers(t, "cli.matrix_split")
+	root := fixture(t, "valid")
+	bulk(t, root, 520)
+	if code, out, errOut := cli(t, "matrix", "--root", root, "--all-levels"); code != 1 {
+		t.Fatalf("matrix = %d, want 1 (the bulk features are missing)\n%s%s", code, out, errOut)
+	}
+	index, _ := os.ReadFile(filepath.Join(root, "MATRIX.md"))
+	if !strings.Contains(string(index), "[`bulk`](temper/matrix/bulk.md)") {
+		t.Fatalf("MATRIX.md is not an index:\n%.800s", index)
+	}
+	for _, rel := range []string{"temper/matrix/bulk.md", "temper/matrix/sink.md"} {
+		if !exists(filepath.Join(root, rel)) {
+			t.Errorf("%s not written", rel)
+		}
+	}
+	// Back under the limit: one page again, and the group pages are gone.
+	edit(t, root, "temper/features.yml", func(s string) string { return s[:strings.Index(s, "  - id: bulk.f000")] })
+	if code, out, errOut := cli(t, "matrix", "--root", root, "--all-levels"); code != 0 {
+		t.Fatalf("matrix = %d\n%s%s", code, out, errOut)
+	}
+	if exists(filepath.Join(root, "temper/matrix/bulk.md")) || exists(filepath.Join(root, "temper/matrix/sink.md")) {
+		t.Fatal("group pages remain after the matrix fits on one page")
+	}
+}
+
+func TestCLI_MatrixCheckSeesStaleAndLeftoverPages(t *testing.T) {
+	temper.Covers(t, "cli.matrix_split")
+	temper.Covers(t, "cli.matrix_check")
+	root := fixture(t, "valid")
+	bulk(t, root, 520)
+	cli(t, "matrix", "--root", root, "--all-levels")
+	if code, out, _ := cli(t, "matrix", "--root", root, "--check", "--all-levels"); code != 1 {
+		t.Fatalf("--check on fresh pages = %d, want 1 (gaps, nothing stale)\n%s", code, out)
+	}
+	edit(t, root, "temper/matrix/bulk.md", func(s string) string { return s + "hand edit\n" })
+	if err := os.WriteFile(filepath.Join(root, "temper/matrix/gone.md"), []byte("old\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out, _ := cli(t, "matrix", "--root", root, "--check", "--all-levels")
+	if code != 3 || !strings.Contains(out, "stale: temper/matrix/bulk.md") || !strings.Contains(out, "stale: temper/matrix/gone.md") {
+		t.Fatalf("--check = %d, want 3 naming both pages\n%s", code, out)
+	}
+}
+
+func TestCLI_RenderWritesEveryPage(t *testing.T) {
+	temper.Covers(t, "cli.matrix_split")
+	temper.Covers(t, "cli.render")
+	root := fixture(t, "valid")
+	bulk(t, root, 520)
+	cli(t, "matrix", "--root", root, "--all-levels")
+	want, _ := os.ReadFile(filepath.Join(root, "temper/matrix/bulk.md"))
+	os.RemoveAll(filepath.Join(root, "temper/matrix"))
+	if code, _, errOut := cli(t, "render", "--root", root); code != 0 {
+		t.Fatalf("render = %d, %s", code, errOut)
+	}
+	if got, _ := os.ReadFile(filepath.Join(root, "temper/matrix/bulk.md")); !bytes.Equal(got, want) {
+		t.Fatal("render wrote a different bulk page than matrix")
 	}
 }

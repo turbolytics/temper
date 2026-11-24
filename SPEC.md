@@ -112,7 +112,8 @@ temper/
     features.yml            #   one row per feature
     subjects/<id>.yml       #   one row per invariant or lattice member, per subject
     lattices/<id>.yml       #   one row per member of a scenario-covered lattice
-MATRIX.md                   # GENERATED, committed: the rendered matrix
+MATRIX.md                   # GENERATED, committed: the rendered matrix, or its index (§13)
+temper/matrix/<group>.md    # GENERATED, committed: one page per group when the matrix splits (§13)
 .temper/evidence/*.jsonl    # GENERATED, not committed: evidence records from test runs
 .temper/scenarios/          # GENERATED, not committed: run logs from temper scenarios run
 ```
@@ -696,13 +697,30 @@ committed statuses. When no level ran at all, nothing would be judged, so
 `temper matrix` without `--all-levels` reports an evidence error and writes
 nothing. It never replays the committed statuses as the result of a run.
 
+**Pages.** A matrix of at most 500 cells is one page, `MATRIX.md`. A larger
+one is split, so no page is too large to render: `MATRIX.md` becomes an index
+with one row per group (its counts by status and a link to its page), and
+each group has its own page at `<dir>/matrix/<group>.md` with the same
+sections, limited to the group. A group is the first segment of an id, so
+`txn` holds every `txn.` feature, invariant and lattice. The index lists only
+failing cells; each group's page lists its missing and unenforced ones.
+`temper matrix` and `temper render` write every page and delete group pages
+the matrix no longer has, and `--check` reports a page that differs or is
+left over. The split changes only where cells are shown, never their
+statuses.
+
+On every page, a lattice's missing members are counted, not listed, under
+"Needs attention": one row per lattice, subject and level, since the
+lattice's table shows each member. Its refusals that share a reason share a
+line under "Exemptions and refusals", naming the members.
+
 **Commands.**
 
 | Command | What it does |
 |---|---|
 | `temper check` | Validates declarations (§14). |
-| `temper matrix [--json] [--check] [--all-levels]` | Checks, reads evidence, writes `status/` and `MATRIX.md`. `--check` writes nothing, judges every level, and reports committed output that differs. `--json` prints the full result. |
-| `temper render` | Rewrites `MATRIX.md` from the committed `status/` (after a merge). |
+| `temper matrix [--json] [--check] [--all-levels]` | Checks, reads evidence, writes `status/` and the matrix pages. `--check` writes nothing, judges every level, and reports committed output that differs or is left over. `--json` prints the full result. |
+| `temper render` | Rewrites the matrix pages from the committed `status/` (after a merge). |
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE` and `TEMPER_RUN` set. Appends; never clears. |
 | `temper clean` | Deletes all evidence: the start of a full run. |
 | `temper guide` | Prints the guide to working in a Temper project, embedded in the binary so it matches the installed version. |
