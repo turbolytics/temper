@@ -163,6 +163,8 @@ func Build(opts Options) error {
 			"A seven-step tutorial that designs Temper itself with Temper: levels, features, invariants, complete lists of cases, tests and the matrix."},
 		{"case-studies/index.html", "case-studies.html", "Case Studies · Temper by Turbolytics", "../", "case-studies/",
 			"Audits of open-source systems against their own documented guarantees, written up with each project's approval."},
+		{"contact/index.html", "contact.html", "Contact · Temper by Turbolytics", "../", "contact/",
+			"Audits, compatibility reports, vendor evaluations and other work from Turbolytics. Book a call or email us."},
 	}
 	for _, c := range caseStudies {
 		out = append(out, struct{ path, tmpl, title, rel, url, description string }{

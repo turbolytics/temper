@@ -282,3 +282,11 @@ main > section.studies { border-top: 0; padding-top: 0; }
 .study-body h2 { margin-top: 40px; }
 .study-body h3 { font-size: 1.15rem; }
 .study-body .note { font-size: 15px; margin-top: 32px; }
+
+/* The Contact page: the two ways to reach us, then the offers by buyer. */
+.contact-ways { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.button.quiet { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.button.quiet:hover { background: var(--bg-raised); color: var(--accent); }
+.offers { margin-top: 56px; }
+.offers > p { max-width: var(--measure); }
+.study h3 { margin: 0 0 8px; font-size: 1.15rem; }

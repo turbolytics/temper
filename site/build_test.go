@@ -14,7 +14,7 @@ import (
 	"github.com/turbolytics/temper/findings"
 )
 
-var pages = []string{"index.html", "findings/index.html", "tutorial/index.html", "case-studies/index.html", "case-studies/feldera/index.html"}
+var pages = []string{"index.html", "findings/index.html", "tutorial/index.html", "case-studies/index.html", "case-studies/feldera/index.html", "contact/index.html"}
 
 // build builds the real repository into a temp directory.
 func build(t *testing.T, analytics bool) string {
@@ -435,18 +435,40 @@ func TestEveryPageHasTheIBeam(t *testing.T) {
 // Every page offers a way to reach Turbolytics. The home and findings pages
 // also ask for it.
 func TestContactOnEveryPage(t *testing.T) {
-	temper.Covers(t, "site.findings")
+	temper.Covers(t, "site.contact")
 	out := build(t, false)
+	rel := map[string]string{"index.html": "./", "findings/index.html": "../", "tutorial/index.html": "../",
+		"case-studies/index.html": "../", "case-studies/feldera/index.html": "../../", "contact/index.html": "../"}
 	for _, p := range pages {
 		page := read(t, filepath.Join(out, p))
-		if !strings.Contains(page, `<a data-ph="nav-contact" href="https://turbolytics.io/contact">Contact</a>`) {
-			t.Errorf("%s has no Contact link in the header", p)
+		if !strings.Contains(page, `<a data-ph="nav-contact" href="`+rel[p]+`contact/">Contact</a>`) {
+			t.Errorf("%s has no Contact link in the header to the site's own contact page", p)
+		}
+		if strings.Contains(page, "https://turbolytics.io/contact") {
+			t.Errorf("%s still sends visitors to turbolytics.io/contact", p)
 		}
 	}
 	for _, p := range []string{"index.html", "findings/index.html"} {
 		page := read(t, filepath.Join(out, p))
 		if !strings.Contains(page, "Contact us to get onboarded to Temper") || !strings.Contains(page, `class="button"`) {
 			t.Errorf("%s has no call to action", p)
+		}
+	}
+}
+
+// The Contact page lists every consulting offer under the buyer it is for,
+// and gives the two ways to reach us: a booked call and email.
+func TestContactPageListsOffers(t *testing.T) {
+	temper.Covers(t, "site.contact")
+	page := read(t, filepath.Join(build(t, false), "contact", "index.html"))
+	for _, want := range []string{
+		`href="https://calendly.com/turbolytics/turbolytics-io-intro"`, `href="mailto:danny@turbolytics.io"`,
+		"For vendors", "For teams that run or buy software", "For investors and acquirers",
+		"Full audit", "Compatibility report", "Conformance kit", "Docs accuracy check", "Release gate",
+		"Vendor evaluation", "Incident follow-up", "Test suite audit", "AI workflow setup", "Technical due diligence",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("contact page lacks %q", want)
 		}
 	}
 }
@@ -562,7 +584,7 @@ func TestSitemapListsEveryPage(t *testing.T) {
 	if !strings.HasPrefix(sitemap, `<?xml version="1.0" encoding="UTF-8"?>`) {
 		t.Errorf("sitemap.xml has no XML declaration")
 	}
-	for _, path := range []string{"", "findings/", "tutorial/"} {
+	for _, path := range []string{"", "findings/", "tutorial/", "contact/"} {
 		if !strings.Contains(sitemap, "<loc>"+siteURL+path+"</loc>") {
 			t.Errorf("sitemap.xml lacks %s", siteURL+path)
 		}
