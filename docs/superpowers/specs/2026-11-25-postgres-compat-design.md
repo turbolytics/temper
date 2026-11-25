@@ -81,9 +81,15 @@ choice), over a flat count.
 
 ## Constraints
 
-- Lives in a new repo, `turbolytics/temper-postgres`, as a Temper project
-  (temper.yml, features, invariants, lattices, subjects, scenarios), so the
-  matrix renders in the existing format and `temper matrix --check` gates it.
+- Lives in the temper repo at `compat/postgres/`, as its own nested Temper
+  project (its own temper.yml, features, invariants, lattices, subjects,
+  scenarios), the way `examples/inventory` is. The repo's root matrix stays
+  Temper's own; `compat/postgres/MATRIX.md` is the compatibility matrix, and
+  `temper matrix --check` gates it. Make targets `compat-postgres` (rerun and
+  regenerate) and `check-compat-postgres` (check the committed matrix), like
+  `example` and `example-matrix`. The oracle is Python in a container, so the
+  root Go module gains no dependencies. Living in temper lets the site render
+  the matrix as the hosted report later.
 - Reference: PostgreSQL 17, the version pg_duckdb's published image targets.
   The generator takes the major version as an argument.
 - Oracle code is Python in a container, as in every recent audit. The parser
@@ -189,7 +195,7 @@ Several: the cell is undecided and listed for a hand check, never guessed.
 The Temper matrix (index plus one page per lattice, the existing split
 format), a `REPORT.md` summary with the scores and the top differences by
 weight, and per-cell one-command reproductions:
-`temper scenarios run --scenario compat.<file> --subject pg_duckdb.release`.
+`cd compat/postgres && temper scenarios run --scenario compat.<file> --subject pg_duckdb.release`.
 
 ### Reporting
 
