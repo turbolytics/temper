@@ -304,7 +304,11 @@ type TargetFrom struct {
 
 // Project is every declaration of one project.
 type Project struct {
-	Root       string
+	Root string
+	// Out, when set, is an absolute folder that holds everything Temper
+	// generates (evidence, run logs, status, the matrix) in place of Root.
+	// Declarations are always read from Root.
+	Out        string
 	Config     Config
 	Features   []Feature
 	Invariants []Invariant
@@ -326,19 +330,31 @@ func (p *Project) FeaturesFile() string { return path.Join(p.Config.Dir, "featur
 // InvariantsFile is invariants.yml, relative to the root, for messages.
 func (p *Project) InvariantsFile() string { return path.Join(p.Config.Dir, "invariants.yml") }
 
+// OutRoot is where generated output goes: Out when set, else Root.
+func (p *Project) OutRoot() string {
+	if p.Out != "" {
+		return p.Out
+	}
+	return p.Root
+}
+
 // StatusDir is the committed status directory, absolute.
-func (p *Project) StatusDir() string { return filepath.Join(p.Root, p.Config.Dir, "status") }
+func (p *Project) StatusDir() string { return filepath.Join(p.OutRoot(), p.Config.Dir, "status") }
 
 // MatrixPath is MATRIX.md, absolute.
-func (p *Project) MatrixPath() string { return filepath.Join(p.Root, p.Config.Matrix) }
+func (p *Project) MatrixPath() string { return filepath.Join(p.OutRoot(), p.Config.Matrix) }
 
-// EvidenceDir is the evidence directory, absolute.
+// EvidenceDir is the evidence directory, absolute. An absolute evidence path
+// in temper.yml stays where it is, with or without Out.
 func (p *Project) EvidenceDir() string {
 	if filepath.IsAbs(p.Config.Evidence) {
 		return p.Config.Evidence
 	}
-	return filepath.Join(p.Root, p.Config.Evidence)
+	return filepath.Join(p.OutRoot(), p.Config.Evidence)
 }
+
+// ScenarioLogDir keeps the run logs of temper scenarios run, absolute.
+func (p *Project) ScenarioLogDir() string { return filepath.Join(p.OutRoot(), ".temper", "scenarios") }
 
 // Feature looks a feature up by id.
 func (p *Project) Feature(id string) (Feature, bool) {

@@ -41,7 +41,7 @@ func cmdScenarios(root string, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "temper: scenarios needs a subcommand: run\n\n%s", usage)
 		return exitError
 	}
-	fs, rootFlag := flags("scenarios run", root, stderr)
+	fs, rootFlag, outFlag := flags("scenarios run", root, stderr)
 	only := fs.String("scenario", "", "run only this scenario")
 	subject := fs.String("subject", "", "run only this subject of an expanded scenario")
 	seedFlag := fs.String("seed", "", "replay this seed")
@@ -59,7 +59,7 @@ func cmdScenarios(root string, args []string, stdout, stderr io.Writer) int {
 		}
 		seed = &n
 	}
-	p, errs := checked(*rootFlag)
+	p, errs := checked(*rootFlag, *outFlag)
 	if len(errs) != 0 {
 		printErrors(stderr, errs)
 		return exitError

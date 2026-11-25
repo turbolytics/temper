@@ -19,7 +19,7 @@ import (
 )
 
 func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
-	fs, rootFlag := flags("matrix", root, stderr)
+	fs, rootFlag, outFlag := flags("matrix", root, stderr)
 	asJSON := fs.Bool("json", false, "print the full result as JSON")
 	checkOnly := fs.Bool("check", false, "write nothing; exit 3 if committed output differs (implies --all-levels)")
 	allLevels := fs.Bool("all-levels", false, "judge every level, even one with no evidence (CI)")
@@ -42,7 +42,7 @@ func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
-	p, errs := checked(*rootFlag)
+	p, errs := checked(*rootFlag, *outFlag)
 	if len(errs) != 0 {
 		return fail(p, errs)
 	}
@@ -149,11 +149,11 @@ func gapLine(p *model.Project, c matrix.Cell) string {
 }
 
 func cmdRender(root string, args []string, stdout, stderr io.Writer) int {
-	fs, rootFlag := flags("render", root, stderr)
+	fs, rootFlag, outFlag := flags("render", root, stderr)
 	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
-	p, errs := project(*rootFlag)
+	p, errs := project(*rootFlag, *outFlag)
 	if len(errs) != 0 {
 		printErrors(stderr, errs)
 		return exitError
