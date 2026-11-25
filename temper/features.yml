@@ -47,6 +47,9 @@ features:
   - id: site.contact
     description: Builds the Contact page, the consulting offers grouped by who buys them with a call link and email, and points every contact link on the site to it so no visitor leaves the site to reach us.
     requires: [unit]
+  - id: site.compatibility_reports
+    description: Features compatibility reports on the home page and the Contact page, saying what a report tests and delivers (a co-branded hosted matrix, a PDF, a badge and reruns on every release) and that it stays independent.
+    requires: [unit]
   - id: cli.scenarios_run
     description: Runs runner-temper scenarios against a Docker Compose topology, injecting named faults on a seeded schedule, and records one verdict per check as evidence.
     requires: [unit, integration]

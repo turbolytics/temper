@@ -473,6 +473,31 @@ func TestContactPageListsOffers(t *testing.T) {
 	}
 }
 
+// Compatibility reports are featured on the home page, which links to the
+// Contact page, and the Contact page leads its vendor offers with them. Both
+// say what a report delivers and that it stays independent.
+func TestCompatibilityReportsAreFeatured(t *testing.T) {
+	temper.Covers(t, "site.compatibility_reports")
+	out := build(t, false)
+	home := read(t, filepath.Join(out, "index.html"))
+	contact := read(t, filepath.Join(out, "contact", "index.html"))
+	for _, want := range []string{"<h2>Compatibility reports</h2>", `href="./contact/"`, "Postgres-compatible",
+		"hosted", "PDF", "badge", "every release", "Independently tested by Temper by Turbolytics"} {
+		if !strings.Contains(home, want) {
+			t.Errorf("home page lacks %q", want)
+		}
+	}
+	vendors := contact[strings.Index(contact, "For vendors"):]
+	if first := strings.Index(vendors, "<h3>"); first < 0 || !strings.HasPrefix(vendors[first:], "<h3>Compatibility report</h3>") {
+		t.Errorf("the Contact page does not lead its vendor offers with the compatibility report")
+	}
+	for _, want := range []string{"PDF", "badge", "every release", "Independently tested by Temper by Turbolytics"} {
+		if !strings.Contains(contact, want) {
+			t.Errorf("contact page lacks %q", want)
+		}
+	}
+}
+
 // The matrix page says the rows are Temper's own specification, in place of
 // the sentence every project's MATRIX.md opens with.
 func TestMatrixPageNamesTemperSpecification(t *testing.T) {
