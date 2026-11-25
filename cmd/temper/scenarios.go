@@ -106,9 +106,7 @@ func cmdScenarios(root string, args []string, stdout, stderr io.Writer) int {
 			file = filepath.Join(p.Root, file)
 		}
 		e := newEngine(file, composeProject(sc.ID))
-		vs, err := scenarios.RunScenario(ctx, e, p, sc, scenarios.Options{
-			Seed: seed, Subject: *subject, Log: stderr, Build: *build, LogDir: filepath.Join(p.Root, ".temper", "scenarios"),
-		})
+		vs, err := scenarios.RunScenario(ctx, e, p, sc, runOptions(p, seed, *subject, stderr, *build))
 		if err != nil {
 			fmt.Fprintf(stderr, "temper: %v\n", err)
 			return exitError
@@ -135,4 +133,10 @@ func cmdScenarios(root string, args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return code
+}
+
+// runOptions are the options every scenario of one `temper scenarios run`
+// shares. Run logs go under the project's Out when it has one.
+func runOptions(p *model.Project, seed *int64, subject string, log io.Writer, build bool) scenarios.Options {
+	return scenarios.Options{Seed: seed, Subject: subject, Log: log, Build: build, LogDir: p.ScenarioLogDir()}
 }

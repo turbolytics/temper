@@ -63,6 +63,10 @@ func cmdRun(root string, args []string, stdout, stderr io.Writer) int {
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, stdout, stderr
 	cmd.Env = append(withoutTemper(os.Environ()),
 		"TEMPER_LEVEL="+*level, "TEMPER_EVIDENCE="+dir, "TEMPER_RUN="+id)
+	if p.Out != "" {
+		// A temper command inside (scenarios run, matrix) writes where this run does.
+		cmd.Env = append(cmd.Env, "TEMPER_OUT="+p.Out)
+	}
 	if err := cmd.Run(); err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
@@ -77,7 +81,7 @@ func cmdRun(root string, args []string, stdout, stderr io.Writer) int {
 func withoutTemper(env []string) []string {
 	var out []string
 	for _, kv := range env {
-		if !strings.HasPrefix(kv, "TEMPER_LEVEL=") && !strings.HasPrefix(kv, "TEMPER_EVIDENCE=") && !strings.HasPrefix(kv, "TEMPER_RUN=") {
+		if !strings.HasPrefix(kv, "TEMPER_LEVEL=") && !strings.HasPrefix(kv, "TEMPER_EVIDENCE=") && !strings.HasPrefix(kv, "TEMPER_RUN=") && !strings.HasPrefix(kv, "TEMPER_OUT=") {
 			out = append(out, kv)
 		}
 	}

@@ -145,3 +145,42 @@ func TestCLI_EvidenceErrorsNamedFromOut(t *testing.T) {
 		t.Fatalf("evidence error not named relative to --out:\n%s", errOut)
 	}
 }
+
+func TestCLI_RunPassesOutAndWritesEvidenceThere(t *testing.T) {
+	temper.Covers(t, "cli.out")
+	temper.Covers(t, "cli.run")
+	root := fixture(t, "valid")
+	out := t.TempDir()
+	h := helperEnv(t)
+	if code, _, errOut := cli(t, helper(root, "--out", out, "--level", "unit")...); code != 0 {
+		t.Fatalf("run --out = %d, %s", code, errOut)
+	}
+	got := readEnv(t, h["out"])
+	if got["EVIDENCE"] != filepath.Join(out, ".temper", "evidence") || got["OUT"] != out {
+		t.Fatalf("child env = %v, want evidence and TEMPER_OUT under %s", got, out)
+	}
+	// Without --out, the child gets no TEMPER_OUT, even if one was inherited
+	// and then cleared.
+	t.Setenv("TEMPER_OUT", "")
+	cli(t, helper(root, "--level", "unit")...)
+	if got := readEnv(t, h["out"]); got["OUT"] != "" {
+		t.Fatalf("TEMPER_OUT = %q without --out", got["OUT"])
+	}
+}
+
+func TestCLI_ScenarioLogsUnderOut(t *testing.T) {
+	temper.Covers(t, "cli.out")
+	temper.Covers(t, "cli.scenarios_run")
+	root := fixture(t, "valid")
+	out := t.TempDir()
+	t.Setenv("TEMPER_OUT", out)
+	fs, rootFlag, outFlag := flags("scenarios run", root, io.Discard)
+	fs.Parse(nil)
+	p, errs := project(*rootFlag, *outFlag)
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	if got := runOptions(p, nil, "", io.Discard, false).LogDir; got != filepath.Join(out, ".temper", "scenarios") {
+		t.Fatalf("LogDir = %q, want it under TEMPER_OUT", got)
+	}
+}
