@@ -33,8 +33,12 @@ front of MotherDuck, DuckDB Labs and Supabase. Doltgres is the second subject.
 - A headline score weighted by what real applications use, with the flat count
   of features underneath and a pass rate per application.
 - One command reproduces any cell from a pinned commit.
-- A pg_duckdb report: the matrix, a one-page summary, and any silent wrong
-  answers posted to the project, Discussion first.
+- The method is public and the results are private (user's decision). The
+  generator, corpus, comparison code and subject definitions live in temper.
+  Every run's output lives in a private repo.
+- A pg_duckdb report, kept private: the matrix, a one-page summary and the
+  scores. Only silent wrong answers are posted to the project, Discussion
+  first, each with its own statement and public reproduction.
 
 ## Non-goals
 
@@ -53,6 +57,9 @@ front of MotherDuck, DuckDB Labs and Supabase. Doltgres is the second subject.
 - An inventory written from a vendor's own support pages (the Doltgres lists
   were). It has to come from Postgres.
 - Counting a statement as a DuckDB pass when Postgres actually executed it.
+- Publishing a vendor's matrix or score. Scores are for private conversations
+  and the co-branded report a vendor buys. Nothing a run produces is
+  committed to the public repo.
 - Filing every difference. Refusals and documented differences are gaps that
   stay in the matrix. Only silent wrong answers (DuckDB returns a different
   result with no error) and crashes are bugs worth posting.
@@ -190,18 +197,48 @@ Several: the cell is undecided and listed for a hand check, never guessed.
 - Underneath: the flat count, the count per lattice, and each application's
   share of its own captured statements that match ("Django: 94%").
 
+### Where results go
+
+Public, in temper at `compat/postgres/`: declarations (features, invariants,
+lattices, subjects, scenarios), the generator, the corpus and the oracle. Its
+`.gitignore` keeps generated output out, and a test fails if `status/`,
+`MATRIX.md` or `REPORT.md` appear under `compat/postgres/`.
+
+Private, in a new private repo `turbolytics/compat-results`, one folder per
+reference system and subject (`postgres/pg_duckdb/`): statuses, the matrix and
+its pages, `REPORT.md`, evidence and run logs, and later the PDF and badge.
+Each folder records the temper commit and image digests it was produced from.
+
+This needs one Temper feature, built first, with a feature in
+`temper/features.yml`, a SPEC.md change and a guide change in the same commit:
+
+- `--out DIR` on `temper run`, `temper matrix` and `temper scenarios run`
+  (and `TEMPER_OUT` for runners that set the environment). Declarations are
+  still read from the project root. Everything generated goes under DIR
+  instead: evidence, scenario run logs, `status/`, the matrix and its pages.
+- `temper matrix --check --out DIR` checks the committed results in DIR.
+- Without `--out`, behavior is unchanged, so every existing project and the
+  root matrix are untouched.
+
+Make targets: `make compat-postgres RESULTS=<private checkout>` reruns and
+writes there; `make check-compat-postgres RESULTS=<private checkout>` checks
+it. In temper's own CI, `make check-compat-postgres` runs `temper check` on the
+declarations only, since the results aren't there.
+
 ### Output
 
-The Temper matrix (index plus one page per lattice, the existing split
-format), a `REPORT.md` summary with the scores and the top differences by
-weight, and per-cell one-command reproductions:
+In the private repo: the Temper matrix (index plus one page per lattice, the
+existing split format), a `REPORT.md` with the scores and the top differences
+by weight, and per-cell one-command reproductions that run from public temper:
 `cd compat/postgres && temper scenarios run --scenario compat.<file> --subject pg_duckdb.release`.
 
 ### Reporting
 
 Silent wrong answers and crashes go to duckdb/pg_duckdb as one Discussion,
-with the matrix and pinned reproductions, after rerunning from a clean
-clone. Refusals and documented gaps stay in the matrix.
+after rerunning from a clean clone. Each one shows its statement, both
+outputs, and the public reproduction pinned to a temper commit. The matrix
+and scores are not linked. Refusals and documented gaps stay in the private
+matrix.
 
 ## Left to the builder
 
