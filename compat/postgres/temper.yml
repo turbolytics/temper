@@ -1,0 +1,14 @@
+temper: "0.1"
+project: postgres-compat
+
+# A vendor-neutral PostgreSQL compatibility matrix. The inventory is generated
+# from PostgreSQL's own catalogs, docs and parser (recipe/oracle/compat/inventory.py);
+# the corpus is PostgreSQL's regression tests, its doc examples and captured
+# application traffic. Every statement runs on PostgreSQL and on the subject.
+#
+# This folder is the method only. Results go to a private repository:
+#   temper run --out <results>/postgres --level compat -- temper scenarios run ...
+# See README.md.
+levels:
+  - name: compat
+    description: Every corpus statement runs on PostgreSQL 17 and on the subject, and the outputs are compared.

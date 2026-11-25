@@ -1,0 +1,3 @@
+commands:
+  ref_sql: {doc: "one statement on the reference, its rows unaligned", exec: [reference, psql, -U, postgres, -Atc]}
+  duck_sql: {doc: "one statement on pg_duckdb, its rows unaligned", exec: [pg_duckdb, psql, -U, postgres, -Atc]}

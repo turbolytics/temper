@@ -1,0 +1,5 @@
+#!/bin/sh
+# oracle pytest ...  runs the oracle's tests
+# oracle <cmd> ...   runs python -m compat <cmd> ...
+if [ "$1" = "pytest" ]; then exec "$@"; fi
+exec python -m compat "$@"

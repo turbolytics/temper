@@ -1,0 +1,32 @@
+# The reference and pg_duckdb run the same PostgreSQL minor (17.12), matching
+# recipe/oracle/PG_TAG, whose source the inventory and corpus come from.
+services:
+  reference:
+    image: postgres:17.12@sha256:87c8b42f423b45d5247e6aa8fdb2e7762fec164c68a50fe3eb07e7bfcaf4dbcf
+    environment: {POSTGRES_PASSWORD: postgres}
+    healthcheck: {test: [CMD, pg_isready, -U, postgres], interval: 2s, retries: 30}
+
+  pg_duckdb:
+    # v1.2.1, the newest release with a linux/arm64 image (v1.2.2 is amd64 only,
+    # and its DuckDB build needs CPU instructions Rosetta lacks). v1.2.2 adds
+    # only a CA-bundle loader and PG 19 builds. Pinned to the arm64 manifest.
+    image: pgduckdb/pgduckdb:17-v1.2.1@sha256:cd7e1574f68b3f6bf179d4f13dc6ff3ebe506730c95b27b51b861cca5a1eaeea
+    platform: linux/arm64
+    environment: {POSTGRES_PASSWORD: postgres}
+    volumes: [./recipe/pg_duckdb/init.sql:/docker-entrypoint-initdb.d/zz-compat.sql:ro]
+    healthcheck: {test: [CMD, pg_isready, -U, postgres], interval: 2s, retries: 60}
+
+  oracle:
+    build: recipe/oracle
+    volumes:
+      - ./recipe/oracle:/oracle
+      - ./corpus:/corpus
+      - ./temper/lattices:/lattices
+      - ledger:/ledger
+    environment: {PGPASSWORD: postgres}
+    depends_on:
+      reference: {condition: service_healthy}
+      pg_duckdb: {condition: service_healthy}
+
+volumes:
+  ledger:

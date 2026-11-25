@@ -59,3 +59,6 @@ features:
   - id: cli.recipes
     description: Lists the built-in recipe packs and prints any one of them.
     requires: [unit, integration]
+  - id: repo.compat_no_results
+    description: compat/postgres holds only the compatibility method; a test fails if a matrix, status, report or evidence is committed under it.
+    requires: [unit]
