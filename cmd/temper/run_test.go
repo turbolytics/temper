@@ -20,7 +20,7 @@ func TestHelperEnv(t *testing.T) {
 	if out == "" {
 		return
 	}
-	body := fmt.Sprintf("LEVEL=%s\nEVIDENCE=%s\nRUN=%s\n", os.Getenv("TEMPER_LEVEL"), os.Getenv("TEMPER_EVIDENCE"), os.Getenv("TEMPER_RUN"))
+	body := fmt.Sprintf("LEVEL=%s\nEVIDENCE=%s\nRUN=%s\nOUT=%s\n", os.Getenv("TEMPER_LEVEL"), os.Getenv("TEMPER_EVIDENCE"), os.Getenv("TEMPER_RUN"), os.Getenv("TEMPER_OUT"))
 	if err := os.WriteFile(out, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

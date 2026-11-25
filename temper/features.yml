@@ -32,6 +32,9 @@ features:
   - id: cli.clean
     description: Deletes all evidence, the start of a full run.
     requires: [unit]
+  - id: cli.out
+    description: "--out DIR (or TEMPER_OUT) writes evidence, run logs, status and the matrix under DIR; declarations are still read from the project root."
+    requires: [unit]
   - id: cli.guide
     description: Prints the guide an LLM or a person needs to work in a Temper project, matching the installed version.
     requires: [unit, integration]

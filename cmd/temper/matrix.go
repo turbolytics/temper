@@ -19,7 +19,7 @@ import (
 )
 
 func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
-	fs, rootFlag := flags("matrix", root, stderr)
+	fs, rootFlag, outFlag := flags("matrix", root, stderr)
 	asJSON := fs.Bool("json", false, "print the full result as JSON")
 	checkOnly := fs.Bool("check", false, "write nothing; exit 3 if committed output differs (implies --all-levels)")
 	allLevels := fs.Bool("all-levels", false, "judge every level, even one with no evidence (CI)")
@@ -42,7 +42,7 @@ func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
-	p, errs := checked(*rootFlag)
+	p, errs := checked(*rootFlag, *outFlag)
 	if len(errs) != 0 {
 		return fail(p, errs)
 	}
@@ -149,11 +149,11 @@ func gapLine(p *model.Project, c matrix.Cell) string {
 }
 
 func cmdRender(root string, args []string, stdout, stderr io.Writer) int {
-	fs, rootFlag := flags("render", root, stderr)
+	fs, rootFlag, outFlag := flags("render", root, stderr)
 	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
-	p, errs := project(*rootFlag)
+	p, errs := project(*rootFlag, *outFlag)
 	if len(errs) != 0 {
 		printErrors(stderr, errs)
 		return exitError
@@ -175,7 +175,7 @@ func pagesDir(p *model.Project) string { return path.Join(p.Config.Dir, "matrix"
 
 // leftoverPages lists group pages on disk that the matrix no longer has.
 func leftoverPages(p *model.Project, pages map[string][]byte) []string {
-	found, _ := filepath.Glob(filepath.Join(p.Root, filepath.FromSlash(pagesDir(p)), "*.md"))
+	found, _ := filepath.Glob(filepath.Join(p.OutRoot(), filepath.FromSlash(pagesDir(p)), "*.md"))
 	var out []string
 	for _, f := range found {
 		rel := path.Join(pagesDir(p), filepath.Base(f))
@@ -191,13 +191,13 @@ func leftoverPages(p *model.Project, pages map[string][]byte) []string {
 // longer has, so a matrix that shrinks back to one page leaves none behind.
 func writePages(p *model.Project, pages map[string][]byte) error {
 	for _, rel := range leftoverPages(p, pages) {
-		if err := os.Remove(filepath.Join(p.Root, filepath.FromSlash(rel))); err != nil {
+		if err := os.Remove(filepath.Join(p.OutRoot(), filepath.FromSlash(rel))); err != nil {
 			return err
 		}
 	}
-	os.Remove(filepath.Join(p.Root, filepath.FromSlash(pagesDir(p)))) // only if empty
+	os.Remove(filepath.Join(p.OutRoot(), filepath.FromSlash(pagesDir(p)))) // only if empty
 	for rel, page := range pages {
-		full := filepath.Join(p.Root, filepath.FromSlash(rel))
+		full := filepath.Join(p.OutRoot(), filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func writePages(p *model.Project, pages map[string][]byte) error {
 func stalePages(p *model.Project, pages map[string][]byte) []string {
 	var out []string
 	for rel, page := range pages {
-		current, err := os.ReadFile(filepath.Join(p.Root, filepath.FromSlash(rel)))
+		current, err := os.ReadFile(filepath.Join(p.OutRoot(), filepath.FromSlash(rel)))
 		if err != nil || !bytes.Equal(current, page) {
 			out = append(out, rel)
 		}
