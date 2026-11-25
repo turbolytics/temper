@@ -53,6 +53,40 @@ Then declare all of it, including what you will not test yet. An untested
 claim is a missing cell, and a missing cell is the honest record. A matrix that
 declares only what passed hides every gap.
 
+## Proving a check can fail
+
+A check is only as good as the failure it can see. Before a check decides a
+claim, show that it can fail, and that it tested something.
+
+- Decide each claim against an outside authority: the project's docs, a
+  reference system such as PostgreSQL or Kafka, or a published checker such
+  as Elle or Hermitage. Quote the docs in the claim. Never decide a claim
+  against your own expectation of the behavior.
+- When a reference decides the claim, make it reproduce the authority
+  exactly, including its documented edge cases. A reference that is close
+  enough hides real differences.
+- Give every check a negative control: a run where the bug is planted, the
+  data is corrupted on purpose, or the reference is perturbed. The check must
+  fail on it. A check whose control passes records an error, not a pass.
+- A check that tested nothing records an error, not a pass. Make it count
+  what it exercised, such as writes made, snapshots compared or writes a
+  fault interrupted, and fail when the count is too low.
+- Void a run when the environment broke under it: the host slept, the clock
+  jumped, or the network of the test harness itself failed. A void run is
+  neither a pass nor a fail. Rerun it on a machine that stays awake.
+
+When a check fails:
+
+1. Suspect the harness first: the workload, the check and the fault timing.
+   Find the cause in the harness or in the system, not in the verdict.
+2. Check intent before calling it a bug. Read the docs, the issue tracker and
+   the source. A behavior the project chose and documented is not a bug,
+   even when it surprises you. Say so in the claim, or exempt it with a
+   reason and a proof.
+3. Rerun from clean evidence, with `temper clean` first.
+4. Before you cite a failure in a report, reduce it to one command that fails
+   every time, such as 10 runs out of 10.
+
 ## The loop
 
 1. Declare first. New behavior gets a feature (and any invariants) in `temper/`
@@ -146,6 +180,9 @@ For machine reading, use `temper matrix --all-levels --json`.
 - Never set a test's level. The runner (`temper run --level`) does.
 - Never rely on a test's name for coverage. A test claims what it proves.
 - Never run unit tests under another level's command: it credits them there.
+- Never trust a check whose negative control did not fail.
+- Never report a failure as a bug before ruling out the harness and checking
+  the project's intent.
 
 ## Declarations
 
