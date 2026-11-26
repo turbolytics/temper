@@ -2,11 +2,12 @@
 
     oracle report SUBJECT OUT_DIR [LEDGER]
 
-The headline score is the weighted share of inventory members that pass.
-A member's weight is how often captured application traffic uses it
-(corpus/weights.json); a member no application uses gets FLOOR. Refused,
-differing, documented, undecided and unexercised members all count as not
-passing.
+The headline score is the weighted share of the tested features that pass:
+of the claimed members in the scored lists, those the corpus decided (pass,
+fail or documented). A member's weight is how often captured application
+traffic uses it (corpus/weights.json); a member no application uses gets
+FLOOR. Untested and undecided members are left out of the score and shown
+as coverage beside it. What a product claims comes from compat/scope.py.
 """
 import json
 import sys
@@ -19,30 +20,19 @@ FLOOR = 0.01
 SCORED = ("sql.command", "sql.syntax", "sql.function", "sql.operator", "sql.type")
 NOT_SCORED = {
     "sql.standard": "no statement maps to an SQL-standard feature id yet",
-    "server.setting": "PostgreSQL's own code under pg_duckdb; not scored",
-    "server.errcode": "PostgreSQL's own code under pg_duckdb; not scored",
-    "catalog.table": "PostgreSQL's own code under pg_duckdb; not scored",
+    "server.setting": "not scored in this version of the method",
+    "server.errcode": "not scored in this version of the method",
+    "catalog.table": "not scored in this version of the method",
 }
 TOP = 20
-# For a subject that only runs queries (pg_duckdb hands DDL and writes to
-# PostgreSQL), the spec marks these "Postgres executes" rather than scoring them.
-POSTGRES_EXECUTES_SYNTAX = {"RETURNING", "ON CONFLICT DO NOTHING", "ON CONFLICT DO UPDATE", "MERGE WHEN MATCHED",
-                            "MERGE WHEN NOT MATCHED", "MERGE RETURNING", "SELECT INTO"}
 
 
-def scored_refs(subject: str, inventory: dict) -> set:
-    """The members the headline score counts for this subject."""
-    from compat.db import SUBJECTS
-    query_only = bool(SUBJECTS[subject].engine_check)
-    refs = set()
-    for lat in SCORED:
-        if query_only and lat == "sql.command":
-            continue
-        for k in inventory.get(lat, ()):
-            if query_only and lat == "sql.syntax" and k in POSTGRES_EXECUTES_SYNTAX:
-                continue
-            refs.add(f"{lat}/{k}")
-    return refs
+def scored_refs(subject: str, inventory: dict, scope_root: Path | None = None) -> set:
+    """The members the headline score can count for this subject: the scored
+    lists, less what the product does not claim (subjects/<name>/scope.yml)."""
+    from compat.scope import not_claimed
+    refs = {f"{lat}/{k}" for lat in SCORED for k in inventory.get(lat, ())}
+    return refs - not_claimed(subject, inventory, scope_root)
 
 
 def _shown(o) -> str:
@@ -54,11 +44,26 @@ def weight(weights: dict, ref: str) -> float:
     return weights.get(ref, FLOOR)
 
 
+def _tested(v, all_refs: set) -> set:
+    """The members the corpus decided: passed, failed or documented."""
+    return all_refs & (v.passed | set(v.failed) | set(v.documented))
+
+
 def score(v, weights: dict, all_refs: set) -> float:
-    total = sum(weight(weights, r) for r in all_refs)
+    """The weighted share of the tested members that pass."""
+    tested = _tested(v, all_refs)
+    total = sum(weight(weights, r) for r in tested)
     if not total:
         return 0.0
-    return sum(weight(weights, r) for r in all_refs if r in v.passed) / total
+    return sum(weight(weights, r) for r in tested if r in v.passed) / total
+
+
+def coverage(v, weights: dict, all_refs: set) -> tuple:
+    """(tested, claimed, weighted share tested) over the scored members."""
+    tested = _tested(v, all_refs)
+    total = sum(weight(weights, r) for r in all_refs)
+    w = sum(weight(weights, r) for r in tested) / total if total else 0.0
+    return len(tested), len(all_refs), w
 
 
 def _cell(s, n=120):
@@ -152,7 +157,10 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
 
     L += ["## Score", ""]
     s = score(v, weights, all_refs)
-    L += [f"**{s:.1%}** of PostgreSQL's features pass, weighted by how often applications use them.", ""]
+    tested, claimed, wcov = coverage(v, weights, all_refs)
+    L += [f"**{s:.1%}** of the tested features pass, weighted by how often applications use them.", "",
+          f"Coverage: {tested} of {claimed} claimed features tested ({wcov:.1%} by weight). Untested and undecided "
+          "features are left out of the score.", ""]
     L += ["| Lattice | Members | Pass | Fail | Documented | Undecided | Not exercised |", "|---|---|---|---|---|---|---|"]
     for lat in SCORED:
         refs = {r for r in all_refs if r.startswith(lat + "/")}
@@ -161,7 +169,7 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
         L.append(f"| `{lat}` | {len(refs)} | {len(refs & v.passed)} | {len(refs & set(v.failed))} | "
                  f"{len(refs & set(v.documented))} | {len(refs & set(v.undecided))} | {len(refs & v.unexercised)} |")
     flat = len(all_refs & v.passed)
-    L += ["", f"Unweighted: {flat} of {len(all_refs)} members pass.", ""]
+    L += ["", f"Unweighted: {flat} of {tested} tested features pass.", ""]
 
     L += ["## Applications", "",
           "Each application's share of its own captured statements that match, of those the subject ran.", ""]
@@ -204,11 +212,9 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
     L += [", ".join(f"`{r}`" for r in sorted(v.unexercised & all_refs)) or "None.", ""]
     L += ["## Not scored", ""]
     L += [f"- `{lat}`: {why}." for lat, why in NOT_SCORED.items()]
-    from compat.db import SUBJECTS
-    if SUBJECTS.get(subject) and SUBJECTS[subject].engine_check:
-        L += ["- `sql.command` and the write-only syntax ("
-              + ", ".join(sorted(POSTGRES_EXECUTES_SYNTAX))
-              + "): the subject hands these to PostgreSQL; refusals among them still appear above."]
+    from compat.scope import load as load_scope
+    for e in load_scope(subject):
+        L += [f"- Not claimed: {', '.join(f'`{m}`' for m in e['members'])}. {e['why']} ({e['cite']})"]
     L += ["", "## Noise and row order", "",
           f"{counts.get('noise', 0)} statements gave two different answers on PostgreSQL itself and were dropped.",
           f"{counts.get('drift', 0)} statements failed only as a knock-on of an earlier difference (an aborted "
