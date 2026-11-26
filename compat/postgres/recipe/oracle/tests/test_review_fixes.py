@@ -157,3 +157,24 @@ def test_pg_duckdb_control_rewrites_and_probes_but_never_skips(tmp_path):
     out = outcomes(tmp_path, "pg_duckdb.control")
     assert [o["outcome"] for o in out] == ["match"] * 4  # the control skips nothing and differs nowhere
     assert out[-1]["rewritten"] and out[-1]["engine"] == "postgres"
+
+
+def test_explain_analyze_timings_are_masked():
+    a = {"cols": [["QUERY PLAN", "text"]], "rows": [["Seq Scan (actual time=0.002..0.004 rows=0 loops=1)"], ["Planning Time: 0.015 ms"], ["Execution Time: 0.031 ms"]], "sqlstate": None, "error": None}
+    b = {"cols": [["QUERY PLAN", "text"]], "rows": [["Seq Scan (actual time=0.003..0.009 rows=0 loops=1)"], ["Planning Time: 0.014 ms"], ["Execution Time: 0.042 ms"]], "sqlstate": None, "error": None}
+    assert replay.server_local_only(a, b, True)
+
+
+def test_statistics_views_are_nondeterministic(tmp_path, monkeypatch):
+    real = replay.execute
+
+    def b_differs(conn, stmt, side, **kw):
+        r = real(conn, stmt, side, **kw)
+        if side == "b" and r.get("rows"):
+            r["rows"] = [["999"]]
+        return r
+
+    monkeypatch.setattr(replay, "execute", b_differs)
+    f = parse_file("t", "SELECT count(*) FROM pg_stat_io WHERE false;")
+    replay.run("postgres.reference", [f], tmp_path)
+    assert kinds(tmp_path, "postgres.reference") == ["noise"]

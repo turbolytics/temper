@@ -177,7 +177,13 @@ SERVER_LOCAL_TYPES = {"oid", "regclass", "regproc", "regprocedure", "regtype", "
                       "regoper", "regoperator", "regconfig", "regdictionary", "regcollation",
                       "xid", "xid8", "cid", "tid", "pg_lsn"}
 SERVER_LOCAL_TEXT = [(re.compile(r"pg_toast_\d+"), "pg_toast_<oid>"),
-                     (re.compile(r"Query Identifier: -?\d+"), "Query Identifier: <id>")]
+                     (re.compile(r"Query Identifier: -?\d+"), "Query Identifier: <id>"),
+                     # EXPLAIN ANALYZE measures time, which no two runs share.
+                     (re.compile(r"actual time=[\d.]+\.\.[\d.]+"), "actual time=<t>"),
+                     (re.compile(r"(Planning|Execution|Serialization) Time: [\d.]+ ms"), r"\1 Time: <t> ms"),
+                     (re.compile(r"(Planning|Execution|Serialization) time: [\d.]+ ms"), r"\1 time: <t> ms")]
+# Statistics views count what the server did, which differs between servers.
+STATISTICS = re.compile(r"\bpg_stat(io|_\w+|io_\w+)?\b|\bpg_statio_\w+", re.I)
 
 
 def _masked(r):
@@ -439,7 +445,7 @@ def _one(subject, subj, sides, stmt, rules, inv=None) -> dict:
     if outcome in ("differs", "order") and server_local_only(a, b, is_ordered):
         line.update(outcome="noise", reason="differs only in server-local identifiers (OIDs, xids, toast names)")
         return line
-    if outcome in ("differs", "order") and NONDETERMINISTIC & set(tag(stmt.sql, inv)):
+    if outcome in ("differs", "order") and (NONDETERMINISTIC & set(tag(stmt.sql, inv)) or STATISTICS.search(stmt.sql)):
         line.update(outcome="noise", reason="uses a function whose answer changes from call to call")
         return line
     if outcome == "differs" and (a.get("truncated") or b.get("truncated")):
