@@ -16,6 +16,7 @@ cli.version: {unit: covered, integration: covered}
 declarations.extension_fields: {unit: covered, integration: not_required}
 declarations.load: {unit: covered, integration: not_required}
 declarations.recipe_packs: {unit: covered, integration: covered}
+repo.compat_no_results: {unit: covered, integration: not_required}
 site.case_studies: {unit: covered, integration: not_required}
 site.compatibility_reports: {unit: covered, integration: not_required}
 site.contact: {unit: covered, integration: not_required}

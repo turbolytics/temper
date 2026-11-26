@@ -2,9 +2,9 @@
 <!-- temper matrix format: 3 -->
 # temper matrix
 
-**20 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
+**21 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
 
-✅ 63 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
+✅ 64 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
 
 Each cell is one claim in `temper/` at one level. It is covered when a test that ran
 at that level passed and none failed: a skip proves nothing, and a pass never hides
@@ -44,6 +44,7 @@ What the system does. Each feature is proven at the levels it requires.
 | `cli.scenarios_run` | Runs runner-temper scenarios against a Docker Compose topology, injecting named faults on a seeded schedule, and records one verdict per check as evidence. | ✅ | ✅ |
 | `declarations.recipe_packs` | Includes Temper's recipe packs from temper.yml and the project's named commands from commands.yml, so a scenario names each command once. | ✅ | ✅ |
 | `cli.recipes` | Lists the built-in recipe packs and prints any one of them. | ✅ | ✅ |
+| `repo.compat_no_results` | compat/postgres holds only the compatibility method; a test fails if a matrix, status, report or evidence is committed under it. | ✅ | — |
 
 ## Invariants
 
