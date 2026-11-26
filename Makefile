@@ -46,13 +46,14 @@ COMPAT_SUBJECTS := postgres.reference pg_duckdb.release
 compat-postgres:
 	@test -n "$(RESULTS)" || { echo "set RESULTS to a checkout of the private results repository"; exit 2; }
 	$(TEMPER) --root $(COMPAT) clean --out $(abspath $(RESULTS))/postgres
+	mkdir -p $(abspath $(RESULTS))/postgres/ledger
 	for s in $(COMPAT_SUBJECTS); do \
-		$(TEMPER) --root $(COMPAT) run --out $(abspath $(RESULTS))/postgres --level compat -- \
+		COMPAT_LEDGER=$(abspath $(RESULTS))/postgres/ledger $(TEMPER) --root $(COMPAT) run --out $(abspath $(RESULTS))/postgres --level compat -- \
 			$(TEMPER) --root $(COMPAT) scenarios run --scenario compat.replay --subject $$s --build || true; \
 	done
 	$(TEMPER) --root $(COMPAT) matrix --all-levels --out $(abspath $(RESULTS))/postgres || test $$? -eq 1
 	for s in $(COMPAT_SUBJECTS); do \
-		docker compose -f $(COMPAT)/compose.yml run --rm -v $(abspath $(RESULTS))/postgres:/results oracle report $$s /results/reports/$$s; \
+		COMPAT_LEDGER=$(abspath $(RESULTS))/postgres/ledger docker compose -f $(COMPAT)/compose.yml run --rm -v $(abspath $(RESULTS))/postgres:/results oracle report $$s /results/reports/$$s; \
 	done
 
 # Without RESULTS, only the declarations are checked (CI has no results).

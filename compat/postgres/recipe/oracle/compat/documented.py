@@ -32,8 +32,10 @@ def _type_names():
 def _types(result) -> set:
     if not result or not result.get("cols"):
         return set()
-    names = _type_names()
-    return {names.get(oid, str(oid)) for _, oid in result["cols"]}
+    out = set()
+    for _, t in result["cols"]:
+        out.add(t if isinstance(t, str) else _type_names().get(t, str(t)))
+    return out
 
 
 def match(rules: list, sql: str, a: dict, b: dict) -> str | None:

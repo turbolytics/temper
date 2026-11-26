@@ -14,6 +14,7 @@ USER, PASSWORD = "postgres", "postgres"
 @dataclass(frozen=True)
 class Subject:
     host_a: str
+    host_a2: str
     host_b: str
     db_a: str
     db_a2: str
@@ -25,9 +26,10 @@ class Subject:
 
 
 SUBJECTS = {
-    "postgres.reference": Subject("reference", "reference", "cmp_a", "cmp_a2", "cmp_b"),
+    # One server per side: roles and tablespaces are server-wide.
+    "postgres.reference": Subject("reference", "reference_a2", "reference_b", "cmp_a", "cmp_a2", "cmp_b"),
     "pg_duckdb.release": Subject(
-        "pg_duckdb", "pg_duckdb", "cmp_a", "cmp_a2", "cmp_b",
+        "pg_duckdb_a", "pg_duckdb_a2", "pg_duckdb", "cmp_a", "cmp_a2", "cmp_b",
         setup_b=["SET duckdb.force_execution = true"], engine_check="duckdb",
     ),
 }
@@ -37,7 +39,7 @@ SIDES = ("a", "a2", "b")
 
 def host(subject: str, side: str) -> str:
     s = SUBJECTS[subject]
-    return s.host_b if side == "b" else s.host_a
+    return {"a": s.host_a, "a2": s.host_a2, "b": s.host_b}[side]
 
 
 def base_db(subject: str, side: str) -> str:

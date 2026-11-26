@@ -5,12 +5,13 @@ def test_pg_duckdb_side_b_forces_duckdb():
     s = SUBJECTS["pg_duckdb.release"]
     assert s.setup_b == ["SET duckdb.force_execution = true"]
     assert s.engine_check == "duckdb"
-    assert s.host_a == s.host_b == "pg_duckdb"
+    assert len({s.host_a, s.host_a2, s.host_b}) == 3  # one server per side
 
 
-def test_reference_sides_are_three_databases():
+def test_reference_sides_are_three_servers():
+    # Roles and tablespaces are server-wide: sides sharing a server interfere.
     s = SUBJECTS["postgres.reference"]
-    assert len({s.db_a, s.db_a2, s.db_b}) == 3
+    assert len({s.host_a, s.host_a2, s.host_b}) == 3
     assert s.setup_b == [] and s.engine_check is None
 
 

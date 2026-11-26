@@ -114,3 +114,55 @@ def test_documented_rule_can_match_a_returned_value():
     b = {"rows": [["unsupportedpostgrestype(duckdb only supports numeric ...)"]], "error": None, "cols": None}
     assert documented.match(rules, "SELECT 1", {"rows": [["numeric"]]}, b) == "r"
     assert documented.match(rules, "SELECT 1", {"rows": [["numeric"]]}, {"rows": [["x"]], "error": None}) is None
+
+
+def test_copy_to_stdout_compares_its_text_and_leaves_the_session_usable(tmp_path):
+    f = parse_file("t", "CREATE TABLE c2(a int);\nINSERT INTO c2 VALUES (1),(2);\nCOPY c2 TO STDOUT;\nCOPY (SELECT 1) TO stdout;\nSELECT 5;\n")
+    replay.run("postgres.reference", [f], tmp_path)
+    out = outcomes(tmp_path, "postgres.reference")
+    assert [o["outcome"] for o in out] == ["match"] * 5
+    assert out[2]["a"]["rows"] == [["1\n2\n"]] and out[2]["a"]["sqlstate"] is None
+    assert out[4]["a"]["rows"] == [["5"]]
+
+
+def test_copy_from_stdin_without_data_sends_nothing(tmp_path):
+    f = parse_file("t", "CREATE TABLE c3(a int);\nCOPY c3 FROM STDIN;\n\\.\nSELECT count(*) FROM c3;\n")
+    replay.run("postgres.reference", [f], tmp_path)
+    out = outcomes(tmp_path, "postgres.reference")
+    assert out[-1]["a"]["rows"] == [["0"]] and all(o["a"]["sqlstate"] is None for o in out)
+
+
+def test_server_wide_objects_do_not_leak_between_sides(tmp_path):
+    f = parse_file("t", "CREATE ROLE compat_iso_role; SELECT 1; DROP ROLE compat_iso_role;")
+    replay.run("postgres.reference", [f], tmp_path)
+    assert kinds(tmp_path, "postgres.reference") == ["match", "match", "match"]
+
+
+def test_reset_inside_an_aborted_transaction_does_not_stop_replay(tmp_path):
+    f = parse_file("t", "BEGIN; SELECT 1/0; RESET ALL; ROLLBACK; RESET SESSION AUTHORIZATION; SELECT 2;")
+    replay.run("postgres.reference", [f], tmp_path)
+    assert kinds(tmp_path, "postgres.reference")[-1] == "match"
+
+
+def test_a_client_encoding_change_does_not_stop_replay(tmp_path):
+    f = parse_file("t", "SET client_encoding TO WIN1252; SELECT '★'; RESET client_encoding; SELECT 'ü';")
+    replay.run("postgres.reference", [f], tmp_path)
+    out = outcomes(tmp_path, "postgres.reference")
+    assert len(out) == 4 and out[-1]["outcome"] == "match" and out[-1]["a"]["rows"] == [["ü"]]
+
+
+def test_user_types_compare_by_name_not_by_server_oid(tmp_path, monkeypatch):
+    real = replay.open_side
+
+    def shifted(subject, side, dbname, timeout_ms):
+        conn = real(subject, side, dbname, timeout_ms)
+        if side == "b":  # use up OIDs on b's server only
+            conn.execute("CREATE TYPE compat_shift AS (x int); DROP TYPE compat_shift")
+        return conn
+
+    monkeypatch.setattr(replay, "open_side", shifted)
+    f = parse_file("t", "CREATE TYPE compat_pair AS (a int); SELECT ROW(1)::compat_pair AS p;")
+    replay.run("postgres.reference", [f], tmp_path)
+    out = outcomes(tmp_path, "postgres.reference")
+    assert out[-1]["outcome"] == "match", out[-1]
+    assert out[-1]["a"]["cols"] == [["p", "compat_pair"]]

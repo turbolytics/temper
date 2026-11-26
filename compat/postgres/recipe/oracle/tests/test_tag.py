@@ -59,3 +59,29 @@ def test_fetch_first_is_not_limit_only():
     inv = {"sql.command": {"SELECT"}, "sql.syntax": {"LIMIT", "FETCH FIRST"}}
     assert "sql.syntax/FETCH FIRST" in tag("SELECT 1 FETCH FIRST 1 ROWS ONLY", inv)
     assert "sql.syntax/FETCH FIRST" not in tag("SELECT 1 LIMIT 1", inv)
+
+
+INV2 = {
+    "sql.command": {"SELECT", "TABLE", "WITH", "CREATE TABLE", "CREATE TABLE AS", "CREATE MATERIALIZED VIEW"},
+    "sql.function": {"extract", "position", "overlay", "current_user", "current_date", "substring", "system_user"},
+    "sql.syntax": {"SQL value function", "AT TIME ZONE"},
+}
+
+
+def test_command_forms_of_select():
+    assert "sql.command/TABLE" in tag("TABLE t", INV2)
+    refs = tag("WITH a AS (SELECT 1) SELECT * FROM a", INV2)
+    assert {"sql.command/WITH", "sql.command/SELECT"} <= refs
+
+
+def test_create_table_as_and_matview():
+    assert "sql.command/CREATE TABLE AS" in tag("CREATE TABLE t2 AS SELECT 1", INV2)
+    assert "sql.command/CREATE TABLE" not in tag("CREATE TABLE t2 AS SELECT 1", INV2)
+    assert "sql.command/CREATE MATERIALIZED VIEW" in tag("CREATE MATERIALIZED VIEW m AS SELECT 1", INV2)
+
+
+def test_sql_syntax_functions_are_functions():
+    refs = tag("SELECT extract(year FROM now()), position('a' IN 'ba'), overlay('abc' PLACING 'x' FROM 2), "
+               "substring('abc' FROM 2), current_user, current_date, system_user", INV2)
+    assert {"sql.function/extract", "sql.function/position", "sql.function/overlay", "sql.function/substring",
+            "sql.function/current_user", "sql.function/current_date", "sql.function/system_user"} <= refs

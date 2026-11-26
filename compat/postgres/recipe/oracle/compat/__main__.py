@@ -6,6 +6,10 @@ COMMANDS = {
     # command: module whose main(argv) -> int runs it
     "inventory": "inventory",
     "replay": "replay",
+    "check": "verdict",
+    "subjects": "subjects",
+    "repro": "repro",
+    "report": "report",
 }
 
 

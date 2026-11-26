@@ -1,1 +1,6 @@
-invariants: []
+invariants:
+  - id: compat.matches_postgres
+    claim: Every corpus statement the subject runs gives PostgreSQL 17's answer, or PostgreSQL's error. A difference the subject documents still counts.
+    applies_to: database
+    family: compatibility
+    requires: [compat]

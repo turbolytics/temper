@@ -50,7 +50,11 @@ def _command(stmt, sql: str, commands: set) -> str | None:
             return "SELECT INTO"
         if stmt.valuesLists and "VALUES" in commands:
             return "VALUES"
+        if re.match(r"\s*TABLE\b", sql, re.I) and "TABLE" in commands:
+            return "TABLE"
         return "SELECT"
+    if kind == "CreateTableAsStmt":
+        return "CREATE MATERIALIZED VIEW" if _name(stmt.objtype) == "OBJECT_MATVIEW" else "CREATE TABLE AS"
     if kind in _DML:
         return _DML[kind]
     words = [w.upper() for w in sql.replace("(", " ").split()[:8]]
@@ -168,10 +172,11 @@ class _Tagger(Visitor):
         names = [n.lower() for n in _strings(node.funcname)]
         if names[:1] == ["pg_catalog"]:
             names = names[1:]
-        if _name(node.funcformat) == "COERCE_SQL_SYNTAX":
-            if names and names[-1] == "timezone":
-                self.syn("AT TIME ZONE")
+        if _name(node.funcformat) == "COERCE_SQL_SYNTAX" and names and names[-1] == "timezone":
+            self.syn("AT TIME ZONE")
         elif names:
+            # SQL-syntax forms (extract(... FROM ...), position(... IN ...),
+            # overlay, substring, system_user) are still these functions.
             self.add("sql.function", names[-1])
         if node.agg_filter is not None:
             self.syn("aggregate FILTER")
@@ -308,6 +313,11 @@ class _Tagger(Visitor):
 
     def visit_SQLValueFunction(self, ancestors, node):
         self.syn("SQL value function")
+        op = _name(node.op)
+        if op.startswith("SVFOP_"):
+            name = op[len("SVFOP_"):].lower()
+            name = re.sub(r"_n$", "", name)  # CURRENT_TIME(3) is still current_time
+            self.add("sql.function", name)
 
     def visit_XmlExpr(self, ancestors, node):
         self.syn("XML expression")
@@ -361,6 +371,8 @@ def tag(sql: str, inventory: dict) -> set:
     cmd = _command(stmt, sql, inventory.get("sql.command", set()))
     if cmd:
         t.add("sql.command", cmd)
+    if getattr(stmt, "withClause", None) is not None:
+        t.add("sql.command", "WITH")
     return t.refs
 
 

@@ -24,7 +24,7 @@ import psycopg
 from psycopg.adapt import Loader
 
 from compat import db, documented
-from compat.tag import is_query, ordered
+from compat.tag import is_query, ordered, tag
 
 SESSION = [
     # pg_regress's settings, so regression statements mean what they were written for.
@@ -35,8 +35,10 @@ SESSION = [
 MAX_ROWS = 10000      # rows compared per statement
 KEEP_ROWS = 20        # rows kept in the ledger
 REFUSED = re.compile(r"not (yet )?supported|unsupported|not implemented", re.I)
-RESETS = re.compile(r"^\s*(RESET\s+ALL|DISCARD\s+ALL|RESET\s+SESSION)", re.I)
+RESETS = re.compile(r"^\s*(RESET\s+ALL|DISCARD\s+ALL)\s*$", re.I)
 ROOT = Path("/pg")
+COPY_OUT = re.compile(r"^\s*COPY\b.*\bTO\s+STDOUT\b", re.I | re.S)
+COPY_IN = re.compile(r"^\s*COPY\b.*\bFROM\s+STDIN\b", re.I | re.S)
 
 
 class _Text(Loader):
@@ -64,6 +66,27 @@ def open_side(subject, side, dbname, timeout_ms):
     return conn
 
 
+_TYPNAMES = {}  # (server host, oid) -> format_type name
+
+
+def _typname(conn, oid) -> str:
+    """A result column's type by name: OIDs of user-defined types differ
+    from server to server, names don't."""
+    key = (conn.info.host, conn.info.dbname, oid)
+    name = _TYPNAMES.get(key)
+    if name is None:
+        try:
+            with conn.cursor(binary=False) as cur:
+                cur.execute("SELECT format_type(%s::oid, NULL)", (oid,), prepare=False)
+                name = str(cur.fetchone()[0])
+        except psycopg.Error:
+            return f"oid {oid}"  # in an aborted transaction; not cached
+        if oid >= 16384:  # FirstNormalObjectId: user objects may be dropped and recreated
+            return name
+        _TYPNAMES[key] = name
+    return name
+
+
 def _digest(rows):
     return hashlib.sha256(json.dumps(rows).encode()).hexdigest()[:16]
 
@@ -74,16 +97,25 @@ def execute(conn, stmt, side, **kw):
     out = {"cols": None, "rows": None, "digest": None, "sqlstate": None, "error": None}
     try:
         with conn.cursor(binary=False) as cur:
-            if stmt.copy_data is not None or stmt.copy_file is not None:
+            if COPY_OUT.search(sql):
+                # COPY ... TO STDOUT: the copied text is the result.
+                chunks = []
+                with cur.copy(sql) as cp:
+                    for data in cp:
+                        chunks.append(bytes(data).decode("utf-8", "replace"))
+                out["rows"] = [["".join(chunks)]]
+                return out
+            if COPY_IN.search(sql) or stmt.copy_data is not None or stmt.copy_file is not None:
                 data = stmt.copy_data
-                if data is None:
+                if data is None and stmt.copy_file is not None:
                     data = (ROOT / stmt.copy_file).read_text(errors="replace")
                 with cur.copy(sql) as cp:
-                    cp.write(data)
+                    if data:
+                        cp.write(data)
                 return out
             cur.execute(sql, prepare=False)
             if cur.description is not None:
-                out["cols"] = [[d.name, d.type_code] for d in cur.description]
+                out["cols"] = [[d.name, _typname(conn, d.type_code)] for d in cur.description]
                 rows = [list(r) for r in cur.fetchmany(MAX_ROWS)]
                 out["rows"] = rows
     except psycopg.OperationalError as e:
@@ -91,10 +123,28 @@ def execute(conn, stmt, side, **kw):
             raise  # the session is gone: a crash, for the caller to record
         out["sqlstate"] = getattr(e, "sqlstate", None) or "08000"
         out["error"] = (str(e).splitlines() or [""])[0][:300]
+        if conn.pgconn.transaction_status == psycopg.pq.TransactionStatus.ACTIVE:
+            conn.close()
     except psycopg.Error as e:
         out["sqlstate"] = getattr(e, "sqlstate", None) or "XX000"
         out["error"] = (str(e).splitlines() or [""])[0][:300]
+    except (UnicodeEncodeError, UnicodeDecodeError) as e:
+        # The harness couldn't send or read this statement in the session's
+        # encoding; every side fails the same way, and nothing is proven.
+        out["sqlstate"] = "HX000"
+        out["error"] = f"harness: {e}"[:300]
+    finally:
+        _utf8(conn)
     return out
+
+
+def _utf8(conn):
+    """The oracle reads and writes UTF-8: undo a corpus statement's client_encoding."""
+    try:
+        if not conn.closed and conn.info.encoding.lower().replace("-", "") != "utf8":
+            conn.execute("SET client_encoding TO 'UTF8'")
+    except psycopg.Error:
+        pass
 
 
 def _canon(result, is_ordered):
@@ -213,8 +263,17 @@ class _Sides:
         self.conns = {}
 
 
-def run(subject: str, files: list, ledger: Path, timeout_ms: int = 30000) -> None:
+def _inventory():
+    from compat.inventory import keys, load
+    try:
+        return keys(load(Path("/lattices")))
+    except (FileNotFoundError, OSError):
+        return {}
+
+
+def run(subject: str, files: list, ledger: Path, timeout_ms: int = 30000, inventory: dict | None = None) -> None:
     subj = db.SUBJECTS[subject]
+    inv = _inventory() if inventory is None else inventory
     rules = documented.load(subject)
     out_dir = Path(ledger) / subject
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -232,6 +291,7 @@ def run(subject: str, files: list, ledger: Path, timeout_ms: int = 30000) -> Non
             try:
                 for stmt in f.statements:
                     line = _one(subject, subj, sides, stmt, rules)
+                    line["refs"] = sorted(tag(stmt.sql, inv))
                     # After a crash, side b reconnects on the next statement: the
                     # server keeps its data, so the file goes on.
                     out.write(json.dumps(line) + "\n")
@@ -269,7 +329,10 @@ def _one(subject, subj, sides, stmt, rules) -> dict:
             sides.conns.pop("b", None)
             return line
         if RESETS.match(stmt.sql):
-            _settings(conn, subject, side, sides.timeout_ms)
+            try:
+                _settings(conn, subject, side, sides.timeout_ms)
+            except psycopg.Error:
+                pass  # inside an aborted transaction the RESET didn't apply either
     a, a2, b = results["a"], results["a2"], results["b"]
     is_ordered = ordered(stmt.sql)
     line["a"], line["b"] = _shorten(a), _shorten(b)
