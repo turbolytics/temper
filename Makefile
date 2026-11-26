@@ -3,7 +3,7 @@
 TEMPER  := go run ./cmd/temper
 EXAMPLE := examples/inventory
 
-.PHONY: test evidence matrix check-matrix example example-matrix site serve-site refresh-projects og-image
+.PHONY: test evidence matrix check-matrix example example-matrix compat-postgres check-compat-postgres site serve-site refresh-projects og-image
 
 test:
 	go vet ./...
@@ -36,6 +36,30 @@ example-matrix:
 	$(TEMPER) --root $(EXAMPLE) run --level unit -- go -C $(EXAMPLE) test ./...
 	$(TEMPER) --root $(EXAMPLE) run --level integration -- go -C $(EXAMPLE) test -tags integration -run '^TestIntegration' ./...
 	$(TEMPER) --root $(EXAMPLE) matrix --all-levels
+
+# The Postgres compatibility matrix. compat/postgres holds the method only;
+# its results go to a checkout of the private results repository:
+#   make compat-postgres RESULTS=../compat-results
+COMPAT        := compat/postgres
+COMPAT_SUBJECTS := postgres.reference pg_duckdb.release
+
+compat-postgres:
+	@test -n "$(RESULTS)" || { echo "set RESULTS to a checkout of the private results repository"; exit 2; }
+	$(TEMPER) --root $(COMPAT) clean --out $(abspath $(RESULTS))/postgres
+	mkdir -p $(abspath $(RESULTS))/postgres/ledger
+	for s in $(COMPAT_SUBJECTS); do \
+		COMPAT_LEDGER=$(abspath $(RESULTS))/postgres/ledger $(TEMPER) --root $(COMPAT) run --out $(abspath $(RESULTS))/postgres --level compat -- \
+			$(TEMPER) --root $(COMPAT) scenarios run --scenario compat.replay --subject $$s --build || true; \
+	done
+	$(TEMPER) --root $(COMPAT) matrix --all-levels --out $(abspath $(RESULTS))/postgres || test $$? -eq 1
+	for s in $(COMPAT_SUBJECTS); do \
+		COMPAT_LEDGER=$(abspath $(RESULTS))/postgres/ledger docker compose -f $(COMPAT)/compose.yml run --rm -v $(abspath $(RESULTS))/postgres:/results oracle report $$s /results/reports/$$s; \
+	done
+
+# Without RESULTS, only the declarations are checked (CI has no results).
+check-compat-postgres:
+	$(TEMPER) --root $(COMPAT) check
+	@if [ -n "$(RESULTS)" ]; then $(TEMPER) --root $(COMPAT) matrix --check --all-levels --out $(abspath $(RESULTS))/postgres; fi
 
 # The website, for a local preview. Analytics is off.
 site:

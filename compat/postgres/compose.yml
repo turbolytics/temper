@@ -1,0 +1,65 @@
+# One server per side, because roles and tablespaces are server-wide: side a
+# is PostgreSQL, side a2 is PostgreSQL again (the negative control), side b
+# is the subject. The reference and pg_duckdb run the same PostgreSQL minor
+# (17.12), matching recipe/oracle/PG_TAG, whose source the inventory and
+# corpus come from.
+x-reference: &reference
+  image: postgres:17.12@sha256:87c8b42f423b45d5247e6aa8fdb2e7762fec164c68a50fe3eb07e7bfcaf4dbcf
+  environment: {POSTGRES_PASSWORD: postgres}
+  healthcheck: {test: [CMD, pg_isready, -U, postgres], interval: 2s, retries: 30}
+
+# pg_duckdb v1.2.1, the newest release with a linux/arm64 image (v1.2.2 is
+# amd64 only, and its DuckDB build needs CPU instructions Rosetta lacks).
+# v1.2.2 adds only a CA-bundle loader and PG 19 builds. Pinned to the arm64
+# manifest.
+x-pg_duckdb: &pg_duckdb
+  image: pgduckdb/pgduckdb:17-v1.2.1@sha256:cd7e1574f68b3f6bf179d4f13dc6ff3ebe506730c95b27b51b861cca5a1eaeea
+  platform: linux/arm64
+  environment: {POSTGRES_PASSWORD: postgres}
+  volumes: [./recipe/pg_duckdb/init.sql:/docker-entrypoint-initdb.d/zz-compat.sql:ro]
+  healthcheck: {test: [CMD, pg_isready, -U, postgres], interval: 2s, retries: 60}
+
+services:
+  reference: *reference        # postgres.reference side a; also names types for the oracle
+  reference_a2: *reference
+  reference_b: *reference
+  pg_duckdb_a: *pg_duckdb      # pg_duckdb.release sides a and a2: no force_execution
+  pg_duckdb_a2: *pg_duckdb
+  pg_duckdb: *pg_duckdb        # pg_duckdb.release side b: SET duckdb.force_execution = true
+
+  oracle:
+    build: recipe/oracle
+    volumes:
+      - ./recipe/oracle:/oracle
+      - ./corpus:/corpus
+      - ./subjects:/subjects
+      - ./temper/lattices:/lattices
+      - ./temper/subjects:/temper-subjects
+      - ./temper/scenarios:/temper-scenarios
+      # Set COMPAT_LEDGER to a host folder (make compat-postgres puts it in the
+      # results checkout) so the outcomes outlive the scenario's teardown.
+      - ${COMPAT_LEDGER:-ledger}:/ledger
+    environment: {PGPASSWORD: postgres}
+    depends_on:
+      reference: {condition: service_healthy}
+      reference_a2: {condition: service_healthy}
+      reference_b: {condition: service_healthy}
+      pg_duckdb_a: {condition: service_healthy}
+      pg_duckdb_a2: {condition: service_healthy}
+      pg_duckdb: {condition: service_healthy}
+
+  # Capturing application traffic (recipe/capture.sh APP): a reference server
+  # that logs every statement, and the application's own test suite run
+  # against it. Started only with --profile capture.
+  capture:
+    <<: *reference
+    command: [postgres, -c, log_statement=all, -c, "log_line_prefix=", -c, log_min_messages=warning, -c, max_connections=200]
+    profiles: [capture]
+  app:
+    build: apps
+    volumes: [./apps:/apps:ro]
+    environment: {PGHOST: capture, PGUSER: postgres, PGPASSWORD: postgres}
+    profiles: [capture]
+
+volumes:
+  ledger:

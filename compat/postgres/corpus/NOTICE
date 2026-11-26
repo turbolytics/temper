@@ -1,0 +1,13 @@
+The corpus replays PostgreSQL's regression tests (src/test/regress) and the
+examples in its documentation (doc/src/sgml), read at the tag in
+recipe/oracle/PG_TAG from https://github.com/postgres/postgres. They are not
+copied into this repository.
+
+PostgreSQL Database Management System
+(also known as Postgres, formerly known as Postgres95)
+Portions Copyright (c) 1996-2025, PostgreSQL Global Development Group
+Portions Copyright (c) 1994, The Regents of the University of California
+Released under the PostgreSQL License: https://www.postgresql.org/about/licence/
+
+Files under corpus/apps/ are statements captured from application test
+suites run against PostgreSQL; each file names its application and version.

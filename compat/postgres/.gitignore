@@ -1,0 +1,10 @@
+# Results live in the private results repository, written with --out.
+/MATRIX.md
+/REPORT.md
+/PROVENANCE.md
+/temper/status/
+/temper/matrix/
+/.temper/
+__pycache__/
+.pytest_cache/
+/corpus/.capture/

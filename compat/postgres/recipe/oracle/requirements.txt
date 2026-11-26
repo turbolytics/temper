@@ -1,0 +1,4 @@
+psycopg[binary]==3.3.9
+pglast==7.25
+PyYAML==6.0.3
+pytest==8.4.2

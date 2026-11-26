@@ -1,0 +1,7 @@
+features:
+  - id: reference.postgres17
+    description: PostgreSQL 17.12 (postgres:17.12), the reference every subject is compared with.
+    requires: []
+  - id: subject.pg_duckdb
+    description: pg_duckdb 1.2.1 on PostgreSQL 17.12 (pgduckdb/pgduckdb:17-v1.2.1), queries forced onto DuckDB with duckdb.force_execution.
+    requires: []
