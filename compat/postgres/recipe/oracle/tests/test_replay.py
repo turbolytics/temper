@@ -197,3 +197,18 @@ def test_type_only_difference_is_named():
     a = {"cols": [["x", "integer"]], "rows": [["3"]], "sqlstate": None, "error": None}
     b = {"cols": [["x", "bigint"]], "rows": [["3"]], "sqlstate": None, "error": None}
     assert replay.compare(a, b, False) == ("differs", "different column types or names, same values")
+
+
+def test_a_random_function_is_noise_even_when_a_and_a2_agree(tmp_path, monkeypatch):
+    real = replay.execute
+
+    def b_differs(conn, stmt, side, **kw):
+        r = real(conn, stmt, side, **kw)
+        if "array_sample" in stmt.sql:
+            r["rows"] = [["{{1}}"]] if side != "b" else [["{{2}}"]]  # a == a2 by chance, b differs
+        return r
+
+    monkeypatch.setattr(replay, "execute", b_differs)
+    f = parse_file("t", "SELECT array_sample(ARRAY[1,2,3], 1);")
+    replay.run("postgres.reference", [f], tmp_path, inventory={"sql.command": {"SELECT"}, "sql.function": {"array_sample"}})
+    assert kinds(tmp_path, "postgres.reference") == ["noise"]

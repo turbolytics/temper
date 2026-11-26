@@ -37,6 +37,16 @@ KEEP_ROWS = 20        # rows kept in the ledger
 REFUSED = re.compile(r"not (yet )?supported|unsupported|not implemented", re.I)
 RESETS = re.compile(r"^\s*(RESET\s+ALL|DISCARD\s+ALL)\s*$", re.I)
 ROOT = Path("/pg")
+# Functions whose answer is meant to change from call to call: random values,
+# the clock, and session identity. A statement using one is noise whenever any
+# side disagrees, even if the two PostgreSQL runs happened to agree.
+NONDETERMINISTIC = {f"sql.function/{n}" for n in (
+    "random", "random_normal", "array_sample", "array_shuffle", "gen_random_uuid", "setseed",
+    "now", "clock_timestamp", "statement_timestamp", "transaction_timestamp", "timeofday",
+    "current_timestamp", "current_time", "localtime", "localtimestamp", "current_date",
+    "pg_backend_pid", "inet_client_port", "inet_client_addr", "txid_current", "pg_current_xact_id",
+    "pg_postmaster_start_time", "pg_conf_load_time", "pg_current_wal_lsn", "pg_current_wal_insert_lsn",
+)}
 COPY_OUT = re.compile(r"^\s*COPY\b.*\bTO\s+STDOUT\b", re.I | re.S)
 COPY_IN = re.compile(r"^\s*COPY\b.*\bFROM\s+STDIN\b", re.I | re.S)
 
@@ -302,7 +312,7 @@ def run(subject: str, files: list, ledger: Path, timeout_ms: int = 30000, invent
                 sides.fresh()
             try:
                 for stmt in f.statements:
-                    line = _one(subject, subj, sides, stmt, rules)
+                    line = _one(subject, subj, sides, stmt, rules, inv)
                     line["refs"] = sorted(tag(stmt.sql, inv))
                     # After a crash, side b reconnects on the next statement: the
                     # server keeps its data, so the file goes on.
@@ -314,7 +324,8 @@ def run(subject: str, files: list, ledger: Path, timeout_ms: int = 30000, invent
             shared.drop()
 
 
-def _one(subject, subj, sides, stmt, rules) -> dict:
+def _one(subject, subj, sides, stmt, rules, inv=None) -> dict:
+    inv = inv or {}
     sql = stmt.sql
     query = is_query(sql)
     rewritten = False
@@ -355,6 +366,9 @@ def _one(subject, subj, sides, stmt, rules) -> dict:
         line.update(outcome="postgres_executed", reason="EXPLAIN shows no DuckDB scan")
         return line
     outcome, reason = compare(a, b, is_ordered)
+    if outcome in ("differs", "order") and NONDETERMINISTIC & set(tag(stmt.sql, inv)):
+        line.update(outcome="noise", reason="uses a function whose answer changes from call to call")
+        return line
     if outcome in ("differs", "refused"):
         rule = documented.match(rules, stmt.sql, a, b)
         if rule:
