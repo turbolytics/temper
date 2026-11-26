@@ -5,6 +5,7 @@ import (
 	"html"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -224,5 +225,45 @@ func TestMethodPageVersionRulesAndSkew(t *testing.T) {
 	}
 	if doc.MethodVersion != "1.0" || doc.MethodDate != "2026-11-26" {
 		t.Errorf("inventory.json method = %q %q", doc.MethodVersion, doc.MethodDate)
+	}
+}
+
+// The method page states the score, the outcomes, the scope and fairness the
+// way the harness computes them, and reads the control run from METHOD.
+func TestMethodPageMatchesTheHarness(t *testing.T) {
+	temper.Covers(t, "site.compatibility")
+	page := html.UnescapeString(read(t, filepath.Join(build(t, false), "compatibility", "index.html")))
+	for _, want := range []string{
+		// The score: five lists, tested features only, coverage beside it.
+		"SQL commands, query syntax, functions, operators and data types",
+		"Untested and undecided features are left out of the score", "coverage",
+		// Outcomes, grouped as the score treats them.
+		"Lowers the score", "Counts as a pass", "Removed before scoring",
+		"0A000", "not supported, unsupported or not implemented",
+		"Crashes and silent wrong answers are the most serious outcomes",
+		// Scope and fairness.
+		"public documentation", "claiming less",
+		"Payment never changes results", "without being asked", "only with the vendor's permission",
+		"dispute",
+		// The four terms, and a sample.
+		"The method", "The harness", "A report", "Your product",
+		"Illustrative",
+		"What a paid report includes",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("method page lacks %q", want)
+		}
+	}
+	// The control numbers come from compat/postgres/METHOD.
+	method := read(t, "../compat/postgres/METHOD")
+	for _, key := range []string{"control_statements", "control_matched", "control_noise"} {
+		m := regexp.MustCompile(`(?m)^` + key + `:\s*(\d+)`).FindStringSubmatch(method)
+		if m == nil {
+			t.Fatalf("METHOD has no %s", key)
+		}
+		n, _ := strconv.Atoi(m[1])
+		if !strings.Contains(page, commas(n)) {
+			t.Errorf("method page lacks %s = %s", key, commas(n))
+		}
 	}
 }

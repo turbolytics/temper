@@ -2,3 +2,10 @@
 # result means: an outcome, a verdict rule or the score. Results cite it.
 version: 1.0
 date: 2026-11-26
+# The harness against PostgreSQL itself (postgres.reference), recorded from
+# this version's run: every corpus statement, how many matched, and how many
+# the two PostgreSQL servers disagreed on (noise). Any other count is a
+# harness bug.
+control_statements: 52296
+control_matched: 52157
+control_noise: 139
