@@ -13,7 +13,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from compat.verdict import FAILING, decide, load_outcomes
+from compat.verdict import FAILING, PROVING, decide, load_outcomes
 
 FLOOR = 0.01
 SCORED = ("sql.command", "sql.syntax", "sql.function", "sql.operator", "sql.type")
@@ -76,7 +76,7 @@ def _answer(r):
     return json.dumps(r.get("rows"))
 
 
-TYPE_ONLY = "different column types or names, same values"
+TYPE_ONLY = "different column types, same values"
 
 
 def _both_answered(o) -> bool:
@@ -139,6 +139,17 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
             L.append(f"| `{ref}` | `{_cell(_shown(e), 80)}` | {_cell(_cols(e['a']), 60)} | {_cell(_cols(e['b']), 60)} |")
         L.append("")
 
+    L += ["## Different column names", "",
+          "Same types and values, different column names, often a default such as `?column?`. These count as matches.", ""]
+    named = [o for o in outcomes if o["outcome"] == "names"]
+    if not named:
+        L += ["None.", ""]
+    else:
+        L += [f"{len(named)} statements.", "", "| Statement | PostgreSQL columns | Subject columns |", "|---|---|---|"]
+        for o in named[:TOP]:
+            L.append(f"| `{_cell(_shown(o), 80)}` | {_cell(_cols(o['a']), 60)} | {_cell(_cols(o['b']), 60)} |")
+        L.append("")
+
     L += ["## Score", ""]
     s = score(v, weights, all_refs)
     L += [f"**{s:.1%}** of PostgreSQL's features pass, weighted by how often applications use them.", ""]
@@ -158,7 +169,7 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
     for o in outcomes:
         if o["file"].startswith("app:") and o["outcome"] not in ("noise", "postgres_executed"):
             per_app[o["file"][4:]][1] += 1
-            if o["outcome"] == "match":
+            if o["outcome"] in PROVING:
                 per_app[o["file"][4:]][0] += 1
     if not per_app:
         L += ["No application traffic captured yet.", ""]

@@ -254,7 +254,10 @@ def compare(a, b, is_ordered) -> tuple:
         return "order", "same rows in another order"
     if a["cols"] != b["cols"]:
         if _canon(a, is_ordered)[1] == _canon(b, is_ordered)[1]:
-            return "differs", "different column types or names, same values"
+            if [t for _, t in a["cols"]] == [t for _, t in b["cols"]]:
+                # A default name such as ?column? is not a wrong answer.
+                return "names", "different column names, same types and values"
+            return "differs", "different column types, same values"
         return "differs", "different columns or types"
     return "differs", "different rows"
 
@@ -433,13 +436,13 @@ def _one(subject, subj, sides, stmt, rules, inv=None) -> dict:
         line.update(outcome="postgres_executed", reason="DuckDB refused this role (duckdb.postgres_role); not run by DuckDB")
         return line
     outcome, reason = compare(a, b, is_ordered)
-    if outcome == "match":
+    if outcome in ("match", "names"):
         if subj.engine_check == "duckdb" and engine != "duckdb":
             # Only a statement DuckDB ran can prove a feature.
             line.update(outcome="postgres_executed",
                         reason="EXPLAIN shows no DuckDB scan" if engine == "postgres" else "engine unknown")
             return line
-        line.update(outcome="match")
+        line.update(outcome=outcome, reason=reason)
         return line
     if drift(a, b, sides.tainted):
         line.update(outcome="drift", reason=f"state diverged earlier: {reason}")

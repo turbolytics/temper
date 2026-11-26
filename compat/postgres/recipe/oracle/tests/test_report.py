@@ -44,7 +44,7 @@ def test_applications_rows_are_each_apps_share_of_matches():
 
 def test_type_only_differences_are_not_silent_wrong_answers():
     outs = [o(["sql.function/array_length"], "differs", a_rows=[["3"]], b_rows=[["3"]])]
-    outs[0]["reason"] = "different column types or names, same values"
+    outs[0]["reason"] = "different column types, same values"
     v = decide(outs, {"sql.function/array_length"})
     text = render_report("s", v, outs, {}, {"sql.function/array_length"})
     silent = text[text.index("## Silent wrong answers"):text.index("## Different result types")]
@@ -56,3 +56,15 @@ def test_order_statements_are_listed_for_a_person_to_check():
     outs = [o(["sql.syntax/ORDER BY"], "order", sql="SELECT a FROM t ORDER BY b", a_rows=[["1"], ["2"]], b_rows=[["2"], ["1"]])]
     text = render_report("s", decide(outs), outs, {}, set())
     assert "SELECT a FROM t ORDER BY b" in text[text.index("## Noise and row order"):]
+
+
+def test_name_only_differences_are_listed_apart_and_count_as_matches():
+    outs = [o(["sql.function/abs"], "names", sql="SELECT abs(-1)", file="app:django")]
+    outs[0]["reason"] = "different column names, same types and values"
+    v = decide(outs, {"sql.function/abs"})
+    assert "sql.function/abs" in v.passed
+    text = render_report("s", v, outs, {}, {"sql.function/abs"})
+    names = text[text.index("## Different column names"):]
+    assert "SELECT abs(-1)" in names
+    assert "SELECT abs(-1)" not in text[text.index("## Different result types"):text.index("## Different column names")]
+    assert "| django | 1 of 1 | 100.0% |" in text

@@ -1,0 +1,4 @@
+# The compatibility method's version. Bump it when a change alters what a
+# result means: an outcome, a verdict rule or the score. Results cite it.
+version: 1.0
+date: 2026-11-26
