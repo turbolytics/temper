@@ -210,6 +210,13 @@ func Build(opts Options) error {
 			return err
 		}
 	}
+	invJSON, err := inv.JSON()
+	if err != nil {
+		return err
+	}
+	if err := write(filepath.Join(opts.Out, "compatibility", "postgres-17", "inventory.json"), invJSON); err != nil {
+		return err
+	}
 	for _, name := range []string{"style.css", "favicon.svg"} {
 		data, err := assets.ReadFile(name)
 		if err != nil {

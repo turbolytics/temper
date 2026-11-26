@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"html"
 	"path/filepath"
 	"regexp"
@@ -125,6 +126,68 @@ func TestCompatibilityPagesNameNoSystem(t *testing.T) {
 			if regexp.MustCompile(`\b` + name + `\b`).MatchString(page) {
 				t.Errorf("%s names %s", p, name)
 			}
+		}
+	}
+}
+
+// The inventory downloads as JSON: every member of every list, with its
+// source, and the PostgreSQL tag it came from.
+func TestInventoryDownloadsAsJSON(t *testing.T) {
+	temper.Covers(t, "site.compatibility")
+	p, errs := load.Load("../compat/postgres")
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	out := build(t, false)
+	var doc struct {
+		Postgres struct{ Tag, Image string }
+		License  string
+		Total    int
+		Lists    []struct {
+			ID       string
+			Count    int
+			Features []struct {
+				Key       string   `json:"key"`
+				Source    string   `json:"source"`
+				SourceURL string   `json:"source_url"`
+				UsedBy    []string `json:"used_by"`
+			}
+		}
+	}
+	raw := read(t, filepath.Join(out, "compatibility", "postgres-17", "inventory.json"))
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Postgres.Tag != "REL_17_12" || !strings.HasPrefix(doc.Postgres.Image, "postgres:17.12@sha256:") || !strings.Contains(doc.License, "PostgreSQL License") {
+		t.Errorf("postgres = %+v, license = %q", doc.Postgres, doc.License)
+	}
+	got := map[string]bool{}
+	total := 0
+	for _, l := range doc.Lists {
+		if l.Count != len(l.Features) {
+			t.Errorf("%s: count %d, %d features", l.ID, l.Count, len(l.Features))
+		}
+		for _, f := range l.Features {
+			got[l.ID+"/"+f.Key] = true
+			if f.Source == "" {
+				t.Errorf("%s/%s has no source", l.ID, f.Key)
+			}
+		}
+		total += len(l.Features)
+	}
+	for _, l := range p.Lattices {
+		for _, m := range l.Members {
+			if !got[l.ID+"/"+m.Key] {
+				t.Errorf("%s/%s missing from inventory.json", l.ID, m.Key)
+			}
+		}
+	}
+	if doc.Total != total {
+		t.Errorf("total %d, want %d", doc.Total, total)
+	}
+	for _, page := range []string{"compatibility/index.html", "compatibility/postgres-17/index.html"} {
+		if !strings.Contains(read(t, filepath.Join(out, page)), `inventory.json"`) {
+			t.Errorf("%s does not link inventory.json", page)
 		}
 	}
 }

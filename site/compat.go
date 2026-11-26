@@ -21,6 +21,7 @@ const compatDir = "compat/postgres"
 // runs on, read from compat/postgres. It names no system under test.
 type inventory struct {
 	Tag   string // the PostgreSQL source tag, such as REL_17_12
+	Image string // the PostgreSQL server image, pinned by digest
 	Total int
 	Lists []invList
 	Pins  []pin
@@ -117,8 +118,55 @@ func loadInventory(root string) (inventory, error) {
 			return inv, fmt.Errorf("%s: list %s has no title; add it to lists in site/compat.go", compatDir, l.ID)
 		}
 	}
-	inv.Pins, err = loadPins(dir, inv.Tag)
-	return inv, err
+	if inv.Pins, err = loadPins(dir, inv.Tag); err != nil {
+		return inv, err
+	}
+	inv.Image = inv.Pins[1].Value
+	return inv, nil
+}
+
+// JSON is the inventory as a download: compatibility/postgres-17/inventory.json.
+func (inv inventory) JSON() ([]byte, error) {
+	type feature struct {
+		Key       string   `json:"key"`
+		Source    string   `json:"source"`
+		SourceURL string   `json:"source_url,omitempty"`
+		UsedBy    []string `json:"used_by"`
+	}
+	type list struct {
+		ID          string    `json:"id"`
+		Title       string    `json:"title"`
+		Description string    `json:"description"`
+		Count       int       `json:"count"`
+		Features    []feature `json:"features"`
+	}
+	doc := struct {
+		Postgres struct {
+			Tag   string `json:"tag"`
+			Image string `json:"image"`
+		} `json:"postgres"`
+		Method  string `json:"method"`
+		License string `json:"license"`
+		Total   int    `json:"total"`
+		Lists   []list `json:"lists"`
+	}{
+		Method:  "https://github.com/turbolytics/temper/tree/main/" + compatDir,
+		License: "Derived from PostgreSQL " + inv.Tag + " (https://github.com/postgres/postgres), distributed under the PostgreSQL License.",
+		Total:   inv.Total,
+	}
+	doc.Postgres.Tag, doc.Postgres.Image = inv.Tag, inv.Image
+	for _, l := range inv.Lists {
+		out := list{ID: l.ID, Title: l.Title, Description: l.About, Count: len(l.Members), Features: []feature{}}
+		for _, m := range l.Members {
+			used := m.UsedBy
+			if used == nil {
+				used = []string{}
+			}
+			out.Features = append(out.Features, feature{Key: m.Key, Source: m.Note, SourceURL: m.NoteURL, UsedBy: used})
+		}
+		doc.Lists = append(doc.Lists, out)
+	}
+	return json.MarshalIndent(doc, "", "  ")
 }
 
 // noteURL links a member's source: a file in PostgreSQL's source at the
