@@ -21,8 +21,10 @@ const compatDir = "compat/postgres"
 // runs on, read from compat/postgres. It names no system under test.
 type inventory struct {
 	Tag string // the PostgreSQL source tag, such as REL_17_12
-	// Version and Date are the method's, from compat/postgres/METHOD.
+	// Version and Date are the method's, from compat/postgres/METHOD, with
+	// the harness's run against PostgreSQL itself.
 	Version, Date string
+	Control       control
 	Skew          string // the largest applications' share of the logged statements
 	Image         string // the PostgreSQL server image, pinned by digest
 	Total         int
@@ -43,6 +45,12 @@ type invMember struct {
 }
 
 type pin struct{ What, Value, URL string }
+
+// control is the harness against PostgreSQL itself, as METHOD records it.
+type control struct {
+	Statements, Matched, Noise int
+	NoiseShare                 string // such as 0.27%
+}
 
 type app struct {
 	ID, Name, Version, What string
@@ -86,7 +94,7 @@ func loadInventory(root string) (inventory, error) {
 		return inv, err
 	}
 	inv.Tag = strings.TrimSpace(string(tag))
-	if inv.Version, inv.Date, err = loadMethod(dir); err != nil {
+	if inv.Version, inv.Date, inv.Control, err = loadMethod(dir); err != nil {
 		return inv, err
 	}
 	p, errs := load.Load(dir)
@@ -181,25 +189,29 @@ func (inv inventory) JSON() ([]byte, error) {
 	return json.MarshalIndent(doc, "", "  ")
 }
 
-var methodLine = regexp.MustCompile(`(?m)^(version|date):\s*(\S+)\s*$`)
+var methodLine = regexp.MustCompile(`(?m)^([a-z_]+):\s*(\S+)\s*$`)
 
-// loadMethod reads the method's version and date.
-func loadMethod(dir string) (version, date string, err error) {
+// loadMethod reads the method's version, date and control run.
+func loadMethod(dir string) (version, date string, c control, err error) {
 	raw, err := os.ReadFile(filepath.Join(dir, "METHOD"))
 	if err != nil {
-		return "", "", err
+		return "", "", c, err
 	}
+	kv := map[string]string{}
 	for _, m := range methodLine.FindAllStringSubmatch(string(raw), -1) {
-		if m[1] == "version" {
-			version = m[2]
-		} else {
-			date = m[2]
+		kv[m[1]] = m[2]
+	}
+	version, date = kv["version"], kv["date"]
+	for key, dst := range map[string]*int{"control_statements": &c.Statements, "control_matched": &c.Matched, "control_noise": &c.Noise} {
+		if *dst, err = strconv.Atoi(kv[key]); err != nil {
+			return "", "", c, fmt.Errorf("%s/METHOD: %s: %v", compatDir, key, err)
 		}
 	}
-	if version == "" || date == "" {
-		return "", "", fmt.Errorf("%s/METHOD: needs a version and a date", compatDir)
+	if version == "" || date == "" || c.Statements == 0 || c.Matched+c.Noise != c.Statements {
+		return "", "", c, fmt.Errorf("%s/METHOD: needs a version, a date, and control counts where matched + noise = statements", compatDir)
 	}
-	return version, date, nil
+	c.NoiseShare = fmt.Sprintf("%.2f%%", 100*float64(c.Noise)/float64(c.Statements))
+	return version, date, c, nil
 }
 
 // skew sets each application's share and says how much of the logged
