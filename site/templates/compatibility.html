@@ -2,6 +2,7 @@
 {{with .Inventory}}
 <p class="eyebrow">Compatibility</p>
 <h1>Compatibility matrices</h1>
+<p class="breadth">Method version {{.Version}} · updated {{.Date}}</p>
 <p class="lead">Many products sell on a claim such as "Postgres-compatible". A compatibility matrix tests that claim. It runs the same statements on PostgreSQL and on the product, and compares the answers feature by feature.</p>
 <p>This page explains the method. The <a href="postgres-17/">PostgreSQL 17 feature inventory</a> lists every feature it checks. The method is open source, in <a href="https://github.com/turbolytics/temper/tree/main/compat/postgres"><code>compat/postgres</code></a> in the Temper repository.</p>
 
@@ -32,11 +33,13 @@
 <li><strong>Real applications.</strong> A PostgreSQL server logged every statement while each application's tests ran. Each distinct statement shape enters the corpus once.</li>
 </ul>
 <table class="statuses">
-<thead><tr><th>Application</th><th>Version</th><th>Traffic</th><th>Statements logged</th></tr></thead>
+<thead><tr><th>Application</th><th>Version</th><th>Traffic</th><th>Statements logged</th><th>Share</th></tr></thead>
 <tbody>
-{{range .Apps}}<tr><td>{{.Name}}</td><td>{{.Version}}</td><td>{{.What}}</td><td>{{commas .Statements}}</td></tr>
+{{range .Apps}}<tr><td>{{.Name}}</td><td>{{.Version}}</td><td>{{.What}}</td><td>{{commas .Statements}}</td><td>{{.Share}}</td></tr>
 {{end}}</tbody>
 </table>
+{{if .Skew}}<p>{{.Skew}}. So the usage weights mostly reflect an ORM's queries and a driver's own tests. The next applications to capture are JDBC, node-postgres, and the catalog queries BI tools send to discover a database.</p>
+{{end}}
 </section>
 
 <section>
@@ -48,13 +51,14 @@
 
 <section>
 <h2>Outcomes</h2>
-<p>Every statement ends with one outcome.</p>
+<p>Every statement ends with one outcome. Out of 11 outcomes, 5 count against the system.</p>
 <table class="statuses">
 <thead><tr><th>Outcome</th><th>Meaning</th><th>Counts against the system</th></tr></thead>
 <tbody>
 <tr><td>Match</td><td>The same answer as PostgreSQL.</td><td>No. It proves the features the statement uses.</td></tr>
 <tr><td>Different answer</td><td>Both answered without an error, and the answers differ. This is a silent wrong answer, the most serious outcome.</td><td>Yes</td></tr>
-<tr><td>Different type</td><td>The same values, with a different column type or name.</td><td>Yes</td></tr>
+<tr><td>Different type</td><td>The same values, with a different column type.</td><td>Yes</td></tr>
+<tr><td>Different column name</td><td>The same types and values, with different column names, often a default such as <code>?column?</code>.</td><td>No. It counts as a match, and the report lists it.</td></tr>
 <tr><td>Refused</td><td>The system returned an error where PostgreSQL answered.</td><td>Yes</td></tr>
 <tr><td>Crash</td><td>The system's server process stopped.</td><td>Yes</td></tr>
 <tr><td>Documented</td><td>A difference the system's own documentation describes.</td><td>Yes, in its own column</td></tr>
@@ -64,23 +68,29 @@
 <tr><td>Noise</td><td>PostgreSQL disagreed with itself.</td><td>No</td></tr>
 </tbody>
 </table>
+<p>Claims come from the system's own documentation. Each documented difference is recorded in the method, citing the page and section it comes from. When a system hands a statement to PostgreSQL instead of running it, the harness detects that for each statement. That statement counts as not claimed, never as a match.</p>
 </section>
 
 <section>
 <h2>From statements to features</h2>
-<p>A feature passes when a statement that uses it matches PostgreSQL. A failing statement blames the features in it that no matching statement has proven. If only one feature is unproven, that feature fails, and the statement becomes its reproduction. If several are unproven, each one is marked undecided. The method never guesses which one is at fault.</p>
+<p>A feature passes when a statement that uses it matches PostgreSQL. When a statement fails, the method looks for the features in it that no matching statement has proven. If only one is unproven, the failure is attributed to that feature, and the statement becomes its reproduction. If several are unproven, each one is marked undecided. The method never guesses between them.</p>
+<p>An attribution can be wrong when a failure comes from how two features interact. That is why each one is shown with its statement and both answers.</p>
 </section>
 
 <section>
 <h2>Reports</h2>
 <p>A report leads with what is broken: crashes first, then silent wrong answers, then refusals. Each finding comes with the statement, both answers and a one-command reproduction.</p>
 <p>The score comes last. It is the share of claimed features that pass, weighted by how often the captured applications use each one. A feature no application uses still counts, at a small floor weight.</p>
-<p>We publish a system's results only after its maintainers have seen them.</p>
+<p>Results follow two publication rules:</p>
+<ul>
+<li>For an open-source system, results are published after its maintainers have had at least 7 days to review them. Their corrections are included.</li>
+<li>A paid or private report is published only with the vendor's approval.</li>
+</ul>
 </section>
 
 <section>
 <h2>Checking the harness</h2>
-<p>Before any result counts, the harness runs against PostgreSQL itself. On PostgreSQL 17.12, every one of the 52,296 statements matched or was dropped as noise. There were no differences.</p>
+<p>Before any result counts, the harness runs against PostgreSQL itself. On PostgreSQL 17.12, 52,157 of the 52,296 statements matched. The other 139 (0.27%) were dropped as noise, because the two PostgreSQL servers disagreed. None differed.</p>
 <p>When a system can switch its own engine off, the harness also runs against the system with that engine off. That run must show no differences either. Both checks have caught harness bugs that would otherwise have read as the system's bugs.</p>
 </section>
 

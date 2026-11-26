@@ -191,3 +191,38 @@ func TestInventoryDownloadsAsJSON(t *testing.T) {
 		}
 	}
 }
+
+// The method page carries the method's version and date, the publication
+// rules, the noise count, and the corpus skew.
+func TestMethodPageVersionRulesAndSkew(t *testing.T) {
+	temper.Covers(t, "site.compatibility")
+	out := build(t, false)
+	page := html.UnescapeString(read(t, filepath.Join(out, "compatibility", "index.html")))
+	for _, want := range []string{
+		"Method version 1.0", "2026-11-26",
+		"at least 7 days", "only with the vendor's approval",
+		"139", "0.27%",
+		"Different column name", "?column?",
+		"attributed to",
+		"Django and psycopg make up 99.4% of the logged statements", "JDBC", "node-postgres",
+		"<td>64.1%</td>",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("method page lacks %q", want)
+		}
+	}
+	inv := read(t, filepath.Join(out, "compatibility", "postgres-17", "index.html"))
+	if !strings.Contains(inv, "Method version 1.0") {
+		t.Error("inventory page lacks the method version")
+	}
+	var doc struct {
+		MethodVersion string `json:"method_version"`
+		MethodDate    string `json:"method_date"`
+	}
+	if err := json.Unmarshal([]byte(read(t, filepath.Join(out, "compatibility", "postgres-17", "inventory.json"))), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.MethodVersion != "1.0" || doc.MethodDate != "2026-11-26" {
+		t.Errorf("inventory.json method = %q %q", doc.MethodVersion, doc.MethodDate)
+	}
+}
