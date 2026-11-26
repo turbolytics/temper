@@ -2,9 +2,9 @@
 <!-- temper matrix format: 3 -->
 # temper matrix
 
-**21 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
+**22 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
 
-✅ 64 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
+✅ 65 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
 
 Each cell is one claim in `temper/` at one level. It is covered when a test that ran
 at that level passed and none failed: a skip proves nothing, and a pass never hides
