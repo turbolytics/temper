@@ -4,6 +4,7 @@ import sys
 
 COMMANDS = {
     # command: module whose main(argv) -> int runs it
+    "inventory": "inventory",
 }
 
 
