@@ -35,6 +35,9 @@ features:
   - id: cli.out
     description: "--out DIR (or TEMPER_OUT) writes evidence, run logs, status and the matrix under DIR; declarations are still read from the project root."
     requires: [unit]
+  - id: cli.subject
+    description: "temper matrix and temper render --subject ID (repeatable) write a matrix of only the named subjects, under --out, so each system under test gets its own results folder."
+    requires: [unit]
   - id: cli.guide
     description: Prints the guide an LLM or a person needs to work in a Temper project, matching the installed version.
     requires: [unit, integration]

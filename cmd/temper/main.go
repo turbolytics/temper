@@ -2,8 +2,8 @@
 // evidence its tests wrote.
 //
 //	temper check                     validate declarations
-//	temper matrix [--json] [--check] [--all-levels]
-//	temper render                    rewrite MATRIX.md from the committed statuses
+//	temper matrix [--json] [--check] [--all-levels] [--subject ID]...
+//	temper render [--subject ID]...  rewrite MATRIX.md from the committed statuses
 //	temper run --level L -- CMD...   run CMD with the level and evidence directory set
 //	temper scenarios run             run runner: temper scenarios under faults
 //	temper recipes list|show PACK    the built-in recipe packs
@@ -69,9 +69,9 @@ usage: temper [--root DIR] <command> [flags]
 
 commands:
   check                              validate declarations
-  matrix [--json] [--check] [--all-levels]
+  matrix [--json] [--check] [--all-levels] [--subject ID]...
                                      join evidence; write temper/status and MATRIX.md
-  render                             rewrite MATRIX.md from the committed statuses
+  render [--subject ID]...           rewrite MATRIX.md from the committed statuses
   run --level LEVEL [--run ID] -- COMMAND [ARGS...]
                                      run COMMAND with TEMPER_LEVEL and TEMPER_EVIDENCE set
   scenarios run [--scenario ID] [--subject ID] [--seed N] [--compose FILE] [--build]
