@@ -7,3 +7,4 @@
 /.temper/
 __pycache__/
 .pytest_cache/
+/corpus/.capture/

@@ -48,5 +48,18 @@ services:
       pg_duckdb_a2: {condition: service_healthy}
       pg_duckdb: {condition: service_healthy}
 
+  # Capturing application traffic (recipe/capture.sh APP): a reference server
+  # that logs every statement, and the application's own test suite run
+  # against it. Started only with --profile capture.
+  capture:
+    <<: *reference
+    command: [postgres, -c, log_statement=all, -c, "log_line_prefix=", -c, log_min_messages=warning, -c, max_connections=200]
+    profiles: [capture]
+  app:
+    build: apps
+    volumes: [./apps:/apps:ro]
+    environment: {PGHOST: capture, PGUSER: postgres, PGPASSWORD: postgres}
+    profiles: [capture]
+
 volumes:
   ledger:

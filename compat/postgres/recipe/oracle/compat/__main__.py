@@ -10,6 +10,7 @@ COMMANDS = {
     "subjects": "subjects",
     "repro": "repro",
     "report": "report",
+    "weights": "capture",
 }
 
 
