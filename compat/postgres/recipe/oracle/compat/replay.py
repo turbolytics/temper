@@ -154,6 +154,10 @@ def _canon(result, is_ordered):
     return result["cols"], rows, result["sqlstate"]
 
 
+def _same_set(x, y) -> bool:
+    return _canon(x, False) == _canon(y, False)
+
+
 def _same(x, y, is_ordered) -> bool:
     cx, rx, sx = _canon(x, is_ordered)
     cy, ry, sy = _canon(y, is_ordered)
@@ -174,7 +178,13 @@ def compare(a, b, is_ordered) -> tuple:
         return "differs", f"only PostgreSQL errored: {a['sqlstate']} {a['error']}"
     if a["sqlstate"] is not None:
         return "differs", f"different errors: {a['sqlstate']} vs {b['sqlstate']}"
+    if is_ordered and _same_set(a, b):
+        # Same rows in another order: rows tied on the ORDER BY keys may come
+        # back in any order, so this neither proves nor disproves anything.
+        return "order", "same rows in another order"
     if a["cols"] != b["cols"]:
+        if _canon(a, is_ordered)[1] == _canon(b, is_ordered)[1]:
+            return "differs", "different column types or names, same values"
         return "differs", "different columns or types"
     return "differs", "different rows"
 
@@ -196,7 +206,9 @@ def _engine(conn, sql) -> str | None:
             cur.execute("EXPLAIN (COSTS OFF) " + sql, prepare=False)
             plan = "\n".join(str(r[0]) for r in cur.fetchall())
     except psycopg.OperationalError:
-        raise
+        if conn.closed or conn.broken:
+            raise  # the session is gone: a crash
+        return None
     except psycopg.Error:
         return None
     return "duckdb" if "DuckDBScan" in plan else "postgres"

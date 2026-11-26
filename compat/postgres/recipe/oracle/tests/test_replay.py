@@ -48,7 +48,9 @@ def test_unordered_rows_compare_as_a_set(tmp_path, monkeypatch):
     monkeypatch.setattr(replay, "execute", reversed_b)
     f = parse_file("t", "SELECT * FROM (VALUES (1),(2)) v(x); SELECT * FROM (VALUES (1),(2)) v(x) ORDER BY x;")
     replay.run("postgres.reference", [f], tmp_path)
-    assert kinds(tmp_path, "postgres.reference") == ["match", "differs"]
+    # Under ORDER BY, the same rows in another order is "order": tied rows may
+    # come back in any order, so it neither proves nor disproves.
+    assert kinds(tmp_path, "postgres.reference") == ["match", "order"]
 
 
 def test_positive_control_documented_numeric(tmp_path):
@@ -166,3 +168,32 @@ def test_user_types_compare_by_name_not_by_server_oid(tmp_path, monkeypatch):
     out = outcomes(tmp_path, "postgres.reference")
     assert out[-1]["outcome"] == "match", out[-1]
     assert out[-1]["a"]["cols"] == [["p", "compat_pair"]]
+
+
+def test_an_operational_error_from_explain_is_not_a_crash():
+    # psycopg raises errors like 55P04 and 54001 as OperationalError while the
+    # session lives on; only a dropped session is a crash.
+    class Cur:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def execute(self, *a, **k): raise psycopg.OperationalError("unsafe use of new value")
+
+    class Conn:
+        closed, broken = False, False
+        def cursor(self, **k): return Cur()
+
+    assert replay._engine(Conn(), "SELECT 1") is None
+
+
+def test_same_rows_in_another_order_under_order_by_is_order_not_differs():
+    a = {"cols": [["x", "integer"]], "rows": [["1"], ["2"]], "sqlstate": None, "error": None}
+    b = {"cols": [["x", "integer"]], "rows": [["2"], ["1"]], "sqlstate": None, "error": None}
+    assert replay.compare(a, b, True)[0] == "order"
+    c = {"cols": [["x", "integer"]], "rows": [["2"], ["3"]], "sqlstate": None, "error": None}
+    assert replay.compare(a, c, True)[0] == "differs"
+
+
+def test_type_only_difference_is_named():
+    a = {"cols": [["x", "integer"]], "rows": [["3"]], "sqlstate": None, "error": None}
+    b = {"cols": [["x", "bigint"]], "rows": [["3"]], "sqlstate": None, "error": None}
+    assert replay.compare(a, b, False) == ("differs", "different column types or names, same values")

@@ -52,9 +52,21 @@ def _answer(r):
     return json.dumps(r.get("rows"))
 
 
-def _silent(o) -> bool:
+TYPE_ONLY = "different column types or names, same values"
+
+
+def _both_answered(o) -> bool:
     return (o["outcome"] == "differs" and not (o.get("a") or {}).get("sqlstate")
             and not (o.get("b") or {}).get("sqlstate"))
+
+
+def _silent(o) -> bool:
+    """A wrong value, not only a different type or column name."""
+    return _both_answered(o) and o.get("reason") != TYPE_ONLY
+
+
+def _cols(r):
+    return ", ".join(f"{n} {t}" for n, t in ((r or {}).get("cols") or []))
 
 
 def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set) -> str:
@@ -90,6 +102,18 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
         L.append("")
     unattributed = [o for o in outcomes if _silent(o)]
     L += [f"Statements with a silent wrong answer, attributed or not: {len(unattributed)}.", ""]
+
+    L += ["## Different result types", "",
+          "Same values, but a different column type or name. Applications that read by type or name see the difference.", ""]
+    typed = {r: f for r, f in v.failed.items() if _both_answered(f["example"]) and not _silent(f["example"])}
+    if not typed:
+        L += ["None.", ""]
+    else:
+        L += ["| Feature | Statement | PostgreSQL columns | Subject columns |", "|---|---|---|---|"]
+        for ref, f in sorted(typed.items(), key=lambda kv: (-weight(weights, kv[0]), kv[0]))[:TOP]:
+            e = f["example"]
+            L.append(f"| `{ref}` | `{_cell(e['sql'], 80)}` | {_cell(_cols(e['a']), 60)} | {_cell(_cols(e['b']), 60)} |")
+        L.append("")
 
     L += ["## Score", ""]
     s = score(v, weights, all_refs)
@@ -129,7 +153,7 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
         L.append("")
 
     L += ["## Refused and other failures", ""]
-    other = {r: f for r, f in v.failed.items() if r not in blamed}
+    other = {r: f for r, f in v.failed.items() if r not in blamed and r not in typed}
     if not other:
         L += ["None.", ""]
     else:
@@ -145,8 +169,18 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
     L += [", ".join(f"`{r}`" for r in sorted(v.unexercised & all_refs)) or "None.", ""]
     L += ["## Not scored", ""]
     L += [f"- `{lat}`: {why}." for lat, why in NOT_SCORED.items()]
-    L += ["", "## Noise", "",
-          f"{counts.get('noise', 0)} statements gave two different answers on PostgreSQL itself and were dropped.", ""]
+    L += ["", "## Noise and row order", "",
+          f"{counts.get('noise', 0)} statements gave two different answers on PostgreSQL itself and were dropped.",
+          f"{counts.get('order', 0)} statements returned the same rows in another order under ORDER BY; tied rows may "
+          "come back in any order, so these neither prove nor disprove a feature. A different order on unique "
+          "keys would be a bug; check these samples by hand.", ""]
+    samples = [o for o in outcomes if o["outcome"] == "order"][:TOP]
+    if samples:
+        L += ["| Statement | Where | PostgreSQL | Subject |", "|---|---|---|---|"]
+        for o in samples:
+            L.append(f"| `{_cell(o['sql'], 80)}` | {o['file']}:{o['line']} | `{_cell(_answer(o['a']), 50)}` | "
+                     f"`{_cell(_answer(o['b']), 50)}` |")
+        L.append("")
     return "\n".join(L)
 
 

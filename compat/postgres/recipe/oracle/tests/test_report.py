@@ -40,3 +40,19 @@ def test_applications_rows_are_each_apps_share_of_matches():
             o([], "postgres_executed", file="app:django")]
     text = render_report("s", decide(outs), outs, {}, set())
     assert "| django | 1 of 2 | 50.0% |" in text
+
+
+def test_type_only_differences_are_not_silent_wrong_answers():
+    outs = [o(["sql.function/array_length"], "differs", a_rows=[["3"]], b_rows=[["3"]])]
+    outs[0]["reason"] = "different column types or names, same values"
+    v = decide(outs, {"sql.function/array_length"})
+    text = render_report("s", v, outs, {}, {"sql.function/array_length"})
+    silent = text[text.index("## Silent wrong answers"):text.index("## Different result types")]
+    assert "array_length" not in silent
+    assert "## Different result types" in text and "array_length" in text[text.index("## Different result types"):]
+
+
+def test_order_statements_are_listed_for_a_person_to_check():
+    outs = [o(["sql.syntax/ORDER BY"], "order", sql="SELECT a FROM t ORDER BY b", a_rows=[["1"], ["2"]], b_rows=[["2"], ["1"]])]
+    text = render_report("s", decide(outs), outs, {}, set())
+    assert "SELECT a FROM t ORDER BY b" in text[text.index("## Noise and row order"):]

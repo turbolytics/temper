@@ -52,3 +52,8 @@ def test_check_json_for_one_lattice_omits_undecided_and_unexercised():
                all_refs={"sql.function/abs", "sql.function/round", "sql.function/x", "sql.function/y",
                          "sql.function/j", "sql.function/never"})
     assert check_json(v, "sql.function") == {"sql.function/abs": 0, "sql.function/round": 1, "sql.function/j": 1}
+
+
+def test_order_outcome_proves_and_blames_nothing():
+    v = decide([stmt(["a"], "order")])
+    assert not v.passed and not v.failed and not v.undecided and v.unexercised == {"a"}
