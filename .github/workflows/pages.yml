@@ -1,7 +1,7 @@
 name: pages
 
-# Builds the Temper by Turbolytics site from findings/findings.csv and
-# MATRIX.md, and deploys it to GitHub Pages. In the repository settings,
+# Builds the Temper by Turbolytics site from findings/findings.csv,
+# MATRIX.md and the compatibility method in compat/postgres, and deploys it to GitHub Pages. In the repository settings,
 # Pages > Source must be set to GitHub Actions.
 
 on:
@@ -11,6 +11,7 @@ on:
       - 'findings/**'
       - 'site/**'
       - 'MATRIX.md'
+      - 'compat/postgres/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
