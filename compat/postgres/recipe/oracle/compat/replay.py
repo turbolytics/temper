@@ -182,6 +182,8 @@ SERVER_LOCAL_TEXT = [(re.compile(r"pg_toast_\d+"), "pg_toast_<oid>"),
                      (re.compile(r"actual time=[\d.]+\.\.[\d.]+"), "actual time=<t>"),
                      (re.compile(r"(Planning|Execution|Serialization) Time: [\d.]+ ms"), r"\1 Time: <t> ms"),
                      (re.compile(r"(Planning|Execution|Serialization) time: [\d.]+ ms"), r"\1 time: <t> ms")]
+# EXPLAIN describes how an engine runs a query, which differs by design.
+EXPLAIN = re.compile(r"^\s*EXPLAIN\b", re.I)
 # Statistics views count what the server did, which differs between servers.
 STATISTICS = re.compile(r"\bpg_stat(io|_\w+|io_\w+)?\b|\bpg_statio_\w+", re.I)
 
@@ -441,6 +443,9 @@ def _one(subject, subj, sides, stmt, rules, inv=None) -> dict:
         return line
     if drift(a, b, sides.tainted):
         line.update(outcome="drift", reason=f"state diverged earlier: {reason}")
+        return line
+    if outcome in ("differs", "order") and EXPLAIN.match(stmt.sql) and _same_shape(a, b):
+        line.update(outcome="noise", reason="the plans differ; a plan is not an answer")
         return line
     if outcome in ("differs", "order") and server_local_only(a, b, is_ordered):
         line.update(outcome="noise", reason="differs only in server-local identifiers (OIDs, xids, toast names)")

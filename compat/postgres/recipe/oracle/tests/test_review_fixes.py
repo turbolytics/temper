@@ -178,3 +178,18 @@ def test_statistics_views_are_nondeterministic(tmp_path, monkeypatch):
     f = parse_file("t", "SELECT count(*) FROM pg_stat_io WHERE false;")
     replay.run("postgres.reference", [f], tmp_path)
     assert kinds(tmp_path, "postgres.reference") == ["noise"]
+
+
+def test_a_different_plan_is_not_a_different_answer(tmp_path, monkeypatch):
+    real = replay.execute
+
+    def other_plan(conn, stmt, side, **kw):
+        r = real(conn, stmt, side, **kw)
+        if side == "b" and stmt.sql.upper().startswith("EXPLAIN"):
+            r["rows"] = [["Custom Scan (DuckDBScan)"]]
+        return r
+
+    monkeypatch.setattr(replay, "execute", other_plan)
+    f = parse_file("t", "CREATE TABLE e(a int); EXPLAIN (COSTS OFF) SELECT a FROM e;")
+    replay.run("postgres.reference", [f], tmp_path)
+    assert kinds(tmp_path, "postgres.reference")[-1] == "noise"
