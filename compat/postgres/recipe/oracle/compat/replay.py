@@ -164,6 +164,38 @@ def _canon(result, is_ordered):
     return result["cols"], rows, result["sqlstate"]
 
 
+# Values each server assigns for itself: object identifiers, transaction ids,
+# WAL positions. Two servers legitimately differ on them.
+SERVER_LOCAL_TYPES = {"oid", "regclass", "regproc", "regprocedure", "regtype", "regnamespace", "regrole",
+                      "regoper", "regoperator", "regconfig", "regdictionary", "regcollation",
+                      "xid", "xid8", "cid", "tid", "pg_lsn"}
+SERVER_LOCAL_TEXT = [(re.compile(r"pg_toast_\d+"), "pg_toast_<oid>"),
+                     (re.compile(r"Query Identifier: -?\d+"), "Query Identifier: <id>")]
+
+
+def _masked(r):
+    if r.get("rows") is None:
+        return r
+    local = [t in SERVER_LOCAL_TYPES for _, t in (r.get("cols") or [])]
+    rows = []
+    for row in r["rows"]:
+        out = []
+        for i, v in enumerate(row):
+            if i < len(local) and local[i] and v is not None:
+                v = "<server-local>"
+            elif isinstance(v, str):
+                for rx, sub in SERVER_LOCAL_TEXT:
+                    v = rx.sub(sub, v)
+            out.append(v)
+        rows.append(out)
+    return dict(r, rows=rows)
+
+
+def server_local_only(a, b, is_ordered) -> bool:
+    """The answers differ, but only in values each server assigns for itself."""
+    return not _same(a, b, is_ordered) and _same(_masked(a), _masked(b), is_ordered)
+
+
 def _same_set(x, y) -> bool:
     return _canon(x, False) == _canon(y, False)
 
@@ -366,6 +398,9 @@ def _one(subject, subj, sides, stmt, rules, inv=None) -> dict:
         line.update(outcome="postgres_executed", reason="EXPLAIN shows no DuckDB scan")
         return line
     outcome, reason = compare(a, b, is_ordered)
+    if outcome in ("differs", "order") and server_local_only(a, b, is_ordered):
+        line.update(outcome="noise", reason="differs only in server-local identifiers (OIDs, xids, toast names)")
+        return line
     if outcome in ("differs", "order") and NONDETERMINISTIC & set(tag(stmt.sql, inv)):
         line.update(outcome="noise", reason="uses a function whose answer changes from call to call")
         return line

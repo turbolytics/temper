@@ -212,3 +212,22 @@ def test_a_random_function_is_noise_even_when_a_and_a2_agree(tmp_path, monkeypat
     f = parse_file("t", "SELECT array_sample(ARRAY[1,2,3], 1);")
     replay.run("postgres.reference", [f], tmp_path, inventory={"sql.command": {"SELECT"}, "sql.function": {"array_sample"}})
     assert kinds(tmp_path, "postgres.reference") == ["noise"]
+
+
+def _r(cols, rows):
+    return {"cols": cols, "rows": rows, "sqlstate": None, "error": None}
+
+
+def test_server_local_values_are_masked():
+    a = _r([["o", "oid"], ["n", "name"]], [["40873", "pg_toast_40873"]])
+    b = _r([["o", "oid"], ["n", "name"]], [["40875", "pg_toast_40875"]])
+    assert replay.server_local_only(a, b, False)
+    plan_a = _r([["QUERY PLAN", "text"]], [["Limit"], ["Query Identifier: -6264222014533813"]])
+    plan_b = _r([["QUERY PLAN", "text"]], [["Limit"], ["Query Identifier: -7376714583795621"]])
+    assert replay.server_local_only(plan_a, plan_b, True)
+
+
+def test_a_real_value_difference_is_not_masked():
+    a = _r([["o", "oid"], ["x", "integer"]], [["40873", "3"]])
+    b = _r([["o", "oid"], ["x", "integer"]], [["40875", "4"]])
+    assert not replay.server_local_only(a, b, False)
