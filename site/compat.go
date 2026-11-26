@@ -20,12 +20,15 @@ const compatDir = "compat/postgres"
 // inventory is the PostgreSQL feature inventory and the pins the method
 // runs on, read from compat/postgres. It names no system under test.
 type inventory struct {
-	Tag   string // the PostgreSQL source tag, such as REL_17_12
-	Image string // the PostgreSQL server image, pinned by digest
-	Total int
-	Lists []invList
-	Pins  []pin
-	Apps  []app
+	Tag string // the PostgreSQL source tag, such as REL_17_12
+	// Version and Date are the method's, from compat/postgres/METHOD.
+	Version, Date string
+	Skew          string // the largest applications' share of the logged statements
+	Image         string // the PostgreSQL server image, pinned by digest
+	Total         int
+	Lists         []invList
+	Pins          []pin
+	Apps          []app
 }
 
 type invList struct {
@@ -44,6 +47,7 @@ type pin struct{ What, Value, URL string }
 type app struct {
 	ID, Name, Version, What string
 	Statements              int
+	Share                   string // of all logged statements, such as 64.1%
 }
 
 // lists says how the site names each list, in page order. A list in
@@ -82,6 +86,9 @@ func loadInventory(root string) (inventory, error) {
 		return inv, err
 	}
 	inv.Tag = strings.TrimSpace(string(tag))
+	if inv.Version, inv.Date, err = loadMethod(dir); err != nil {
+		return inv, err
+	}
 	p, errs := load.Load(dir)
 	if len(errs) != 0 {
 		return inv, fmt.Errorf("%s: %v", compatDir, errs)
@@ -89,6 +96,7 @@ func loadInventory(root string) (inventory, error) {
 	if inv.Apps, err = loadApps(dir); err != nil {
 		return inv, err
 	}
+	inv.Skew = skew(inv.Apps)
 	used, err := appUse(dir, inv.Apps)
 	if err != nil {
 		return inv, err
@@ -145,14 +153,18 @@ func (inv inventory) JSON() ([]byte, error) {
 			Tag   string `json:"tag"`
 			Image string `json:"image"`
 		} `json:"postgres"`
-		Method  string `json:"method"`
-		License string `json:"license"`
-		Total   int    `json:"total"`
-		Lists   []list `json:"lists"`
+		Method        string `json:"method"`
+		MethodVersion string `json:"method_version"`
+		MethodDate    string `json:"method_date"`
+		License       string `json:"license"`
+		Total         int    `json:"total"`
+		Lists         []list `json:"lists"`
 	}{
-		Method:  "https://github.com/turbolytics/temper/tree/main/" + compatDir,
-		License: "Derived from PostgreSQL " + inv.Tag + " (https://github.com/postgres/postgres), distributed under the PostgreSQL License.",
-		Total:   inv.Total,
+		Method:        "https://github.com/turbolytics/temper/tree/main/" + compatDir,
+		MethodVersion: inv.Version,
+		MethodDate:    inv.Date,
+		License:       "Derived from PostgreSQL " + inv.Tag + " (https://github.com/postgres/postgres), distributed under the PostgreSQL License.",
+		Total:         inv.Total,
 	}
 	doc.Postgres.Tag, doc.Postgres.Image = inv.Tag, inv.Image
 	for _, l := range inv.Lists {
@@ -167,6 +179,49 @@ func (inv inventory) JSON() ([]byte, error) {
 		doc.Lists = append(doc.Lists, out)
 	}
 	return json.MarshalIndent(doc, "", "  ")
+}
+
+var methodLine = regexp.MustCompile(`(?m)^(version|date):\s*(\S+)\s*$`)
+
+// loadMethod reads the method's version and date.
+func loadMethod(dir string) (version, date string, err error) {
+	raw, err := os.ReadFile(filepath.Join(dir, "METHOD"))
+	if err != nil {
+		return "", "", err
+	}
+	for _, m := range methodLine.FindAllStringSubmatch(string(raw), -1) {
+		if m[1] == "version" {
+			version = m[2]
+		} else {
+			date = m[2]
+		}
+	}
+	if version == "" || date == "" {
+		return "", "", fmt.Errorf("%s/METHOD: needs a version and a date", compatDir)
+	}
+	return version, date, nil
+}
+
+// skew sets each application's share and says how much of the logged
+// traffic the two largest make up: "Django and psycopg make up 99.4%".
+func skew(apps []app) string {
+	total := 0
+	for _, a := range apps {
+		total += a.Statements
+	}
+	if total == 0 {
+		return ""
+	}
+	for i := range apps {
+		apps[i].Share = fmt.Sprintf("%.1f%%", 100*float64(apps[i].Statements)/float64(total))
+	}
+	if len(apps) < 3 {
+		return ""
+	}
+	top := append([]app(nil), apps...)
+	sort.SliceStable(top, func(i, j int) bool { return top[i].Statements > top[j].Statements })
+	share := 100 * float64(top[0].Statements+top[1].Statements) / float64(total)
+	return fmt.Sprintf("%s and %s make up %.1f%% of the logged statements", top[0].Name, top[1].Name, share)
 }
 
 // noteURL links a member's source: a file in PostgreSQL's source at the
