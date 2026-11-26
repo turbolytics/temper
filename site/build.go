@@ -55,6 +55,7 @@ type page struct {
 	Snippets    map[string]string // the tutorial's quotes from Temper's own files
 	TestHTML    template.HTML     // the tutorial's test, with its temper calls highlighted
 	CaseStudies []caseStudy
+	Inventory   inventory // the compatibility pages' PostgreSQL inventory and pins
 }
 
 // caseStudy is an audit written up with the project's approval. Each one has
@@ -149,8 +150,12 @@ func Build(opts Options) error {
 			}
 		}
 	}
+	inv, err := loadInventory(opts.Root)
+	if err != nil {
+		return err
+	}
 	h := summarize(grouped)
-	base := page{CaseStudies: caseStudies, Snippet: snippet, Home: h, SiteURL: cfg.SiteURL, GoogleCode: cfg.GoogleVerification,
+	base := page{Inventory: inv, CaseStudies: caseStudies, Snippet: snippet, Home: h, SiteURL: cfg.SiteURL, GoogleCode: cfg.GoogleVerification,
 		CSS: "style.css?v=" + contentHash(css)}
 	out := []struct {
 		path, tmpl, title, rel, url, description string
@@ -165,6 +170,10 @@ func Build(opts Options) error {
 			"Audits of open-source systems against their own documented guarantees, written up with each project's approval."},
 		{"contact/index.html", "contact.html", "Contact · Temper by Turbolytics", "../", "contact/",
 			"Audits, compatibility reports, vendor evaluations and other work from Turbolytics. Book a call or email us."},
+		{"compatibility/index.html", "compatibility.html", "Compatibility · Temper by Turbolytics", "../", "compatibility/",
+			"How a compatibility matrix tests a Postgres-compatible claim: the PostgreSQL 17 inventory, the corpus, how answers are compared and what counts as a pass."},
+		{"compatibility/postgres-17/index.html", "compat-postgres-17.html", "PostgreSQL 17 feature inventory · Temper by Turbolytics", "../../", "compatibility/postgres-17/",
+			fmt.Sprintf("Every PostgreSQL 17 feature a compatibility matrix checks: %s commands, functions, operators, types, settings, error codes and catalogs, each linked to its source.", commas(inv.Total))},
 	}
 	for _, c := range caseStudies {
 		out = append(out, struct{ path, tmpl, title, rel, url, description string }{
@@ -398,6 +407,8 @@ func matrixDoc(src []byte) (template.HTML, error) {
 }
 
 var funcs = template.FuncMap{
+	"commas": commas,
+	"join":   strings.Join,
 	// plural picks the word that fits n: 1 issue, 2 issues.
 	"plural": func(n int, one, many string) string {
 		if n == 1 {

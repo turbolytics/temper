@@ -173,6 +173,11 @@ main > p.breadth { max-width: none; }
   scroll-margin-top: 96px;
 }
 .findings-main .project h2 { margin: 0 0 4px; font-size: 1.3rem; }
+/* Compatibility inventory: the findings layout, one card per list. */
+.findings-main .inventory-list { margin: 0; padding: 22px 26px 10px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; scroll-margin-top: 96px; }
+.findings-main .inventory-list h2 { margin: 0 0 4px; font-size: 1.3rem; }
+table.inventory { font-size: 14px; width: 100%; }
+table.inventory td:last-child { color: var(--text-faint); font-size: 13px; }
 .project h2 a { color: var(--text); text-decoration: none; }
 .project h2 a:hover { color: var(--accent); }
 .project-meta { color: var(--text-faint); font: 13px var(--font-mono); margin: 0 0 6px; }
