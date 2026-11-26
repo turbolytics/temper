@@ -22,6 +22,8 @@ class Subject:
     # Run on every new side-b session, and again after RESET ALL / DISCARD ALL.
     setup_b: list = field(default_factory=list)
     # "duckdb": a query only counts when EXPLAIN shows DuckDB ran it.
+    # "probe-only": run the probe and the table-less rewrite but never skip a
+    # statement: the control that runs pg_duckdb's code paths against itself.
     engine_check: str | None = None
 
 
@@ -31,6 +33,11 @@ SUBJECTS = {
     "pg_duckdb.release": Subject(
         "pg_duckdb_a", "pg_duckdb_a2", "pg_duckdb", "cmp_a", "cmp_a2", "cmp_b",
         setup_b=["SET duckdb.force_execution = true"], engine_check="duckdb",
+    ),
+    # pg_duckdb against itself, DuckDB off on every side, with the probe and
+    # the rewrite on: any difference is the harness's, never pg_duckdb's.
+    "pg_duckdb.control": Subject(
+        "pg_duckdb_a", "pg_duckdb_a2", "pg_duckdb", "cmp_a", "cmp_a2", "cmp_b", engine_check="probe-only",
     ),
 }
 

@@ -47,6 +47,19 @@ _COPY_VAR = re.compile(r"^\s*COPY\s+(.+?)\s+FROM\s+:'(\w+)'(.*?);?\s*$", re.I | 
 _FROM_STDIN = re.compile(r"\bFROM\s+stdin\b", re.I)
 
 
+_LEADING_COMMENT = re.compile(r"\A\s*(?:--[^\n]*(?:\n|\Z)|/\*.*?\*/)", re.S)
+
+
+def strip_comments(sql: str) -> str:
+    """The statement without the comments before it, so classifiers that read
+    its first word (RESET, DISCARD, COPY) see it."""
+    prev = None
+    while prev != sql:
+        prev = sql
+        sql = _LEADING_COMMENT.sub("", sql, count=1)
+    return sql.strip()
+
+
 def _parses(sql: str) -> bool:
     try:
         pglast.parse_sql(sql)
@@ -163,6 +176,9 @@ def parse_file(name: str, text: str, source: str = "", shared_db: bool = False,
 
 def _emit(f: CorpusFile, sql: str, line: int, files: dict, lines: list, i: int) -> int:
     """Add one statement; return the next line index (past any COPY data)."""
+    sql = strip_comments(sql)
+    if not sql:
+        return i
     stmt = Stmt(f.name, line, sql)
     cv = _COPY_VAR.match(sql)
     if cv and cv.group(2) in files:
@@ -234,7 +250,8 @@ def docs(pg: Path) -> list:
         for m in _PROGRAM.finditer(body):
             line = body.count("\n", 0, m.start()) + 1
             for sql in _split(_unsgml(m.group(1))):
-                if _parses(sql):
+                sql = strip_comments(sql)
+                if sql and _parses(sql):
                     f.statements.append(Stmt(f.name, line, sql))
                 else:
                     f.skipped_unparsed += 1

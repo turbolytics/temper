@@ -386,3 +386,33 @@ def is_query(sql: str) -> bool:
     """A statement that only reads and returns rows (SELECT, VALUES, TABLE)."""
     stmt = _root(sql)
     return isinstance(stmt, ast.SelectStmt) and stmt.intoClause is None and not stmt.lockingClause
+
+
+# Aggregates whose result order is the input order, which depends on the plan.
+UNORDERED_AGGS = {"array_agg", "string_agg", "json_agg", "jsonb_agg", "json_object_agg",
+                  "jsonb_object_agg", "xmlagg", "json_agg_strict", "jsonb_agg_strict"}
+
+
+class _PlanDependent(Visitor):
+    def __init__(self):
+        super().__init__()
+        self.found = False
+
+    def visit_FuncCall(self, ancestors, node):
+        name = (_strings(node.funcname) or [""])[-1].lower()
+        if name in UNORDERED_AGGS and not node.agg_order:
+            self.found = True
+
+
+def plan_dependent(sql: str) -> bool:
+    """The answer legitimately depends on the plan: an aggregate that keeps
+    input order without ORDER BY, or a LIMIT/FETCH, where ties at the cut
+    may pick different rows."""
+    stmt = _root(sql)
+    if stmt is None:
+        return False
+    if isinstance(stmt, ast.SelectStmt) and stmt.limitCount is not None:
+        return True
+    v = _PlanDependent()
+    v(stmt)
+    return v.found

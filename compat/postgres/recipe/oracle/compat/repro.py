@@ -70,7 +70,9 @@ def repro(subject: str, ref: str, ledger: Path, files: list | None = None, inven
         last = json.loads((Path(tmp) / subject / "outcomes.jsonl").read_text().splitlines()[-1])
     print(f"cell: {ref} on {subject}")
     print(f"statement: {target['file']}:{target['line']}")
-    print(f"  {last['sql']}")
+    print(f"  {last.get('sent') or last['sql']}")
+    if last.get("sent"):
+        print(f"  (rewritten from: {last['sql']}, so the subject's engine runs it)")
     print(_show("PostgreSQL", last.get("a")))
     print(_show(subject, last.get("b")))
     print(f"outcome: {last['outcome']} {last.get('reason', '')}".rstrip())

@@ -7,9 +7,6 @@ import yaml
 
 SUBJECT_DIRS = {"pg_duckdb.release": "pg_duckdb"}
 ROOT = Path("/subjects")  # compat/postgres/subjects, mounted in the oracle container
-TYPE_NAMES = {}  # oid -> type name, filled from the reference server on first use
-
-
 def load(subject: str, root: Path | None = None) -> list:
     d = SUBJECT_DIRS.get(subject)
     if d is None:
@@ -20,22 +17,49 @@ def load(subject: str, root: Path | None = None) -> list:
     return yaml.safe_load(path.read_text()).get("rules", [])
 
 
-def _type_names():
-    if not TYPE_NAMES:
-        from compat.db import connect
-        with connect("postgres.reference", "a") as c:
-            for oid, name in c.execute("SELECT oid, format_type(oid, NULL) FROM pg_type"):
-                TYPE_NAMES[oid] = name
-    return TYPE_NAMES
+def _norm(value, kind):
+    """A value compared across the documented type change: numerics as
+    numbers, json as parsed json."""
+    if value is None:
+        return None
+    try:
+        if kind == "number":
+            return round(float(value), 9)
+        if kind == "json":
+            return json.dumps(json.loads(value), sort_keys=True)
+    except (TypeError, ValueError):
+        return ("unparsed", value)
+    return value
 
 
-def _types(result) -> set:
-    if not result or not result.get("cols"):
-        return set()
-    out = set()
-    for _, t in result["cols"]:
-        out.add(t if isinstance(t, str) else _type_names().get(t, str(t)))
-    return out
+def _kind(a_type):
+    return "json" if a_type in ("jsonb", "json") else "number"
+
+
+def _type_change_only(rule, a, b) -> bool:
+    """Every difference is the rule's type change, in the same column, with
+    the same values once compared as that kind of value."""
+    ac, bc = (a or {}).get("cols") or [], (b or {}).get("cols") or []
+    if len(ac) != len(bc) or (a or {}).get("rows") is None or (b or {}).get("rows") is None:
+        return False
+    changed = []
+    for i, ((_, at), (_, bt)) in enumerate(zip(ac, bc)):
+        if at == bt:
+            continue
+        if at == rule["a_type"] and bt == rule["b_type"]:
+            changed.append(i)
+        else:
+            return False
+    if not changed:
+        return False
+    kind = _kind(rule["a_type"])
+
+    def rows(r):
+        return sorted(tuple(_norm(v, kind) if i in changed else v for i, v in enumerate(row)) for row in r["rows"])
+    try:
+        return rows(a) == rows(b)
+    except TypeError:
+        return False
 
 
 def match(rules: list, sql: str, a: dict, b: dict) -> str | None:
@@ -47,9 +71,7 @@ def match(rules: list, sql: str, a: dict, b: dict) -> str | None:
             continue
         if "sql" in r and not re.search(r["sql"], sql):
             continue
-        if "a_type" in r and r["a_type"] not in _types(a):
-            continue
-        if "b_type" in r and r["b_type"] not in _types(b):
+        if ("a_type" in r or "b_type" in r) and not _type_change_only(r, a, b):
             continue
         return r["id"]
     return None

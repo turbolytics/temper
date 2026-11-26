@@ -24,6 +24,30 @@ NOT_SCORED = {
     "catalog.table": "PostgreSQL's own code under pg_duckdb; not scored",
 }
 TOP = 20
+# For a subject that only runs queries (pg_duckdb hands DDL and writes to
+# PostgreSQL), the spec marks these "Postgres executes" rather than scoring them.
+POSTGRES_EXECUTES_SYNTAX = {"RETURNING", "ON CONFLICT DO NOTHING", "ON CONFLICT DO UPDATE", "MERGE WHEN MATCHED",
+                            "MERGE WHEN NOT MATCHED", "MERGE RETURNING", "SELECT INTO"}
+
+
+def scored_refs(subject: str, inventory: dict) -> set:
+    """The members the headline score counts for this subject."""
+    from compat.db import SUBJECTS
+    query_only = bool(SUBJECTS[subject].engine_check)
+    refs = set()
+    for lat in SCORED:
+        if query_only and lat == "sql.command":
+            continue
+        for k in inventory.get(lat, ()):
+            if query_only and lat == "sql.syntax" and k in POSTGRES_EXECUTES_SYNTAX:
+                continue
+            refs.add(f"{lat}/{k}")
+    return refs
+
+
+def _shown(o) -> str:
+    """The statement as it ran (a rewritten table-less SELECT shows its rewrite)."""
+    return o.get("sent") or o["sql"]
 
 
 def weight(weights: dict, ref: str) -> float:
@@ -81,7 +105,7 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
     else:
         L += ["| Statement | Where | Error |", "|---|---|---|"]
         for o in crashes:
-            L.append(f"| `{_cell(o['sql'])}` | {o['file']}:{o['line']} | {_cell(o.get('reason'))} |")
+            L.append(f"| `{_cell(_shown(o))}` | {o['file']}:{o['line']} | {_cell(o.get('reason'))} |")
         L.append("")
 
     L += ["## Silent wrong answers", "",
@@ -97,7 +121,7 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
         L += ["| Feature | Statement | PostgreSQL | Subject | Reproduce |", "|---|---|---|---|---|"]
         for ref, f in silent_rows:
             e = f["example"]
-            L.append(f"| `{ref}` | `{_cell(e['sql'], 80)}` | `{_cell(_answer(e['a']), 60)}` | "
+            L.append(f"| `{ref}` | `{_cell(_shown(e), 80)}` | `{_cell(_answer(e['a']), 60)}` | "
                      f"`{_cell(_answer(e['b']), 60)}` | `oracle repro {subject} '{ref}'` |")
         L.append("")
     unattributed = [o for o in outcomes if _silent(o)]
@@ -112,7 +136,7 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
         L += ["| Feature | Statement | PostgreSQL columns | Subject columns |", "|---|---|---|---|"]
         for ref, f in sorted(typed.items(), key=lambda kv: (-weight(weights, kv[0]), kv[0]))[:TOP]:
             e = f["example"]
-            L.append(f"| `{ref}` | `{_cell(e['sql'], 80)}` | {_cell(_cols(e['a']), 60)} | {_cell(_cols(e['b']), 60)} |")
+            L.append(f"| `{ref}` | `{_cell(_shown(e), 80)}` | {_cell(_cols(e['a']), 60)} | {_cell(_cols(e['b']), 60)} |")
         L.append("")
 
     L += ["## Score", ""]
@@ -160,7 +184,7 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
         L += ["| Feature | Outcome | Statement | Subject |", "|---|---|---|---|"]
         for r, f in sorted(other.items(), key=lambda kv: (-weight(weights, kv[0]), kv[0])):
             e = f["example"]
-            L.append(f"| `{r}` | {e['outcome']} | `{_cell(e['sql'], 80)}` | `{_cell(_answer(e['b']), 80)}` |")
+            L.append(f"| `{r}` | {e['outcome']} | `{_cell(_shown(e), 80)}` | `{_cell(_answer(e['b']), 80)}` |")
         L.append("")
 
     L += ["## Undecided", "", "A failing statement used several unproven features; none is blamed.", ""]
@@ -169,8 +193,15 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
     L += [", ".join(f"`{r}`" for r in sorted(v.unexercised & all_refs)) or "None.", ""]
     L += ["## Not scored", ""]
     L += [f"- `{lat}`: {why}." for lat, why in NOT_SCORED.items()]
+    from compat.db import SUBJECTS
+    if SUBJECTS.get(subject) and SUBJECTS[subject].engine_check:
+        L += ["- `sql.command` and the write-only syntax ("
+              + ", ".join(sorted(POSTGRES_EXECUTES_SYNTAX))
+              + "): the subject hands these to PostgreSQL; refusals among them still appear above."]
     L += ["", "## Noise and row order", "",
           f"{counts.get('noise', 0)} statements gave two different answers on PostgreSQL itself and were dropped.",
+          f"{counts.get('drift', 0)} statements failed only as a knock-on of an earlier difference (an aborted "
+          "transaction, or an object one side lacks); they prove and blame nothing.",
           f"{counts.get('order', 0)} statements returned the same rows in another order under ORDER BY; tied rows may "
           "come back in any order, so these neither prove nor disprove a feature. A different order on unique "
           "keys would be a bug; check these samples by hand.", ""]
@@ -178,7 +209,7 @@ def render_report(subject: str, v, outcomes: list, weights: dict, all_refs: set)
     if samples:
         L += ["| Statement | Where | PostgreSQL | Subject |", "|---|---|---|---|"]
         for o in samples:
-            L.append(f"| `{_cell(o['sql'], 80)}` | {o['file']}:{o['line']} | `{_cell(_answer(o['a']), 50)}` | "
+            L.append(f"| `{_cell(_shown(o), 80)}` | {o['file']}:{o['line']} | `{_cell(_answer(o['a']), 50)}` | "
                      f"`{_cell(_answer(o['b']), 50)}` |")
         L.append("")
     return "\n".join(L)
@@ -189,7 +220,7 @@ def main(argv) -> int:
     subject, out = argv[0], Path(argv[1])
     ledger = Path(argv[2] if len(argv) > 2 else "/ledger")
     inv = keys(load(Path("/lattices")))
-    all_refs = {f"{lat}/{k}" for lat in SCORED for k in inv[lat]}
+    all_refs = scored_refs(subject, inv)
     outcomes = load_outcomes(ledger, subject, inv)
     v = decide(outcomes, all_refs)
     wpath = Path("/corpus/weights.json")

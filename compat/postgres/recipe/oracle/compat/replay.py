@@ -24,7 +24,7 @@ import psycopg
 from psycopg.adapt import Loader
 
 from compat import db, documented
-from compat.tag import is_query, ordered, tag
+from compat.tag import is_query, ordered, plan_dependent, tag
 
 SESSION = [
     # pg_regress's settings, so regression statements mean what they were written for.
@@ -32,9 +32,14 @@ SESSION = [
     "SET DateStyle = 'Postgres, MDY'",
     "SET extra_float_digits = 3",
 ]
-MAX_ROWS = 10000      # rows compared per statement
+MAX_ROWS = 100000     # rows compared per statement; a result this long is "truncated"
 KEEP_ROWS = 20        # rows kept in the ledger
 REFUSED = re.compile(r"not (yet )?supported|unsupported|not implemented", re.I)
+# A session-state change the subject refused can make later statements differ.
+# Postgres failing on an object the subject has (or the reverse, after the
+# subject refused a statement) is that drift, not an incompatibility.
+OBJECT_STATES = {"42P01", "42704", "3F000", "3D000", "42P07", "42P06", "42710", "42883"}
+ROLE_REFUSAL = re.compile(r"DuckDB execution is not allowed because you have not been granted", re.I)
 RESETS = re.compile(r"^\s*(RESET\s+ALL|DISCARD\s+ALL)\s*$", re.I)
 ROOT = Path("/pg")
 # Functions whose answer is meant to change from call to call: random values,
@@ -128,6 +133,8 @@ def execute(conn, stmt, side, **kw):
                 out["cols"] = [[d.name, _typname(conn, d.type_code)] for d in cur.description]
                 rows = [list(r) for r in cur.fetchmany(MAX_ROWS)]
                 out["rows"] = rows
+                if len(rows) >= MAX_ROWS:
+                    out["truncated"] = True
     except psycopg.OperationalError as e:
         if conn.closed or conn.broken:
             raise  # the session is gone: a crash, for the caller to record
@@ -194,6 +201,19 @@ def _masked(r):
 def server_local_only(a, b, is_ordered) -> bool:
     """The answers differ, but only in values each server assigns for itself."""
     return not _same(a, b, is_ordered) and _same(_masked(a), _masked(b), is_ordered)
+
+
+def drift(a, b, tainted: bool) -> bool:
+    """The two sides' states have diverged: a knock-on failure, never a
+    verdict on the statement itself."""
+    sa, sb = a.get("sqlstate"), b.get("sqlstate")
+    if sb == "25P02" and sa != "25P02":
+        return True  # b's transaction was already aborted by an earlier statement
+    if sa in OBJECT_STATES and sb != sa:
+        return True  # PostgreSQL lacks (or already has) an object the subject doesn't
+    if tainted and sa != sb and (sa in OBJECT_STATES or sb in OBJECT_STATES or sb == "25P02"):
+        return True
+    return False
 
 
 def _same_set(x, y) -> bool:
@@ -273,6 +293,7 @@ class _Sides:
     def __init__(self, subject, dbname, timeout_ms):
         self.subject, self.dbname, self.timeout_ms = subject, dbname, timeout_ms
         self.conns = {}
+        self.tainted = False  # the subject refused a state change earlier in this file
 
     def name(self, side):
         return f"{db.base_db(self.subject, side)}_{self.dbname}"
@@ -338,10 +359,13 @@ def run(subject: str, files: list, ledger: Path, timeout_ms: int = 30000, invent
                 if shared is None:
                     shared = _Sides(subject, "regress", timeout_ms)
                     shared.fresh()
+                else:
+                    shared.close()  # a new session per file, as pg_regress runs them
                 sides = shared
             else:
                 sides = _Sides(subject, f"f{n}", timeout_ms)
                 sides.fresh()
+            sides.tainted = False
             try:
                 for stmt in f.statements:
                     line = _one(subject, subj, sides, stmt, rules, inv)
@@ -368,14 +392,16 @@ def _one(subject, subj, sides, stmt, rules, inv=None) -> dict:
         rewritten = True
     line = {"file": stmt.file, "line": stmt.line, "sql": stmt.sql, "rewritten": rewritten,
             "outcome": None, "reason": "", "a": None, "b": None}
+    if rewritten:
+        line["sent"] = sql
     engine = None
     results = {}
     for side in ("a", "a2", "b"):
         conn = sides.get(side)
         try:
-            if side == "b" and subj.engine_check:
-                engine = _engine(conn, sql) if query else "postgres"
             results[side] = execute(conn, stmt, side, sql=sql)
+            if side == "b" and subj.engine_check:
+                engine = _engine_after(conn, sql, query, results["b"])
         except psycopg.OperationalError as e:
             if side != "b":
                 raise
@@ -391,19 +417,44 @@ def _one(subject, subj, sides, stmt, rules, inv=None) -> dict:
     a, a2, b = results["a"], results["a2"], results["b"]
     is_ordered = ordered(stmt.sql)
     line["a"], line["b"] = _shorten(a), _shorten(b)
+    line["engine"] = engine
     if not _same(a, a2, is_ordered):
         line.update(outcome="noise", reason="PostgreSQL gave two different answers")
         return line
-    if engine == "postgres":
-        line.update(outcome="postgres_executed", reason="EXPLAIN shows no DuckDB scan")
+    if ROLE_REFUSAL.search(b.get("error") or ""):
+        line.update(outcome="postgres_executed", reason="DuckDB refused this role (duckdb.postgres_role); not run by DuckDB")
         return line
     outcome, reason = compare(a, b, is_ordered)
+    if outcome == "match":
+        if subj.engine_check == "duckdb" and engine != "duckdb":
+            # Only a statement DuckDB ran can prove a feature.
+            line.update(outcome="postgres_executed",
+                        reason="EXPLAIN shows no DuckDB scan" if engine == "postgres" else "engine unknown")
+            return line
+        line.update(outcome="match")
+        return line
+    if drift(a, b, sides.tainted):
+        line.update(outcome="drift", reason=f"state diverged earlier: {reason}")
+        return line
     if outcome in ("differs", "order") and server_local_only(a, b, is_ordered):
         line.update(outcome="noise", reason="differs only in server-local identifiers (OIDs, xids, toast names)")
         return line
     if outcome in ("differs", "order") and NONDETERMINISTIC & set(tag(stmt.sql, inv)):
         line.update(outcome="noise", reason="uses a function whose answer changes from call to call")
         return line
+    if outcome == "differs" and (a.get("truncated") or b.get("truncated")):
+        line.update(outcome="order", reason=f"result longer than {MAX_ROWS} rows; compared only in part")
+        return line
+    if outcome == "differs" and plan_dependent(stmt.sql) and _same_shape(a, b):
+        line.update(outcome="order", reason="the answer depends on the plan (unordered aggregate or LIMIT)")
+        return line
+    if subj.engine_check == "duckdb" and engine == "postgres" and query:
+        # DuckDB declined and PostgreSQL ran it on both sides, yet the answers
+        # differ: the sides' states diverged.
+        line.update(outcome="drift", reason=f"run by PostgreSQL on both sides: {reason}")
+        return line
+    if not query and outcome in ("differs", "refused"):
+        sides.tainted = True  # a refused state change: later knock-ons are drift
     if outcome in ("differs", "refused"):
         rule = documented.match(rules, stmt.sql, a, b)
         if rule:
@@ -411,6 +462,24 @@ def _one(subject, subj, sides, stmt, rules, inv=None) -> dict:
             outcome, reason = "documented", f"{rule}: {reason}"
     line.update(outcome=outcome, reason=reason)
     return line
+
+
+def _same_shape(a, b) -> bool:
+    """Both answered, with the same columns: only which rows, or their order, differs."""
+    return a.get("sqlstate") is None and b.get("sqlstate") is None and a.get("cols") == b.get("cols")
+
+
+def _engine_after(conn, sql, query, result):
+    """Which engine ran the statement on side b, asked after it ran so the
+    probe can never change the corpus's transaction: 'duckdb', 'postgres', or
+    None when it can't be asked (a failed statement, or inside a transaction)."""
+    if not query:
+        return "postgres"
+    if result.get("sqlstate") is not None:
+        return None
+    if conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
+        return None
+    return _engine(conn, sql)
 
 
 def main(argv) -> int:
