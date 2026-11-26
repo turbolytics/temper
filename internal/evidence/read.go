@@ -40,7 +40,7 @@ func Read(p *model.Project) ([]Located, diag.List) {
 		return nil, nil
 	}
 	rel := func(name string) string {
-		r, rerr := filepath.Rel(p.Root, filepath.Join(dir, name))
+		r, rerr := filepath.Rel(p.OutRoot(), filepath.Join(dir, name))
 		if rerr != nil {
 			return filepath.ToSlash(filepath.Join(dir, name))
 		}

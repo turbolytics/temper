@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 
@@ -135,15 +136,19 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-// flags returns a flag set for a command that also accepts --root.
-func flags(name, root string, stderr io.Writer) (*flag.FlagSet, *string) {
+// flags returns a flag set for a command that also accepts --root and
+// --out. --out defaults to $TEMPER_OUT, which temper run sets for its child.
+func flags(name, root string, stderr io.Writer) (*flag.FlagSet, *string, *string) {
 	fs := flag.NewFlagSet("temper "+name, flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	return fs, fs.String("root", root, "project root")
+	r := fs.String("root", root, "project root")
+	out := fs.String("out", os.Getenv("TEMPER_OUT"), "write generated output (evidence, run logs, status, the matrix) under this folder")
+	return fs, r, out
 }
 
-// project finds the root and loads the declarations.
-func project(root string) (*model.Project, diag.List) {
+// project finds the root and loads the declarations. A non-empty out,
+// relative to the working directory, becomes the project's Out.
+func project(root, out string) (*model.Project, diag.List) {
 	if root == "" {
 		found, err := load.FindRoot(".")
 		if err != nil {
@@ -151,12 +156,20 @@ func project(root string) (*model.Project, diag.List) {
 		}
 		root = found
 	}
-	return load.Load(root)
+	p, errs := load.Load(root)
+	if p != nil && out != "" {
+		abs, err := filepath.Abs(out)
+		if err != nil {
+			return p, append(errs, diag.Error{File: "--out", Message: err.Error()})
+		}
+		p.Out = abs
+	}
+	return p, errs
 }
 
 // checked loads and checks the project; any finding is an error.
-func checked(root string) (*model.Project, diag.List) {
-	p, errs := project(root)
+func checked(root, out string) (*model.Project, diag.List) {
+	p, errs := project(root, out)
 	if len(errs) != 0 {
 		return p, errs
 	}
@@ -170,11 +183,11 @@ func printErrors(w io.Writer, errs diag.List) {
 }
 
 func cmdCheck(root string, args []string, stdout, stderr io.Writer) int {
-	fs, rootFlag := flags("check", root, stderr)
+	fs, rootFlag, outFlag := flags("check", root, stderr)
 	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
-	p, errs := checked(*rootFlag)
+	p, errs := checked(*rootFlag, *outFlag)
 	if len(errs) != 0 {
 		printErrors(stderr, errs)
 		return exitError

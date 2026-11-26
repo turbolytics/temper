@@ -118,7 +118,8 @@ temper/matrix/<group>.md    # GENERATED, committed: one page per group when the 
 .temper/scenarios/          # GENERATED, not committed: run logs from temper scenarios run
 ```
 
-Paths are configurable in `temper.yml` (§6). Generated files carry a header
+Paths are configurable in `temper.yml` (§6), and `--out` moves every
+GENERATED path to another folder (§13). Generated files carry a header
 saying so and are never edited by hand. Status files are split by kind
 because ids are unique only within a kind.
 
@@ -193,6 +194,10 @@ packs:                        # optional; built-in recipe packs for scenarios (�
 pack's commands and faults are used as `<as>.<name>`, where `as` defaults to
 the pack's name; `with` sets the pack's parameters, and one without a
 default is required. A pack is included once per `as`.
+
+These paths are relative to the root. With `--out DIR` (§13), the generated
+ones (`evidence` when relative, `status/`, the matrix and its pages, and run
+logs) are relative to DIR instead; declarations are always read from the root.
 
 The order of `levels` is the order of matrix columns. A runner tells an
 adapter which level it is running at through `TEMPER_LEVEL`, and where to
@@ -724,6 +729,17 @@ line under "Exemptions and refusals", naming the members.
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE` and `TEMPER_RUN` set. Appends; never clears. |
 | `temper clean` | Deletes all evidence: the start of a full run. |
 | `temper guide` | Prints the guide to working in a Temper project, embedded in the binary so it matches the installed version. |
+
+**Results kept elsewhere.** `temper run`, `matrix`, `render`, `clean` and
+`scenarios run` take `--out DIR`, defaulting to `$TEMPER_OUT`. Everything
+they generate goes under DIR, at the same relative paths it would have under
+the root: evidence, scenario run logs, `<dir>/status/`, the matrix and its
+group pages. Declarations are still read from the root, so a public project
+can keep its results in a private repository. `temper run --out DIR` sets
+`TEMPER_OUT` for its command, so a `temper scenarios run` inside writes there
+too. `temper matrix --check --out DIR` checks the results in DIR. A relative
+DIR is relative to the working directory. Without `--out` or `$TEMPER_OUT`,
+nothing changes.
 
 **Exit codes.** `0` every enforced, judged cell is covered or exempt. `1` one
 is missing or failing. `2` a declaration, evidence or usage error, including

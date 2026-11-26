@@ -19,7 +19,7 @@ import (
 // never chooses its own level (R4). It never deletes evidence: a level may be
 // built from several commands, each wrapped in its own `temper run`.
 func cmdRun(root string, args []string, stdout, stderr io.Writer) int {
-	fs, rootFlag := flags("run", root, stderr)
+	fs, rootFlag, outFlag := flags("run", root, stderr)
 	level := fs.String("level", "", "the level this command runs at (required)")
 	runID := fs.String("run", "", "run id (default: $TEMPER_RUN, else the current UTC time)")
 	if err := fs.Parse(args); err != nil {
@@ -32,7 +32,7 @@ func cmdRun(root string, args []string, stdout, stderr io.Writer) int {
 	}
 
 	// Declaration errors are matrix's to report; a run needs only the config.
-	p, errs := project(*rootFlag)
+	p, errs := project(*rootFlag, *outFlag)
 	if p == nil || len(p.Config.Levels) == 0 {
 		printErrors(stderr, errs)
 		return exitError
@@ -63,6 +63,10 @@ func cmdRun(root string, args []string, stdout, stderr io.Writer) int {
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, stdout, stderr
 	cmd.Env = append(withoutTemper(os.Environ()),
 		"TEMPER_LEVEL="+*level, "TEMPER_EVIDENCE="+dir, "TEMPER_RUN="+id)
+	if p.Out != "" {
+		// A temper command inside (scenarios run, matrix) writes where this run does.
+		cmd.Env = append(cmd.Env, "TEMPER_OUT="+p.Out)
+	}
 	if err := cmd.Run(); err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
@@ -77,7 +81,7 @@ func cmdRun(root string, args []string, stdout, stderr io.Writer) int {
 func withoutTemper(env []string) []string {
 	var out []string
 	for _, kv := range env {
-		if !strings.HasPrefix(kv, "TEMPER_LEVEL=") && !strings.HasPrefix(kv, "TEMPER_EVIDENCE=") && !strings.HasPrefix(kv, "TEMPER_RUN=") {
+		if !strings.HasPrefix(kv, "TEMPER_LEVEL=") && !strings.HasPrefix(kv, "TEMPER_EVIDENCE=") && !strings.HasPrefix(kv, "TEMPER_RUN=") && !strings.HasPrefix(kv, "TEMPER_OUT=") {
 			out = append(out, kv)
 		}
 	}
@@ -86,11 +90,11 @@ func withoutTemper(env []string) []string {
 
 // cmdClean deletes all evidence: the start of a full local run.
 func cmdClean(root string, args []string, stdout, stderr io.Writer) int {
-	fs, rootFlag := flags("clean", root, stderr)
+	fs, rootFlag, outFlag := flags("clean", root, stderr)
 	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
-	p, errs := project(*rootFlag)
+	p, errs := project(*rootFlag, *outFlag)
 	if p == nil || len(p.Config.Levels) == 0 && len(errs) != 0 {
 		printErrors(stderr, errs)
 		return exitError
