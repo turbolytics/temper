@@ -1,4 +1,4 @@
-from compat.report import FLOOR, render_report, score
+from compat.report import FLOOR, coverage, render_report, score
 from compat.verdict import Verdicts, decide
 
 
@@ -17,9 +17,24 @@ def test_documented_counts_against_score():
 
 
 def test_unweighted_refs_get_the_floor():
-    v = Verdicts(passed={"a"})
+    v = Verdicts(passed={"a"}, failed={"b": {"count": 1, "example": {}}})
     assert score(v, {}, {"a", "b"}) == 0.5
     assert score(v, {"a": 1.0}, {"a", "b"}) == 1.0 / (1.0 + FLOOR)
+
+
+def test_untested_and_undecided_features_do_not_lower_the_score():
+    v = Verdicts(passed={"a"}, undecided={"b": []}, unexercised={"c"})
+    assert score(v, {}, {"a", "b", "c"}) == 1.0
+    tested, total, weighted = coverage(v, {"a": 1.0}, {"a", "b", "c"})
+    assert (tested, total) == (1, 3)
+    assert weighted == 1.0 / (1.0 + 2 * FLOOR)
+
+
+def test_report_gives_the_score_with_its_coverage():
+    v = Verdicts(passed={"a"}, unexercised={"b"})
+    text = render_report("s", v, [], {}, {"a", "b"})
+    assert "of the tested features pass" in text
+    assert "Coverage: 1 of 2 claimed features tested" in text
 
 
 def test_report_sections_in_order_and_silent_wrong_answers_listed():
