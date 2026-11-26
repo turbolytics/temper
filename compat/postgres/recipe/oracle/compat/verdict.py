@@ -1,7 +1,7 @@
 """From statement outcomes to a verdict per inventory member.
 
-A member passes when a statement using it matched and PostgreSQL itself
-accepted that statement. A failing statement (differs, refused, crash)
+A member passes when a statement using it matched (or differed only in
+column names) and PostgreSQL itself accepted that statement. A failing statement (differs, refused, crash)
 blames the members in it that nothing has proven: exactly one, and that
 member fails with this statement as its reproduction; more than one, and
 each is undecided, never guessed. A documented difference blames the same
@@ -27,8 +27,12 @@ class Verdicts:
     documented: dict = field(default_factory=dict)   # ref -> rule id
 
 
+# A name-only difference (same types and values) proves its features too.
+PROVING = ("match", "names")
+
+
 def _proves(o) -> bool:
-    return o["outcome"] == "match" and (o.get("a") or {}).get("sqlstate") is None
+    return o["outcome"] in PROVING and (o.get("a") or {}).get("sqlstate") is None
 
 
 def decide(outcomes: list, all_refs: set | None = None) -> Verdicts:

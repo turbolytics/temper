@@ -196,7 +196,17 @@ def test_same_rows_in_another_order_under_order_by_is_order_not_differs():
 def test_type_only_difference_is_named():
     a = {"cols": [["x", "integer"]], "rows": [["3"]], "sqlstate": None, "error": None}
     b = {"cols": [["x", "bigint"]], "rows": [["3"]], "sqlstate": None, "error": None}
-    assert replay.compare(a, b, False) == ("differs", "different column types or names, same values")
+    assert replay.compare(a, b, False) == ("differs", "different column types, same values")
+
+
+def test_name_only_difference_is_its_own_outcome():
+    # A default name such as ?column? is not a wrong answer.
+    a = {"cols": [["?column?", "integer"]], "rows": [["3"]], "sqlstate": None, "error": None}
+    b = {"cols": [["x", "integer"]], "rows": [["3"]], "sqlstate": None, "error": None}
+    assert replay.compare(a, b, False) == ("names", "different column names, same types and values")
+    # A different name and a different type is a type difference.
+    c = {"cols": [["x", "bigint"]], "rows": [["3"]], "sqlstate": None, "error": None}
+    assert replay.compare(a, c, False) == ("differs", "different column types, same values")
 
 
 def test_a_random_function_is_noise_even_when_a_and_a2_agree(tmp_path, monkeypatch):

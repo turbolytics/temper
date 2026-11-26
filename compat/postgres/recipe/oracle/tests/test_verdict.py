@@ -57,3 +57,8 @@ def test_check_json_for_one_lattice_omits_undecided_and_unexercised():
 def test_order_outcome_proves_and_blames_nothing():
     v = decide([stmt(["a"], "order")])
     assert not v.passed and not v.failed and not v.undecided and v.unexercised == {"a"}
+
+
+def test_a_name_only_difference_proves_its_features():
+    outs = [{"refs": ["sql.function/abs"], "outcome": "names", "a": {"sqlstate": None}}]
+    assert decide(outs).passed == {"sql.function/abs"}
