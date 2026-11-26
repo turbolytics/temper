@@ -13,6 +13,7 @@ cli.recipes: {unit: covered, integration: covered}
 cli.render: {unit: covered, integration: not_required}
 cli.run: {unit: covered, integration: covered}
 cli.scenarios_run: {unit: covered, integration: covered}
+cli.subject: {unit: covered, integration: not_required}
 cli.version: {unit: covered, integration: covered}
 declarations.extension_fields: {unit: covered, integration: not_required}
 declarations.load: {unit: covered, integration: not_required}

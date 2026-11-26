@@ -724,8 +724,8 @@ line under "Exemptions and refusals", naming the members.
 | Command | What it does |
 |---|---|
 | `temper check` | Validates declarations (§14). |
-| `temper matrix [--json] [--check] [--all-levels]` | Checks, reads evidence, writes `status/` and the matrix pages. `--check` writes nothing, judges every level, and reports committed output that differs or is left over. `--json` prints the full result. |
-| `temper render` | Rewrites the matrix pages from the committed `status/` (after a merge). |
+| `temper matrix [--json] [--check] [--all-levels] [--subject ID]…` | Checks, reads evidence, writes `status/` and the matrix pages. `--check` writes nothing, judges every level, and reports committed output that differs or is left over. `--json` prints the full result. |
+| `temper render [--subject ID]…` | Rewrites the matrix pages from the committed `status/` (after a merge). |
 | `temper run --level L [--run ID] -- CMD…` | Runs `CMD` with `TEMPER_LEVEL`, `TEMPER_EVIDENCE` and `TEMPER_RUN` set. Appends; never clears. |
 | `temper clean` | Deletes all evidence: the start of a full run. |
 | `temper guide` | Prints the guide to working in a Temper project, embedded in the binary so it matches the installed version. |
@@ -740,6 +740,16 @@ can keep its results in a private repository. `temper run --out DIR` sets
 too. `temper matrix --check --out DIR` checks the results in DIR. A relative
 DIR is relative to the working directory. Without `--out` or `$TEMPER_OUT`,
 nothing changes.
+
+**One subject's matrix.** `temper matrix` and `temper render` take
+`--subject ID`, repeatable, and only with `--out`. The matrix then holds only
+the named subjects: their invariant and lattice cells, every feature except
+those that only other subjects declare as their own (`feature:`), and
+scenario-covered lattices. Evidence is validated against every subject, and
+the other subjects' records are then ignored. `--check` with the same
+`--subject` checks that folder. The project's own matrix always covers every
+subject, which is why `--subject` without `--out` is a usage error. A
+subject that is not declared is a usage error.
 
 **Exit codes.** `0` every enforced, judged cell is covered or exempt. `1` one
 is missing or failing. `2` a declaration, evidence or usage error, including

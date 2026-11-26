@@ -2,9 +2,9 @@
 <!-- temper matrix format: 3 -->
 # temper matrix
 
-**21 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
+**22 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
 
-✅ 64 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
+✅ 65 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
 
 Each cell is one claim in `temper/` at one level. It is covered when a test that ran
 at that level passed and none failed: a skip proves nothing, and a pass never hides
@@ -36,6 +36,7 @@ What the system does. Each feature is proven at the levels it requires.
 | `cli.run` | Runs a command with the level and evidence directory set, so no test chooses its own level. | ✅ | ✅ |
 | `cli.clean` | Deletes all evidence, the start of a full run. | ✅ | — |
 | `cli.out` | --out DIR (or TEMPER_OUT) writes evidence, run logs, status and the matrix under DIR; declarations are still read from the project root. | ✅ | — |
+| `cli.subject` | temper matrix and temper render --subject ID (repeatable) write a matrix of only the named subjects, under --out, so each system under test gets its own results folder. | ✅ | — |
 | `cli.guide` | Prints the guide an LLM or a person needs to work in a Temper project, matching the installed version. | ✅ | ✅ |
 | `cli.version` | Prints the name, Temper by Turbolytics, and the version the binary was built as, whether stamped at release or installed with go install. | ✅ | ✅ |
 | `site.findings` | Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it. | ✅ | — |

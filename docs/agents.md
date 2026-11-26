@@ -123,6 +123,7 @@ their commands are declared in `temper.yml`.
 | `temper recipes list` | Lists the built-in recipe packs. `temper recipes show PACK` prints one, the reference for each command and fault it provides. |
 | `temper render` | Rebuilds `MATRIX.md` and any group pages from the committed statuses. |
 | `--out DIR` | On `run`, `matrix`, `render`, `clean` and `scenarios run`: writes evidence, run logs, statuses and the matrix under DIR instead of the project, for results kept in another repository. Declarations still come from the project. |
+| `--subject ID` | On `matrix` and `render`, with `--out`: a matrix of only that subject (repeat it for more), so each system under test gets its own results folder. Features only other subjects own are left out. |
 | `temper guide` | Prints this guide. |
 | `temper version` | Prints the installed version. |
 

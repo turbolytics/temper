@@ -23,6 +23,8 @@ func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
 	asJSON := fs.Bool("json", false, "print the full result as JSON")
 	checkOnly := fs.Bool("check", false, "write nothing; exit 3 if committed output differs (implies --all-levels)")
 	allLevels := fs.Bool("all-levels", false, "judge every level, even one with no evidence (CI)")
+	var subjects subjectList
+	fs.Var(&subjects, "subject", "write a matrix of only this subject, under --out (repeatable)")
 	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
@@ -51,6 +53,11 @@ func cmdMatrix(root string, args []string, stdout, stderr io.Writer) int {
 	if errs := append(readErrs, validErrs...); len(errs) != 0 {
 		return fail(p, errs.Sorted())
 	}
+	// Evidence is validated against every subject, then narrowed.
+	if errs := onlySubjects(p, subjects); len(errs) != 0 {
+		return fail(p, errs)
+	}
+	kept = forSubjects(p, kept)
 	// With no evidence at any level, nothing would be judged: every cell
 	// would replay its committed status, and the exit code would read as a
 	// passing run. That is an evidence error, not a result.
@@ -150,10 +157,15 @@ func gapLine(p *model.Project, c matrix.Cell) string {
 
 func cmdRender(root string, args []string, stdout, stderr io.Writer) int {
 	fs, rootFlag, outFlag := flags("render", root, stderr)
+	var subjects subjectList
+	fs.Var(&subjects, "subject", "render a matrix of only this subject, under --out (repeatable)")
 	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
 	p, errs := project(*rootFlag, *outFlag)
+	if len(errs) == 0 {
+		errs = onlySubjects(p, subjects)
+	}
 	if len(errs) != 0 {
 		printErrors(stderr, errs)
 		return exitError
