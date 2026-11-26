@@ -21,6 +21,7 @@ services:
     volumes:
       - ./recipe/oracle:/oracle
       - ./corpus:/corpus
+      - ./subjects:/subjects
       - ./temper/lattices:/lattices
       - ledger:/ledger
     environment: {PGPASSWORD: postgres}

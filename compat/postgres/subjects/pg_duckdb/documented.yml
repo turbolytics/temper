@@ -1,0 +1,35 @@
+# Differences pg_duckdb's own docs already list. A statement whose difference
+# one of these rules matches is "documented", not "differs": it still counts
+# against the score, in its own column. Each rule cites the doc it comes from,
+# at duckdb/pg_duckdb v1.2.1.
+#
+# A rule matches when every condition it gives holds:
+#   b_error:  regex on the subject's error message
+#   a_type / b_type:  result column type names on PostgreSQL / the subject
+#   b_rows:   regex on the subject's returned rows (as JSON)
+#   sql:      regex on the statement
+rules:
+  - id: "types.md#1 enum"
+    cite: "docs/types.md, Known limitations 1: enum types are not supported"
+    b_error: "(?i)enum"
+  - id: "types.md#2 numeric precision"
+    cite: "docs/types.md, Known limitations 2: numeric beyond DuckDB's decimal range becomes double precision"
+    b_error: "(?i)precision of 1-38|unsupportedpostgrestype"
+  - id: "types.md#2 numeric precision value"
+    cite: "docs/types.md, Known limitations 2: DuckDB's decimal supports precision 1-38 only"
+    b_rows: "unsupportedpostgrestype"
+  - id: "types.md#2 numeric as double"
+    cite: "docs/types.md, Known limitations 2: numeric beyond DuckDB's decimal range becomes double precision"
+    a_type: numeric
+    b_type: double precision
+  - id: "types.md#4 jsonb as json"
+    cite: "docs/types.md, Known limitations 4: jsonb columns are converted to json when reading from DuckDB"
+    a_type: jsonb
+    b_type: json
+  - id: "types.md#5 json functions"
+    cite: "docs/types.md, Known limitations 5: many Postgres json and jsonb functions and operators are not implemented in DuckDB"
+    sql: "(?i)json"
+    b_error: "(?i)(function|operator).*(does not exist|not (yet )?(supported|implemented))|not implemented"
+  - id: "types.md#7 multi-dimensional arrays"
+    cite: "docs/types.md, Known limitations 7: multi-dimensional arrays convert only within a common subset"
+    b_error: "(?i)dimension"
