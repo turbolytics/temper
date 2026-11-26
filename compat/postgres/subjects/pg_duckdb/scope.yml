@@ -1,0 +1,14 @@
+# What pg_duckdb claims, from its own docs at v1.2.1, and so what its score
+# counts. Statements PostgreSQL runs in DuckDB's place are also detected, one
+# by one, by the harness (EXPLAIN shows no DuckDB scan).
+claim:
+  cite: "README.md, Key features: \"Execute analytics queries without changes: run your existing SQL analytics queries as you normally would, and pg_duckdb will automatically use DuckDB's SQL engine to execute them when you set duckdb.force_execution=true.\""
+not_claimed:
+  - members: ["sql.command/*"]
+    why: "Commands (schema changes, writes and utility statements) are not analytics queries; PostgreSQL runs them."
+    cite: "README.md, Key features: \"Execute analytics queries without changes\"; README.md, Use cases: \"Analytical Workloads: Aggregations, window functions, complex JOINs\""
+  - members: ["sql.syntax/RETURNING", "sql.syntax/ON CONFLICT DO NOTHING", "sql.syntax/ON CONFLICT DO UPDATE",
+              "sql.syntax/MERGE WHEN MATCHED", "sql.syntax/MERGE WHEN NOT MATCHED", "sql.syntax/MERGE RETURNING",
+              "sql.syntax/SELECT INTO"]
+    why: "Syntax that only appears in writes; PostgreSQL runs those statements."
+    cite: "README.md, Key features: \"Execute analytics queries without changes\""

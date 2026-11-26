@@ -1,4 +1,4 @@
-from compat.report import FLOOR, render_report, score
+from compat.report import FLOOR, coverage, render_report, score
 from compat.verdict import Verdicts, decide
 
 
@@ -17,9 +17,24 @@ def test_documented_counts_against_score():
 
 
 def test_unweighted_refs_get_the_floor():
-    v = Verdicts(passed={"a"})
+    v = Verdicts(passed={"a"}, failed={"b": {"count": 1, "example": {}}})
     assert score(v, {}, {"a", "b"}) == 0.5
     assert score(v, {"a": 1.0}, {"a", "b"}) == 1.0 / (1.0 + FLOOR)
+
+
+def test_untested_and_undecided_features_do_not_lower_the_score():
+    v = Verdicts(passed={"a"}, undecided={"b": []}, unexercised={"c"})
+    assert score(v, {}, {"a", "b", "c"}) == 1.0
+    tested, total, weighted = coverage(v, {"a": 1.0}, {"a", "b", "c"})
+    assert (tested, total) == (1, 3)
+    assert weighted == 1.0 / (1.0 + 2 * FLOOR)
+
+
+def test_report_gives_the_score_with_its_coverage():
+    v = Verdicts(passed={"a"}, unexercised={"b"})
+    text = render_report("s", v, [], {}, {"a", "b"})
+    assert "of the tested features pass" in text
+    assert "Coverage: 1 of 2 claimed features tested" in text
 
 
 def test_report_sections_in_order_and_silent_wrong_answers_listed():
@@ -44,7 +59,7 @@ def test_applications_rows_are_each_apps_share_of_matches():
 
 def test_type_only_differences_are_not_silent_wrong_answers():
     outs = [o(["sql.function/array_length"], "differs", a_rows=[["3"]], b_rows=[["3"]])]
-    outs[0]["reason"] = "different column types or names, same values"
+    outs[0]["reason"] = "different column types, same values"
     v = decide(outs, {"sql.function/array_length"})
     text = render_report("s", v, outs, {}, {"sql.function/array_length"})
     silent = text[text.index("## Silent wrong answers"):text.index("## Different result types")]
@@ -56,3 +71,15 @@ def test_order_statements_are_listed_for_a_person_to_check():
     outs = [o(["sql.syntax/ORDER BY"], "order", sql="SELECT a FROM t ORDER BY b", a_rows=[["1"], ["2"]], b_rows=[["2"], ["1"]])]
     text = render_report("s", decide(outs), outs, {}, set())
     assert "SELECT a FROM t ORDER BY b" in text[text.index("## Noise and row order"):]
+
+
+def test_name_only_differences_are_listed_apart_and_count_as_matches():
+    outs = [o(["sql.function/abs"], "names", sql="SELECT abs(-1)", file="app:django")]
+    outs[0]["reason"] = "different column names, same types and values"
+    v = decide(outs, {"sql.function/abs"})
+    assert "sql.function/abs" in v.passed
+    text = render_report("s", v, outs, {}, {"sql.function/abs"})
+    names = text[text.index("## Different column names"):]
+    assert "SELECT abs(-1)" in names
+    assert "SELECT abs(-1)" not in text[text.index("## Different result types"):text.index("## Different column names")]
+    assert "| django | 1 of 1 | 100.0% |" in text

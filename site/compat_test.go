@@ -5,6 +5,7 @@ import (
 	"html"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -188,6 +189,81 @@ func TestInventoryDownloadsAsJSON(t *testing.T) {
 	for _, page := range []string{"compatibility/index.html", "compatibility/postgres-17/index.html"} {
 		if !strings.Contains(read(t, filepath.Join(out, page)), `inventory.json"`) {
 			t.Errorf("%s does not link inventory.json", page)
+		}
+	}
+}
+
+// The method page carries the method's version and date, the publication
+// rules, the noise count, and the corpus skew.
+func TestMethodPageVersionRulesAndSkew(t *testing.T) {
+	temper.Covers(t, "site.compatibility")
+	out := build(t, false)
+	page := html.UnescapeString(read(t, filepath.Join(out, "compatibility", "index.html")))
+	for _, want := range []string{
+		"Method version 1.0", "2026-11-26",
+		"at least 7 days", "only with the vendor's approval",
+		"139", "0.27%",
+		"Different column name", "?column?",
+		"attributed to",
+		"Django and psycopg make up 99.4% of the logged statements", "JDBC", "node-postgres",
+		"<td>64.1%</td>",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("method page lacks %q", want)
+		}
+	}
+	inv := read(t, filepath.Join(out, "compatibility", "postgres-17", "index.html"))
+	if !strings.Contains(inv, "Method version 1.0") {
+		t.Error("inventory page lacks the method version")
+	}
+	var doc struct {
+		MethodVersion string `json:"method_version"`
+		MethodDate    string `json:"method_date"`
+	}
+	if err := json.Unmarshal([]byte(read(t, filepath.Join(out, "compatibility", "postgres-17", "inventory.json"))), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.MethodVersion != "1.0" || doc.MethodDate != "2026-11-26" {
+		t.Errorf("inventory.json method = %q %q", doc.MethodVersion, doc.MethodDate)
+	}
+}
+
+// The method page states the score, the outcomes, the scope and fairness the
+// way the harness computes them, and reads the control run from METHOD.
+func TestMethodPageMatchesTheHarness(t *testing.T) {
+	temper.Covers(t, "site.compatibility")
+	page := html.UnescapeString(read(t, filepath.Join(build(t, false), "compatibility", "index.html")))
+	for _, want := range []string{
+		// The score: five lists, tested features only, coverage beside it.
+		"SQL commands, query syntax, functions, operators and data types",
+		"Untested and undecided features are left out of the score", "coverage",
+		// Outcomes, grouped as the score treats them.
+		"Lowers the score", "Counts as a pass", "Removed before scoring",
+		"0A000", "not supported, unsupported or not implemented",
+		"Crashes and silent wrong answers are the most serious outcomes",
+		// Scope and fairness.
+		"public documentation", "claiming less",
+		"Payment never changes results", "without being asked", "only with the vendor's permission",
+		"dispute",
+		// The four terms, and a sample.
+		"The method", "The harness", "A report", "Your product",
+		"Illustrative",
+		"What a paid report includes",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("method page lacks %q", want)
+		}
+	}
+	// The control numbers come from compat/postgres/METHOD.
+	method := read(t, "../compat/postgres/METHOD")
+	for _, key := range []string{"control_statements", "control_matched", "control_noise"} {
+		m := regexp.MustCompile(`(?m)^` + key + `:\s*(\d+)`).FindStringSubmatch(method)
+		if m == nil {
+			t.Fatalf("METHOD has no %s", key)
+		}
+		n, _ := strconv.Atoi(m[1])
+		if !strings.Contains(page, commas(n)) {
+			t.Errorf("method page lacks %s = %s", key, commas(n))
 		}
 	}
 }
