@@ -56,7 +56,15 @@ type page struct {
 	TestHTML    template.HTML     // the tutorial's test, with its temper calls highlighted
 	CaseStudies []caseStudy
 	Inventory   inventory // the compatibility pages' PostgreSQL inventory and pins
+	// ReportRequest is the compatibility button's email: it asks for the
+	// product, the Postgres version it targets and a reply address.
+	ReportRequest template.URL
 }
+
+// reportRequest is a mailto with its subject and body already filled in.
+// Spaces are %20, never +, so every mail client shows them as spaces.
+const reportRequest = "mailto:danny@turbolytics.io?subject=Compatibility%20report%20request" +
+	"&body=Product%3A%20%0APostgres%20version%20you%20target%3A%20%0AEmail%3A%20%0A"
 
 // caseStudy is an audit written up with the project's approval. Each one has
 // its own template, case-<Slug>.html, and is linked from the Case Studies
@@ -157,7 +165,7 @@ func Build(opts Options) error {
 	}
 	h := summarize(grouped)
 	base := page{Inventory: inv, CaseStudies: caseStudies, Snippet: snippet, Home: h, SiteURL: cfg.SiteURL, GoogleCode: cfg.GoogleVerification,
-		CSS: "style.css?v=" + contentHash(css)}
+		CSS: "style.css?v=" + contentHash(css), ReportRequest: reportRequest}
 	out := []struct {
 		path, tmpl, title, rel, url, description string
 	}{
@@ -171,7 +179,9 @@ func Build(opts Options) error {
 			"Audits of open-source systems against their own documented guarantees, written up with each project's approval."},
 		{"contact/index.html", "contact.html", "Contact · Temper by Turbolytics", "../", "contact/",
 			"Audits, compatibility reports, vendor evaluations and other work from Turbolytics. Book a call or email us."},
-		{"compatibility/index.html", "compatibility.html", "Compatibility · Temper by Turbolytics", "../", "compatibility/",
+		{"compatibility/index.html", "compatibility.html", "Postgres compatibility reports · Temper by Turbolytics", "../", "compatibility/",
+			"Is your database really Postgres-compatible? We run real Postgres statements against your product and plain Postgres 17, and show you exactly where the answers differ."},
+		{"compatibility/method/index.html", "compat-method.html", "Compatibility method · Temper by Turbolytics", "../../", "compatibility/method/",
 			"How a compatibility matrix tests a Postgres-compatible claim: the PostgreSQL 17 inventory, the corpus, how answers are compared and what counts as a pass."},
 		{"compatibility/postgres-17/index.html", "compat-postgres-17.html", "PostgreSQL 17 feature inventory · Temper by Turbolytics", "../../", "compatibility/postgres-17/",
 			fmt.Sprintf("Every PostgreSQL 17 feature a compatibility matrix checks: %s commands, functions, operators, types, settings, error codes and catalogs, each linked to its source.", commas(inv.Total))},

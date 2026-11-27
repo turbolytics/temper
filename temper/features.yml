@@ -57,7 +57,10 @@ features:
     description: Features compatibility reports on the home page and the Contact page, saying what a report tests and delivers (a co-branded hosted matrix, a PDF, a badge and reruns on every release) and that it stays independent.
     requires: [unit]
   - id: site.compatibility
-    description: "Builds the Compatibility pages: the method behind Temper's compatibility matrices, and the full PostgreSQL 17 feature inventory generated from compat/postgres with each member linked to its source. They name no system under test."
+    description: "Builds the Compatibility pages: the method behind Temper's compatibility matrices (at /compatibility/method/), and the full PostgreSQL 17 feature inventory generated from compat/postgres with each member linked to its source. They name no system under test."
+    requires: [unit]
+  - id: site.compatibility_offer
+    description: "The Compatibility page is one screen for a buyer: what is checked, why to trust it, what they get, and a button that opens an email asking for the product, the Postgres version it targets and a reply address. It links to the method page for the engineer."
     requires: [unit]
   - id: cli.scenarios_run
     description: Runs runner-temper scenarios against a Docker Compose topology, injecting named faults on a seeded schedule, and records one verdict per check as evidence.
