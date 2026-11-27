@@ -238,6 +238,13 @@ func TestMethodPageMatchesTheHarness(t *testing.T) {
 		// The score: five lists, tested features only, coverage beside it.
 		"SQL commands, query syntax, functions, operators and data types",
 		"Untested and undecided features are left out of the score", "coverage",
+		// Attribution as compat/verdict.py decides it: a match proves only
+		// where PostgreSQL answered without an error, a failure whose
+		// features are all proven blames none, and so a feature that passes
+		// anywhere passes.
+		"PostgreSQL itself answered without an error",
+		"attributed to none of them",
+		"A feature that passes in one statement and fails in another counts as a pass",
 		// Outcomes, grouped as the score treats them.
 		"Lowers the score", "Counts as a pass", "Removed before scoring",
 		"0A000", "not supported, unsupported or not implemented",
