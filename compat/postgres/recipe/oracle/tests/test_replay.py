@@ -241,3 +241,46 @@ def test_a_real_value_difference_is_not_masked():
     a = _r([["o", "oid"], ["x", "integer"]], [["40873", "3"]])
     b = _r([["o", "oid"], ["x", "integer"]], [["40875", "4"]])
     assert not replay.server_local_only(a, b, False)
+
+
+def test_a_statement_with_no_answer_times_out_on_the_client():
+    # Doltgres ignores statement_timeout and cancel requests, so the harness
+    # drops the connection and records PostgreSQL's timeout code.
+    import time
+    from compat import db, replay
+    from compat.corpus import Stmt
+    conn = db.connect("doltgres.release", "b")
+    t0 = time.time()
+    r = replay.execute(conn, Stmt("t:x", 1, "SELECT pg_sleep(5)"), "b", timeout_s=1)
+    assert time.time() - t0 < 4
+    assert r["sqlstate"] == "57014" and r.get("timeout") is True
+    assert conn.closed or conn.broken
+
+
+def test_an_unreadable_pg_type_falls_back_to_psycopgs_types():
+    # Doltgres can leave pg_type unreadable ("unable to resolve type ... during
+    # deserialization"). The session must still open, with every type psycopg
+    # would parse read as text.
+    import psycopg
+    from compat import replay
+
+    class Adapters:
+        def __init__(self):
+            self.oids = set()
+
+        def register_loader(self, oid, loader):
+            self.oids.add(oid)
+
+    class Conn:
+        adapters = Adapters()
+
+        def execute(self, sql, *a, **k):
+            raise psycopg.errors.InternalError("unable to resolve type `x` during deserialization")
+
+        def rollback(self):
+            pass
+
+    c = Conn()
+    replay._text_everything(c)
+    assert {23, 1700, 1082, 3802} <= c.adapters.oids  # int4, numeric, date, jsonb
+    assert 1007 in c.adapters.oids  # int4[]

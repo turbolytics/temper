@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-SUBJECT_DIRS = {"pg_duckdb.release": "pg_duckdb"}
+SUBJECT_DIRS = {"pg_duckdb.release": "pg_duckdb", "doltgres.release": "doltgres"}
 ROOT = Path("/subjects")  # compat/postgres/subjects, mounted in the oracle container
 def load(subject: str, root: Path | None = None) -> list:
     d = SUBJECT_DIRS.get(subject)

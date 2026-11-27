@@ -5,3 +5,6 @@ features:
   - id: subject.pg_duckdb
     description: pg_duckdb 1.2.2 on PostgreSQL 17.12 (pgduckdb/pgduckdb:17-v1.2.2), queries forced onto DuckDB with duckdb.force_execution.
     requires: []
+  - id: subject.doltgres
+    description: Doltgres 1.5.3 (dolthub/doltgresql:1.5.3), a Postgres-compatible server built on Dolt's engine, compared with two PostgreSQL 17.12 servers.
+    requires: []

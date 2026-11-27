@@ -41,7 +41,7 @@ example-matrix:
 # its results go to a checkout of the private results repository:
 #   make compat-postgres RESULTS=../compat-results
 COMPAT        := compat/postgres
-COMPAT_SUBJECTS := postgres.reference pg_duckdb.release
+COMPAT_SUBJECTS := postgres.reference pg_duckdb.release doltgres.release
 
 compat-postgres:
 	@test -n "$(RESULTS)" || { echo "set RESULTS to a checkout of the private results repository"; exit 2; }
