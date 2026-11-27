@@ -62,6 +62,9 @@ features:
   - id: site.compatibility_offer
     description: "The Compatibility page is one screen for a buyer: what is checked, why to trust it, what they get, and a button that opens an email asking for the product, the Postgres version it targets and a reply address. It links to the method page for the engineer."
     requires: [unit]
+  - id: site.reading_measure
+    description: "Prose on every page shares one right edge: each paragraph and list placed directly in a page or in a top-level section stops at the same reading width, and the larger lead text stops there too."
+    requires: [unit]
   - id: cli.scenarios_run
     description: Runs runner-temper scenarios against a Docker Compose topology, injecting named faults on a seeded schedule, and records one verdict per check as evidence.
     requires: [unit, integration]

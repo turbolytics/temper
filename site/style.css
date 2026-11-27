@@ -93,7 +93,7 @@ h3 { font-size: 1.2rem; margin: 28px 0 8px; }
   color: var(--accent);
 }
 main p, main li { color: var(--text-muted); }
-main > section > p, main > section > ul, main > p, .step > p { max-width: var(--measure); }
+main > section > p, main > section > ul, main > section > ol, main > p, main > ul, main > ol, .step > p { max-width: var(--measure); }
 strong { color: var(--text); }
 
 /* Sections sit on hairlines, the way turbolytics.io stacks them. */
@@ -102,7 +102,7 @@ main > section + section { margin-top: 56px; padding-top: 48px; border-top: 1px 
 .hero p.lead { font-size: 1.35rem; line-height: 1.5; color: var(--text); max-width: 40ch; margin: 0 0 24px; }
 .hero p.eyebrow { font-size: 13px; color: var(--accent); }
 .hero p.small { font-family: var(--font-mono); font-size: 14px; color: var(--text-faint); }
-p.lead { font-size: 1.2rem; color: var(--text); }
+p.lead { font-size: 1.2rem; color: var(--text); max-width: calc(var(--measure) / 1.2); }
 
 /* Code: inset wells with a hairline; inline code on the raised surface. */
 code { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 0.86em; background: var(--bg-raised); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; color: var(--text); }
