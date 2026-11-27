@@ -81,7 +81,7 @@
 <thead><tr><th>What</th><th>Version</th></tr></thead>
 <tbody>
 {{range .Pins}}<tr><td>{{.What}}</td><td>{{if .URL}}<a href="{{.URL}}"><code>{{.Value}}</code></a>{{else}}<code>{{.Value}}</code>{{end}}</td></tr>
-{{end}}{{range .Apps}}<tr><td>{{.Name}}, captured from {{.What}}</td><td><code>{{.Version}}</code></td></tr>
+{{end}}{{range .Apps}}<tr><td>{{.Name}}</td><td><code>{{.Version}}</code></td></tr>
 {{end}}</tbody>
 </table>
 </section>
