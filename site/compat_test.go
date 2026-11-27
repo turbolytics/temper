@@ -204,7 +204,6 @@ func TestMethodPageVersionRulesAndSkew(t *testing.T) {
 		"Method version 1.0", "2026-11-26",
 		"at least 7 days", "only with the vendor's approval",
 		"139", "0.27%",
-		"Different column name", "?column?",
 		"attributed to",
 		"Django and psycopg make up 99.4% of the logged statements", "JDBC", "node-postgres",
 		"<td>64.1%</td>",
@@ -229,7 +228,7 @@ func TestMethodPageVersionRulesAndSkew(t *testing.T) {
 	}
 }
 
-// The method page states the score, the outcomes, the scope and fairness the
+// The method page states the score, the scope and fairness the
 // way the harness computes them, and reads the control run from METHOD.
 func TestMethodPageMatchesTheHarness(t *testing.T) {
 	temper.Covers(t, "site.compatibility")
@@ -245,10 +244,8 @@ func TestMethodPageMatchesTheHarness(t *testing.T) {
 		"PostgreSQL itself answered without an error",
 		"attributed to none of them",
 		"A feature that passes in one statement and fails in another counts as a pass",
-		// Outcomes, grouped as the score treats them.
-		"Lowers the score", "Counts as a pass", "Removed before scoring",
-		"0A000", "not supported, unsupported or not implemented",
-		"Crashes and silent wrong answers are the most serious outcomes",
+		// The outcomes live in the harness's README, one link away.
+		"compat/postgres#outcomes",
 		// Scope and fairness.
 		"public documentation", "claiming less",
 		"Payment never changes results", "without being asked", "only with the vendor's permission",
@@ -260,6 +257,22 @@ func TestMethodPageMatchesTheHarness(t *testing.T) {
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("method page lacks %q", want)
+		}
+	}
+	if strings.Contains(page, "<h2>Outcomes</h2>") {
+		t.Error("the method page still lists the outcomes; they live in compat/postgres/README.md")
+	}
+	// The harness's README lists the outcomes, grouped as the score treats them.
+	readme := read(t, "../compat/postgres/README.md")
+	for _, want := range []string{
+		"## Outcomes",
+		"Lowers the score", "Counts as a pass", "Removed before scoring",
+		"0A000", "not supported, unsupported or not implemented",
+		"Crashes and silent wrong answers are the most serious outcomes",
+		"Different column name", "?column?",
+	} {
+		if !strings.Contains(readme, want) {
+			t.Errorf("compat/postgres/README.md lacks %q", want)
 		}
 	}
 	// The control numbers come from compat/postgres/METHOD.
@@ -283,7 +296,7 @@ func TestMethodPageReadsInSkimmingOrder(t *testing.T) {
 	temper.Covers(t, "site.compatibility")
 	page := html.UnescapeString(read(t, filepath.Join(build(t, false), "compatibility", "method", "index.html")))
 	last := -1
-	for _, h := range []string{"Fairness", "The score", "Outcomes", "The inventory", "The corpus", "Limits", "Pinned versions", "Reproduce it", "Glossary"} {
+	for _, h := range []string{"Fairness", "The score", "The inventory", "The corpus", "Limits", "Pinned versions", "Reproduce it", "Glossary"} {
 		i := strings.Index(page, "<h2>"+h+"</h2>")
 		if i < 0 {
 			t.Fatalf("method page has no %q section", h)
