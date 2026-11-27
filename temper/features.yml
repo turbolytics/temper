@@ -45,7 +45,7 @@ features:
     description: Prints the name, Temper by Turbolytics, and the version the binary was built as, whether stamped at release or installed with go install.
     requires: [unit, integration]
   - id: site.findings
-    description: Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it.
+    description: Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it. The findings page features how many of the reported bugs maintainers have fixed.
     requires: [unit]
   - id: site.case_studies
     description: Builds the Case Studies pages, audits written up with the project's approval, linked from the top-level nav and from each project's findings.

@@ -1,7 +1,7 @@
 {{define "content"}}
 <p class="eyebrow">Open-source audits</p>
 <h1>Findings</h1>
-<p class="breadth">{{.Home.Projects}} {{plural .Home.Projects "project" "projects"}} · {{.Home.Stars}} GitHub stars · {{.Home.Issues}} {{plural .Home.Issues "issue" "issues"}} · {{.Home.PRs}} {{plural .Home.PRs "pull request" "pull requests"}}{{if .Home.Reports}} · {{.Home.Reports}} {{plural .Home.Reports "report" "reports"}}{{end}}</p>
+<p class="breadth">{{.Home.Projects}} {{plural .Home.Projects "project" "projects"}} · {{.Home.Stars}} GitHub stars · {{.Home.Issues}} {{plural .Home.Issues "issue" "issues"}} · {{if .Home.Fixed}}<strong class="fixed-count">{{.Home.Fixed}} fixed</strong> · {{end}}{{.Home.PRs}} {{plural .Home.PRs "pull request" "pull requests"}}{{if .Home.Reports}} · {{.Home.Reports}} {{plural .Home.Reports "report" "reports"}}{{end}}</p>
 <p>Temper helped find these bugs. We reported each one to the project's maintainers, with a reproduction and a Temper matrix. The list also shows the pull requests that fix or test them. The status shows where each one stands. When an audit found no bug worth filing, the list links to the report we posted instead.</p>
 
 <div class="findings-layout">
