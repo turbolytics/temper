@@ -39,7 +39,7 @@ What the system does. Each feature is proven at the levels it requires.
 | `cli.subject` | temper matrix and temper render --subject ID (repeatable) write a matrix of only the named subjects, under --out, so each system under test gets its own results folder. | ✅ | — |
 | `cli.guide` | Prints the guide an LLM or a person needs to work in a Temper project, matching the installed version. | ✅ | ✅ |
 | `cli.version` | Prints the name, Temper by Turbolytics, and the version the binary was built as, whether stamped at release or installed with go install. | ✅ | ✅ |
-| `site.findings` | Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it. | ✅ | — |
+| `site.findings` | Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it. The findings page features how many of the reported bugs maintainers have fixed. | ✅ | — |
 | `site.case_studies` | Builds the Case Studies pages, audits written up with the project's approval, linked from the top-level nav and from each project's findings. | ✅ | — |
 | `site.contact` | Builds the Contact page, the consulting offers grouped by who buys them with a call link and email, and points every contact link on the site to it so no visitor leaves the site to reach us. | ✅ | — |
 | `site.compatibility_reports` | Features compatibility reports on the home page and the Contact page, saying what a report tests and delivers (a co-branded hosted matrix, a PDF, a badge and reruns on every release) and that it stays independent. | ✅ | — |
