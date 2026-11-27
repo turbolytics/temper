@@ -159,6 +159,7 @@ type ghEvent struct {
 	User        *ghUser `json:"user"`
 	Association string  `json:"author_association"`
 	CreatedAt   string  `json:"created_at"`
+	SubmittedAt string  `json:"submitted_at"` // reviews
 	Body        string  `json:"body"`
 	Source      *struct {
 		Issue *struct {
@@ -167,6 +168,7 @@ type ghEvent struct {
 			Draft      bool   `json:"draft"`
 			Repository *struct {
 				FullName string `json:"full_name"`
+				Private  bool   `json:"private"`
 			} `json:"repository"`
 			PullRequest *struct {
 				MergedAt string `json:"merged_at"`
@@ -204,17 +206,24 @@ func (g github) issue(repo string, n int) (Entry, error) {
 		}
 		for _, ev := range page {
 			switch ev.Event {
-			case "commented":
+			case "commented", "reviewed":
 				login, kind := "ghost", "User"
 				if ev.User != nil {
 					login, kind = ev.User.Login, ev.User.Type
 				}
-				e.comment(login, kind, strconv.FormatInt(ev.ID, 10), ev.Association, ev.CreatedAt, ev.Body)
+				at := ev.CreatedAt
+				if ev.Event == "reviewed" {
+					at = ev.SubmittedAt
+				}
+				e.comment(login, kind, strconv.FormatInt(ev.ID, 10), ev.Association, at, ev.Body)
 			case "cross-referenced":
 				if ev.Source == nil || ev.Source.Issue == nil || ev.Source.Issue.PullRequest == nil || ev.Source.Issue.Repository == nil {
 					continue
 				}
 				src := ev.Source.Issue
+				if src.Repository.Private {
+					continue // snapshot.json is public: never name a private repo
+				}
 				if ours(src.Repository.FullName) && !ours(repo) {
 					continue // our ledger and fork PRs are our activity
 				}
@@ -245,8 +254,8 @@ const discussionQuery = `query($owner: String!, $name: String!, $number: Int!) {
       isAnswered
       comments(last: 100) {
         nodes {
-          id author { login } authorAssociation createdAt body
-          replies(last: 100) { nodes { id author { login } authorAssociation createdAt body } }
+          id author { __typename login } authorAssociation createdAt body
+          replies(last: 100) { nodes { id author { __typename login } authorAssociation createdAt body } }
         }
       }
     }
@@ -256,7 +265,8 @@ const discussionQuery = `query($owner: String!, $name: String!, $number: Int!) {
 type gqlComment struct {
 	ID     string `json:"id"`
 	Author *struct {
-		Login string `json:"login"`
+		Typename string `json:"__typename"` // Bot for a bot, whose login lacks [bot]
+		Login    string `json:"login"`
 	} `json:"author"`
 	Association string `json:"authorAssociation"`
 	CreatedAt   string `json:"createdAt"`
@@ -307,11 +317,11 @@ func (g github) discussion(repo string, n int) (Entry, error) {
 	var walk func([]gqlComment)
 	walk = func(cs []gqlComment) {
 		for _, c := range cs {
-			login := "ghost"
+			login, kind := "ghost", "User"
 			if c.Author != nil {
-				login = c.Author.Login
+				login, kind = c.Author.Login, c.Author.Typename
 			}
-			e.comment(login, "User", c.ID, c.Association, c.CreatedAt, c.Body)
+			e.comment(login, kind, c.ID, c.Association, c.CreatedAt, c.Body)
 			if c.Replies != nil {
 				walk(c.Replies.Nodes)
 			}

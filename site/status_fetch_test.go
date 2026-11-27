@@ -241,3 +241,58 @@ func TestCheckFindingsFailsWithoutWriting(t *testing.T) {
 		t.Fatalf("snapshot.json changed after a failed check:\n%s", after)
 	}
 }
+
+// A PR in a private repo can mention a finding, and the token can see it.
+// snapshot.json is public, so the private repo's name must never land in it.
+func TestCheckFindingsSkipsPrivateRepos(t *testing.T) {
+	temper.Covers(t, "site.findings_status")
+	root := statusRoot(t, "acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,,\n")
+	gh := &fakeGitHub{rest: map[string]string{
+		"/repos/acme/db/issues/7": openIssue7,
+		"/repos/acme/db/issues/7/timeline": `[
+		  {"event":"cross-referenced","source":{"type":"issue","issue":{"number":5,"state":"open","repository":{"full_name":"someone/secret","private":true},"pull_request":{"merged_at":null}}}},
+		  {"event":"cross-referenced","source":{"type":"issue","issue":{"number":9,"state":"open","repository":{"full_name":"acme/db","private":false},"pull_request":{"merged_at":null}}}}
+		]`,
+	}}
+	runCheck(t, root, gh)
+	if b := read(t, filepath.Join(root, "findings", "snapshot.json")); strings.Contains(b, "secret") {
+		t.Fatalf("snapshot.json names a private repo:\n%s", b)
+	}
+	if got := loadSnapshot(t, root)["https://github.com/acme/db/issues/7"].LinkedPRs; len(got) != 1 || got[0].Ref != "acme/db#9" {
+		t.Fatalf("linked PRs = %#v, want only acme/db#9", got)
+	}
+}
+
+// A maintainer's review is the main signal on a fix PR. Reviews count as
+// comments, dated by when they were submitted. Ours don't count.
+func TestCheckFindingsCountsReviews(t *testing.T) {
+	temper.Covers(t, "site.findings_status")
+	root := statusRoot(t, "acme/db,fix-pr,9,https://github.com/acme/db/pull/9,The fix.,open,,2026-11-17,,\n")
+	gh := &fakeGitHub{rest: map[string]string{
+		"/repos/acme/db/issues/9": `{"number":9,"state":"open","labels":[],"draft":false,"pull_request":{"merged_at":null}}`,
+		"/repos/acme/db/issues/9/timeline": `[
+		  {"event":"reviewed","id":201,"user":{"login":"turbolytics","type":"User"},"author_association":"NONE","submitted_at":"2026-11-20T10:00:00Z","state":"commented","body":"ours"},
+		  {"event":"reviewed","id":202,"user":{"login":"maint","type":"User"},"author_association":"MEMBER","submitted_at":"2026-11-26T10:00:00Z","state":"changes_requested","body":"Please add a test."}
+		]`,
+	}}
+	runCheck(t, root, gh)
+	e := loadSnapshot(t, root)["https://github.com/acme/db/pull/9"]
+	if e.OthersComments != 1 || e.Newest == nil || e.Newest.ID != "202" || e.Newest.Author != "maint" || e.Newest.Date != "2026-11-26" {
+		t.Fatalf("PR 9 = %#v (newest %#v)", e, e.Newest)
+	}
+}
+
+// GraphQL names a bot without the [bot] suffix. Its __typename says Bot.
+func TestCheckFindingsIgnoresBotsInDiscussions(t *testing.T) {
+	temper.Covers(t, "site.findings_status")
+	root := statusRoot(t, "acme/db,report,12,https://github.com/acme/db/discussions/12,A report.,posted,,2026-11-27,,\n")
+	gh := &fakeGitHub{graphql: `{"data":{"repository":{"discussion":{"closed":false,"isAnswered":false,"comments":{"nodes":[
+	  {"id":"DC_1","author":{"__typename":"Bot","login":"github-actions"},"authorAssociation":"NONE","createdAt":"2026-11-28T08:00:00Z","body":"stale","replies":{"nodes":[]}},
+	  {"id":"DC_2","author":null,"authorAssociation":"NONE","createdAt":"2026-11-27T08:00:00Z","body":"from a deleted account","replies":{"nodes":[]}}
+	]}}}}}`}
+	runCheck(t, root, gh)
+	e := loadSnapshot(t, root)["https://github.com/acme/db/discussions/12"]
+	if e.OthersComments != 1 || e.Newest == nil || e.Newest.Author != "ghost" {
+		t.Fatalf("discussion 12 = %#v (newest %#v), want only the ghost comment", e, e.Newest)
+	}
+}
