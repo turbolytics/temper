@@ -62,7 +62,7 @@ const (
 	  {"event":"cross-referenced","source":{"type":"issue","issue":{"number":9,"state":"closed","draft":false,"repository":{"full_name":"acme/db"},"pull_request":{"merged_at":"2026-11-26T20:02:32Z"}}}},
 	  {"event":"cross-referenced","source":{"type":"issue","issue":{"number":3,"state":"open","repository":{"full_name":"other/repo"}}}}
 	]`
-	mergedPR9   = `{"number":9,"state":"closed","state_reason":null,"closed_at":"2026-11-26T20:02:32Z","closed_by":null,"labels":[],"draft":false,"pull_request":{"merged_at":"2026-11-26T20:02:32Z"}}`
+	mergedPR9    = `{"number":9,"state":"closed","state_reason":null,"closed_at":"2026-11-26T20:02:32Z","closed_by":null,"labels":[],"draft":false,"pull_request":{"merged_at":"2026-11-26T20:02:32Z"}}`
 	discussion12 = `{"data":{"repository":{"discussion":{"closed":false,"isAnswered":false,"comments":{"nodes":[
 	  {"id":"DC_1","author":{"login":"turbolytics"},"authorAssociation":"NONE","createdAt":"2026-11-27T19:40:00Z","body":"ours","replies":{"nodes":[
 	    {"id":"DC_2","author":{"login":"maint"},"authorAssociation":"MEMBER","createdAt":"2026-11-28T08:00:00Z","body":"Thanks, looking."}
@@ -141,6 +141,26 @@ func TestCheckFindingsRecordsIssuesPRsAndDiscussions(t *testing.T) {
 	}
 }
 
+// Our own ledger PRs and fork PRs mention the issues they record. They are
+// our activity, not the project's, so they never count as linked PRs.
+func TestCheckFindingsIgnoresOurOwnRepos(t *testing.T) {
+	temper.Covers(t, "site.findings_status")
+	root := statusRoot(t, "acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,,\n")
+	gh := &fakeGitHub{rest: map[string]string{
+		"/repos/acme/db/issues/7": openIssue7,
+		"/repos/acme/db/issues/7/timeline": `[
+		  {"event":"cross-referenced","source":{"type":"issue","issue":{"number":68,"state":"closed","repository":{"full_name":"turbolytics/temper"},"pull_request":{"merged_at":"2026-11-27T20:00:00Z"}}}},
+		  {"event":"cross-referenced","source":{"type":"issue","issue":{"number":2,"state":"open","repository":{"full_name":"Turbolytics/db"},"pull_request":{"merged_at":null}}}},
+		  {"event":"cross-referenced","source":{"type":"issue","issue":{"number":9,"state":"open","repository":{"full_name":"acme/db"},"pull_request":{"merged_at":null}}}}
+		]`,
+	}}
+	runCheck(t, root, gh)
+	got := loadSnapshot(t, root)["https://github.com/acme/db/issues/7"].LinkedPRs
+	if len(got) != 1 || got[0] != (LinkedPR{"acme/db#9", "open"}) {
+		t.Fatalf("linked PRs = %#v, want only acme/db#9 open", got)
+	}
+}
+
 func TestCheckFindingsReportsChangesAndProposals(t *testing.T) {
 	temper.Covers(t, "site.findings_status")
 	root := statusRoot(t, "acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,,\n")
@@ -188,6 +208,13 @@ func TestCheckFindingsListsEverySplitRow(t *testing.T) {
 	out := runCheck(t, root, gh)
 	if !strings.Contains(out, "acme/db#7 (issue), items 1, 2 (ledger: fixed, reported)") || !strings.Contains(out, "proposed: needs review") {
 		t.Errorf("report =\n%s", out)
+	}
+	// Closed by a merged PR, a split issue still needs judgment: the PR may
+	// fix only one item (pydata/xarray#11899).
+	gh.rest["/repos/acme/db/issues/7"] = `{"number":7,"state":"closed","state_reason":"completed","closed_at":"2026-11-27T01:00:00Z","closed_by":{"login":"maint"},"labels":[{"name":"bug"}]}`
+	out = runCheck(t, root, gh)
+	if strings.Contains(out, "proposed: fixed") || !strings.Contains(out, "proposed: needs review") {
+		t.Errorf("a split issue got a mechanical status:\n%s", out)
 	}
 }
 

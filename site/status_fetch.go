@@ -107,7 +107,8 @@ func report(out io.Writer, changes []Change, byURL map[string][]findings.Finding
 			newest = newest || c.Field == "newest" || c.Field == "new"
 		}
 		e := cur[url]
-		if status, ok := Propose(first.Kind, e); ok {
+		// A split issue needs judgment: a fix may cover only one item.
+		if status, ok := Propose(first.Kind, e); ok && len(items) == 0 {
 			fmt.Fprintf(out, "  proposed: %s\n", status)
 		} else {
 			fmt.Fprintln(out, "  proposed: needs review")
@@ -214,6 +215,9 @@ func (g github) issue(repo string, n int) (Entry, error) {
 					continue
 				}
 				src := ev.Source.Issue
+				if ours(src.Repository.FullName) && !ours(repo) {
+					continue // our ledger and fork PRs are our activity
+				}
 				ref := fmt.Sprintf("%s#%d", src.Repository.FullName, src.Number)
 				if linked[ref] {
 					continue
@@ -371,6 +375,12 @@ func (g github) do(method, url string, body []byte, v any, h http.Header) error 
 		}
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
+}
+
+// ours reports whether an "owner/name" repo belongs to our account.
+func ours(repo string) bool {
+	owner, _, _ := strings.Cut(repo, "/")
+	return strings.EqualFold(owner, ourLogin)
 }
 
 var nextLink = regexp.MustCompile(`<([^>]+)>;\s*rel="next"`)
