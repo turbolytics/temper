@@ -235,7 +235,8 @@ func TestMethodPageMatchesTheHarness(t *testing.T) {
 	page := html.UnescapeString(read(t, filepath.Join(build(t, false), "compatibility", "method", "index.html")))
 	for _, want := range []string{
 		// The score: five lists, tested features only, coverage beside it.
-		"SQL commands, query syntax, functions, operators and data types",
+		"scores five lists, less what your product doesn't claim:",
+		"<li>SQL commands</li>", "<li>Query syntax</li>", "<li>Functions</li>", "<li>Operators</li>", "<li>Data types</li>",
 		"Untested and undecided features are left out of the score", "coverage",
 		// Attribution as compat/verdict.py decides it: a match proves only
 		// where PostgreSQL answered without an error, a failure whose
