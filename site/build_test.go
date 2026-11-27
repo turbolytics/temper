@@ -348,6 +348,37 @@ func TestBreadthLeavesOutOurProjects(t *testing.T) {
 	}
 }
 
+// The findings page features how many reported bugs maintainers fixed.
+// Each item of a split issue counts on its own, as it does in the issue
+// count.
+func TestBreadthFeaturesFixedBugs(t *testing.T) {
+	temper.Covers(t, "site.findings")
+	rows := csvHeader +
+		"acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,fixed,,2026-11-17,,\n" +
+		"acme/db,issue,8,https://github.com/acme/db/issues/8,Bug one.,fixed,,2026-11-17,,1\n" +
+		"acme/db,issue,8,https://github.com/acme/db/issues/8,Bug two.,reported,,2026-11-17,,2\n" +
+		"beta/kv,fix-pr,3,https://github.com/beta/kv/pull/3,A fix.,merged,,2026-11-17,,\n"
+	root := fakeRoot(t, rows, `{"posthog_key": "", "posthog_host": ""}`)
+	out := t.TempDir()
+	if err := Build(Options{Root: root, Out: out}); err != nil {
+		t.Fatal(err)
+	}
+	page := read(t, filepath.Join(out, "findings/index.html"))
+	if !strings.Contains(page, `3 issues · <strong class="fixed-count">2 fixed</strong> · 1 pull request`) {
+		t.Errorf("findings summary does not feature the fixed count:\n%s", page)
+	}
+
+	// With nothing fixed, the summary leaves the count out.
+	rows = csvHeader + "acme/db,issue,7,https://github.com/acme/db/issues/7,A bug.,reported,,2026-11-17,,\n"
+	root = fakeRoot(t, rows, `{"posthog_key": "", "posthog_host": ""}`)
+	if err := Build(Options{Root: root, Out: out}); err != nil {
+		t.Fatal(err)
+	}
+	if page := read(t, filepath.Join(out, "findings/index.html")); strings.Contains(page, "fixed-count") {
+		t.Errorf("a summary with no fixed bugs shows a fixed count")
+	}
+}
+
 // A report counts on its own, never as an issue or a pull request.
 func TestBreadthCountsReports(t *testing.T) {
 	temper.Covers(t, "site.findings")

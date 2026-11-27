@@ -81,6 +81,7 @@ var caseStudies = []caseStudy{
 // only, never ours.
 type home struct {
 	Issues, Projects, PRs, Reports      int
+	Fixed                               int    // issue rows maintainers fixed
 	Stars                               string // combined GitHub stars, formatted
 	HasOurs                             bool   // the findings include a Turbolytics project
 	IssueStatus, PRStatus, ReportStatus []count
@@ -313,6 +314,9 @@ func summarize(projects []project) home {
 			case it.IsIssue():
 				h.Issues++
 				issues[it.Status]++
+				if it.Status == "fixed" {
+					h.Fixed++
+				}
 			case it.IsReport():
 				h.Reports++
 				reports[it.Status]++
