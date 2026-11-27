@@ -59,6 +59,23 @@ When a status changes, edit one row and commit, for example
 `findings: zarr-python#4645 confirmed`. The site rebuilds on the next push to
 `main`.
 
+## Checking for changes
+
+`make findings-check` reads every URL in `findings.csv` from GitHub and
+records the fields that decide a status in `snapshot.json`. It records the
+state, the close reason, who closed it, merged and draft, labels, the PRs
+that mention the item, and the newest comment by someone else. Our own
+comments and bots' comments don't count. Then it prints each field that
+changed since the last snapshot.
+
+For a change a rule can decide, the check proposes a status. A merged PR is
+`merged`, and an issue closed by a merged PR is `fixed`. Anything else says
+`needs review`, with the newest comment, for a person or an LLM to judge.
+
+The check never edits `findings.csv`. Update the rows it flags, then commit
+them together with `snapshot.json`. The first run, with no snapshot, records
+a baseline and reports nothing.
+
 ## projects.csv
 
 `projects.csv` holds one row per project that `findings.csv` names: its

@@ -25,4 +25,5 @@ site.compatibility_offer: {unit: covered, integration: not_required}
 site.compatibility_reports: {unit: covered, integration: not_required}
 site.contact: {unit: covered, integration: not_required}
 site.findings: {unit: covered, integration: not_required}
+site.findings_status: {unit: covered, integration: not_required}
 site.reading_measure: {unit: covered, integration: not_required}

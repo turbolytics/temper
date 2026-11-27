@@ -2,9 +2,9 @@
 <!-- temper matrix format: 3 -->
 # temper matrix
 
-**26 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
+**27 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
 
-✅ 69 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
+✅ 70 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
 
 Each cell is one claim in `temper/` at one level. It is covered when a test that ran
 at that level passed and none failed: a skip proves nothing, and a pass never hides
@@ -40,6 +40,7 @@ What the system does. Each feature is proven at the levels it requires.
 | `cli.guide` | Prints the guide an LLM or a person needs to work in a Temper project, matching the installed version. | ✅ | ✅ |
 | `cli.version` | Prints the name, Temper by Turbolytics, and the version the binary was built as, whether stamped at release or installed with go install. | ✅ | ✅ |
 | `site.findings` | Holds findings.csv, the public record of what Temper helped find, to its rules, and builds the Temper site from it. The findings page features how many of the reported bugs maintainers have fixed. | ✅ | — |
+| `site.findings_status` | Checks every finding's GitHub issue, PR or Discussion, records the fields that decide its status in findings/snapshot.json, and reports each field that changed since the last check, with a proposed status where a rule decides it. | ✅ | — |
 | `site.case_studies` | Builds the Case Studies pages, audits written up with the project's approval, linked from the top-level nav and from each project's findings. | ✅ | — |
 | `site.contact` | Builds the Contact page, the consulting offers grouped by who buys them with a call link and email, and points every contact link on the site to it so no visitor leaves the site to reach us. | ✅ | — |
 | `site.compatibility_reports` | Features compatibility reports on the home page and the Contact page, saying what a report tests and delivers (a co-branded hosted matrix, a PDF, a badge and reruns on every release) and that it stays independent. | ✅ | — |
