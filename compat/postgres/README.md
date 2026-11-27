@@ -20,5 +20,5 @@ make check-compat-postgres RESULTS=../compat-results  # check the committed resu
 | Piece | Where |
 |---|---|
 | Reference | `reference`: PostgreSQL 17.12, matching `recipe/oracle/PG_TAG`. |
-| Subjects | `pg_duckdb`: pg_duckdb 1.2.1 on PostgreSQL 17.12. Side b sets `duckdb.force_execution`. |
+| Subjects | `pg_duckdb`: pg_duckdb 1.2.2 on PostgreSQL 17.12. Side b sets `duckdb.force_execution`. |
 | Oracle | `recipe/oracle`: Python. `docker compose run --rm oracle pytest -q` runs its tests. |

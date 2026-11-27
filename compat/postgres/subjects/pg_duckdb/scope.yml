@@ -1,4 +1,4 @@
-# What pg_duckdb claims, from its own docs at v1.2.1, and so what its score
+# What pg_duckdb claims, from its own docs at v1.2.2, and so what its score
 # counts. Statements PostgreSQL runs in DuckDB's place are also detected, one
 # by one, by the harness (EXPLAIN shows no DuckDB scan).
 claim:

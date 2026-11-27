@@ -20,7 +20,7 @@ SUBJECTS = {
     },
     "pg_duckdb.release": {
         "feature": "subject.pg_duckdb",
-        "doc": "pg_duckdb 1.2.1 on PostgreSQL 17.12, three servers. Side b sets duckdb.force_execution = true; sides a and a2 run without it.",
+        "doc": "pg_duckdb 1.2.2 on PostgreSQL 17.12, three servers. Side b sets duckdb.force_execution = true; sides a and a2 run without it.",
     },
 }
 
