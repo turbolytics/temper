@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -105,7 +104,7 @@ func TestMethodPagePinsVersionsAndReproduces(t *testing.T) {
 	page := read(t, filepath.Join(build(t, false), "compatibility", "method", "index.html"))
 	for _, want := range []string{
 		"postgres:17.12@sha256:87c8b42f423b45d5247e6aa8fdb2e7762fec164c68a50fe3eb07e7bfcaf4dbcf",
-		"REL_17_12", "pglast", "7.25", "psycopg", "3.3.9", "Django", "6.1.3", "pg_dump", "31,484",
+		"REL_17_12", "pglast", "7.25", "psycopg", "3.3.9", "Django", "6.1.3", "pg_dump",
 		"make compat-postgres", `href="../postgres-17/"`,
 		"github.com/turbolytics/temper/tree/main/compat/postgres",
 	} {
@@ -195,7 +194,7 @@ func TestInventoryDownloadsAsJSON(t *testing.T) {
 }
 
 // The method page carries the method's version and date, the publication
-// rules, the noise count, and the corpus skew.
+// rules, and the corpus skew among its limits.
 func TestMethodPageVersionRulesAndSkew(t *testing.T) {
 	temper.Covers(t, "site.compatibility")
 	out := build(t, false)
@@ -203,10 +202,7 @@ func TestMethodPageVersionRulesAndSkew(t *testing.T) {
 	for _, want := range []string{
 		"Method version 1.0", "2026-11-26",
 		"at least 7 days", "only with the vendor's approval",
-		"139", "0.27%",
-		"attributed to",
 		"Django and psycopg make up 99.4% of the logged statements", "JDBC", "node-postgres",
-		"<td>64.1%</td>",
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("method page lacks %q", want)
@@ -237,20 +233,18 @@ func TestMethodPageMatchesTheHarness(t *testing.T) {
 		// The score: five lists, tested features only, coverage beside it.
 		"scores five lists, less what your product doesn't claim:",
 		"<li>SQL commands</li>", "<li>Query syntax</li>", "<li>Functions</li>", "<li>Operators</li>", "<li>Data types</li>",
-		"Untested and undecided features are left out of the score", "coverage",
-		// Attribution as compat/verdict.py decides it: a match proves only
-		// where PostgreSQL answered without an error, and a failure whose
-		// features are all proven blames none.
-		"PostgreSQL itself answered without an error",
-		"attributed to none of them",
+		"The score always appears with its coverage and the counts of crashes and silent wrong answers.",
+		// The method in one paragraph: two PostgreSQL servers, noise dropped,
+		// clean against itself.
+		"two PostgreSQL 17.12 servers", "When the two PostgreSQL servers disagree, we drop the statement",
+		"Run against PostgreSQL itself, the harness finds no differences.",
 		// The outcomes live in the harness's README, one link away.
 		"compat/postgres#outcomes",
 		// Scope and fairness.
 		"public documentation", "claiming less",
-		"Payment never changes results", `We test <a href="../../findings/">popular open-source projects</a>.`,
+		"We'll never change our answers based on payment.", `We test <a href="../../findings/">popular open-source projects</a>.`,
 		"dispute",
-		// The four terms, and a sample.
-		"The method", "The harness", "A report", "Your product",
+		// A sample finding.
 		"Illustrative",
 		"What a paid report includes",
 	} {
@@ -274,28 +268,27 @@ func TestMethodPageMatchesTheHarness(t *testing.T) {
 			t.Errorf("compat/postgres/README.md lacks %q", want)
 		}
 	}
-	// The control numbers come from compat/postgres/METHOD.
-	method := read(t, "../compat/postgres/METHOD")
-	for _, key := range []string{"control_statements", "control_matched", "control_noise"} {
-		m := regexp.MustCompile(`(?m)^` + key + `:\s*(\d+)`).FindStringSubmatch(method)
-		if m == nil {
-			t.Fatalf("METHOD has no %s", key)
-		}
-		n, _ := strconv.Atoi(m[1])
-		if !strings.Contains(page, commas(n)) {
-			t.Errorf("method page lacks %s = %s", key, commas(n))
-		}
-	}
 }
 
-// The method page reads in skimming order: why to trust it, the score,
-// how statements end, what it checks, its limits, then reference material,
-// with the terms in a glossary at the end.
-func TestMethodPageReadsInSkimmingOrder(t *testing.T) {
+// The method page leads with what a report gives a technical leader, then
+// the method in one paragraph, a sample finding, independence, what a paid
+// report includes and its limits. Reference material comes last.
+func TestMethodPageLeadsWithTheValue(t *testing.T) {
 	temper.Covers(t, "site.compatibility")
 	page := html.UnescapeString(read(t, filepath.Join(build(t, false), "compatibility", "method", "index.html")))
+	for _, want := range []string{
+		"<h1>What a compatibility report gives you</h1>",
+		"as an independent third party",
+		"Bugs found before your customers find them.",
+		"Your bug surface area.",
+		"A claim you can back up.",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("method page lacks %q", want)
+		}
+	}
 	last := -1
-	for _, h := range []string{"Fairness", "The score", "The inventory", "The corpus", "Limits", "Pinned versions", "Reproduce it", "Glossary"} {
+	for _, h := range []string{"What you get", "How it works", "What a finding looks like", "Independent by design", "What a paid report includes", "Limits", "Pinned versions", "Reproduce it"} {
 		i := strings.Index(page, "<h2>"+h+"</h2>")
 		if i < 0 {
 			t.Fatalf("method page has no %q section", h)
@@ -305,13 +298,13 @@ func TestMethodPageReadsInSkimmingOrder(t *testing.T) {
 		}
 		last = i
 	}
-	if !strings.Contains(page, "The score always appears with its coverage and the counts of crashes and silent wrong answers.") {
-		t.Error("the score section lacks the headline rule")
+	// The method is one paragraph, not a section per mechanism.
+	for _, gone := range []string{"From statements to features", "How a statement is compared", "Checking the harness", "<h2>Glossary</h2>", "<h2>The corpus</h2>"} {
+		if strings.Contains(page, gone) {
+			t.Errorf("method page still carries %q", gone)
+		}
 	}
-	if strings.Contains(page, "This page uses four terms") {
-		t.Error("the terms paragraph is still at the top")
-	}
-	if strings.Count(page, "<h1>PostgreSQL compatibility, tested</h1>") > 0 {
+	if strings.Contains(page, "<h1>PostgreSQL compatibility, tested</h1>") {
 		t.Error("the method page repeats the short page's headline")
 	}
 }
