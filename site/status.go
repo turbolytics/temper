@@ -40,6 +40,7 @@ type Entry struct {
 	OthersComments int        `json:"others_comments"`
 	Newest         *Comment   `json:"newest,omitempty"`
 	NewestBody     string     `json:"-"` // for the report, never stored
+	newestTime     string     // the newest comment's full timestamp, to compare
 }
 
 // Snapshot is every finding's entry, keyed by the row's URL.
