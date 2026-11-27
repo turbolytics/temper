@@ -23,6 +23,9 @@ x-doltgres: &doltgres
   platform: linux/arm64
   environment: {DOLTGRES_USER: postgres, DOLTGRES_PASSWORD: postgres}
   healthcheck: {test: [CMD, pg_isready, -h, 127.0.0.1, -U, postgres], interval: 2s, retries: 60}
+  # If its process dies, Docker restarts it. Its databases live in the
+  # container, so they survive, and the oracle reconnects.
+  restart: on-failure
 
 services:
   reference: *reference        # postgres.reference side a; also names types for the oracle

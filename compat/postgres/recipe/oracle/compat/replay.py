@@ -77,6 +77,13 @@ def session_for(subject: str) -> list:
     return list(own) if own else list(SESSION)
 
 
+def reconnect_wait_s(subject: str) -> int:
+    """How long to keep trying to reopen a side after its session is lost. A
+    server that ignores timeouts can keep working on a dropped statement for
+    minutes, so such a subject gets ten."""
+    return 600 if db.SUBJECTS[subject].client_timeout_s else 90
+
+
 def _settings(conn, subject, side, timeout_ms):
     for s in session_for(subject) + [f"SET statement_timeout = {int(timeout_ms)}"]:
         conn.execute(s)
@@ -357,8 +364,8 @@ class _Sides:
             c = self._reopen(side)
         return c
 
-    def _reopen(self, side, wait_s=90):
-        deadline = time.time() + wait_s
+    def _reopen(self, side, wait_s=None):
+        deadline = time.time() + (wait_s if wait_s is not None else reconnect_wait_s(self.subject))
         while True:
             try:
                 c = open_side(self.subject, side, self.name(side), self.timeout_ms)

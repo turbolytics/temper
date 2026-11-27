@@ -78,3 +78,12 @@ def test_every_subject_has_a_topology_in_the_scenario():
         assert subject in topology, f"{subject} has no topology in the compat scenario"
         for host in (s.host_a, s.host_a2, s.host_b):
             assert host in topology[subject], f"{subject}: {host} is not started"
+
+
+def test_doltgres_reconnects_for_up_to_ten_minutes():
+    # A statement Doltgres keeps running after the harness drops it can leave
+    # the server unresponsive for minutes. 90 seconds ended a run at 16,077
+    # statements.
+    from compat.replay import reconnect_wait_s
+    assert reconnect_wait_s("doltgres.release") == 600
+    assert reconnect_wait_s("pg_duckdb.release") == 90
