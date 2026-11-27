@@ -8,12 +8,9 @@ x-reference: &reference
   environment: {POSTGRES_PASSWORD: postgres}
   healthcheck: {test: [CMD, pg_isready, -U, postgres], interval: 2s, retries: 30}
 
-# pg_duckdb v1.2.1, the newest release with a linux/arm64 image (v1.2.2 is
-# amd64 only, and its DuckDB build needs CPU instructions Rosetta lacks).
-# v1.2.2 adds only a CA-bundle loader and PG 19 builds. Pinned to the arm64
-# manifest.
+# pg_duckdb v1.2.2, pinned to its linux/arm64 manifest.
 x-pg_duckdb: &pg_duckdb
-  image: pgduckdb/pgduckdb:17-v1.2.1@sha256:cd7e1574f68b3f6bf179d4f13dc6ff3ebe506730c95b27b51b861cca5a1eaeea
+  image: pgduckdb/pgduckdb:17-v1.2.2@sha256:d016d755c242b8c4b56aa55f0ab5bd3c4f230e5b164e26c358906c6de4922862
   platform: linux/arm64
   environment: {POSTGRES_PASSWORD: postgres}
   volumes: [./recipe/pg_duckdb/init.sql:/docker-entrypoint-initdb.d/zz-compat.sql:ro]

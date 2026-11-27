@@ -1,7 +1,7 @@
 # Differences pg_duckdb's own docs already list. A statement whose difference
 # one of these rules matches is "documented", not "differs": it still counts
 # against the score, in its own column. Each rule cites the doc it comes from,
-# at duckdb/pg_duckdb v1.2.1.
+# at duckdb/pg_duckdb v1.2.2.
 #
 # A rule matches when every condition it gives holds:
 #   b_error:  regex on the subject's error message
