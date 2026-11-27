@@ -65,3 +65,16 @@ def test_drop_db_works_without_with_force():
     with psycopg.connect(host=host("doltgres.release", "b"), user=USER, password=PASSWORD,
                          dbname="postgres", autocommit=True) as c:
         assert c.execute("SELECT 1 FROM pg_database WHERE datname = 'cmp_b_dropme'").fetchone() is None
+
+
+def test_every_subject_has_a_topology_in_the_scenario():
+    # temper runs a subject only when the scenario names its containers.
+    import yaml
+    from compat.subjects import SCENARIO_HEAD
+    topology = yaml.safe_load(SCENARIO_HEAD.split("covers:")[0] + "\n")[0]["subjects"]
+    for subject, s in SUBJECTS.items():
+        if subject.endswith(".control"):
+            continue  # the control runs on its subject's containers
+        assert subject in topology, f"{subject} has no topology in the compat scenario"
+        for host in (s.host_a, s.host_a2, s.host_b):
+            assert host in topology[subject], f"{subject}: {host} is not started"
