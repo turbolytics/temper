@@ -26,6 +26,10 @@ x-doltgres: &doltgres
   # If its process dies, Docker restarts it. Its databases live in the
   # container, so they survive, and the oracle reconnects.
   restart: on-failure
+  # Some queries make Doltgres use memory without bound. The cap keeps the
+  # kernel's out-of-memory kill inside this container, so the oracle and the
+  # PostgreSQL servers survive it.
+  mem_limit: 4g
 
 services:
   reference: *reference        # postgres.reference side a; also names types for the oracle
@@ -40,6 +44,7 @@ services:
 
   oracle:
     build: recipe/oracle
+    oom_score_adj: -1000         # never the kernel's choice when a subject exhausts memory
     volumes:
       - ./recipe/oracle:/oracle
       - ./corpus:/corpus
