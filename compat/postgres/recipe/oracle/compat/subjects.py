@@ -22,6 +22,10 @@ SUBJECTS = {
         "feature": "subject.pg_duckdb",
         "doc": "pg_duckdb 1.2.2 on PostgreSQL 17.12, three servers. Side b sets duckdb.force_execution = true; sides a and a2 run without it.",
     },
+    "doltgres.release": {
+        "feature": "subject.doltgres",
+        "doc": "Doltgres 1.5.3 (dolthub/doltgresql:1.5.3), its own server, compared with two PostgreSQL 17.12 servers.",
+    },
 }
 
 

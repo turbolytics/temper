@@ -241,3 +241,17 @@ def test_a_real_value_difference_is_not_masked():
     a = _r([["o", "oid"], ["x", "integer"]], [["40873", "3"]])
     b = _r([["o", "oid"], ["x", "integer"]], [["40875", "4"]])
     assert not replay.server_local_only(a, b, False)
+
+
+def test_a_statement_with_no_answer_times_out_on_the_client():
+    # Doltgres ignores statement_timeout and cancel requests, so the harness
+    # drops the connection and records PostgreSQL's timeout code.
+    import time
+    from compat import db, replay
+    from compat.corpus import Stmt
+    conn = db.connect("doltgres.release", "b")
+    t0 = time.time()
+    r = replay.execute(conn, Stmt("t:x", 1, "SELECT pg_sleep(5)"), "b", timeout_s=1)
+    assert time.time() - t0 < 4
+    assert r["sqlstate"] == "57014" and r.get("timeout") is True
+    assert conn.closed or conn.broken

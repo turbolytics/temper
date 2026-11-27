@@ -1,0 +1,51 @@
+# What Doltgres claims, from its own docs at v1.5.3, and so what its score
+# counts. Doltgres is its own server: every statement it answers is its own,
+# so the harness has no engine to detect.
+claim:
+  cite: "README.md: \"Connect to your Doltgres server just like any Postgres database to read or modify schema and data.\" and \"Import your existing Postgres database into Doltgres with pg_dump and psql\""
+not_claimed:
+  # The inventory is PostgreSQL 17's. These members are absent from a
+  # PostgreSQL 15 server's catalogs (postgres:15.15, the 15 series' current
+  # patch release; minor releases add no features).
+  - members: ["sql.function/any_value",
+              "sql.function/array_sample",
+              "sql.function/array_shuffle",
+              "sql.function/date_add",
+              "sql.function/date_subtract",
+              "sql.function/erf",
+              "sql.function/erfc",
+              "sql.function/icu_unicode_version",
+              "sql.function/json_agg_strict",
+              "sql.function/json_object_agg_strict",
+              "sql.function/json_object_agg_unique",
+              "sql.function/json_object_agg_unique_strict",
+              "sql.function/jsonb_agg_strict",
+              "sql.function/jsonb_object_agg_strict",
+              "sql.function/jsonb_object_agg_unique",
+              "sql.function/jsonb_object_agg_unique_strict",
+              "sql.function/jsonb_populate_record_valid",
+              "sql.function/pg_available_wal_summaries",
+              "sql.function/pg_basetype",
+              "sql.function/pg_column_toast_chunk_id",
+              "sql.function/pg_get_wal_summarizer_state",
+              "sql.function/pg_input_error_info",
+              "sql.function/pg_input_is_valid",
+              "sql.function/pg_log_standby_snapshot",
+              "sql.function/pg_split_walfile_name",
+              "sql.function/pg_sync_replication_slots",
+              "sql.function/pg_wal_summary_contents",
+              "sql.function/random_normal",
+              "sql.function/system_user",
+              "sql.function/to_bin",
+              "sql.function/to_oct",
+              "sql.function/to_regtypemod",
+              "sql.function/unicode_assigned",
+              "sql.function/unicode_version"]
+    why: "Functions added in PostgreSQL 16 or 17. Doltgres reports itself as PostgreSQL 15.5."
+    cite: "server/functions/version.go at v1.5.3: version() returns \"PostgreSQL 15.5\""
+  - members: ["sql.syntax/IS JSON", "sql.syntax/JSON constructor", "sql.syntax/JSON query function", "sql.syntax/JSON_TABLE", "sql.syntax/MERGE RETURNING"]
+    why: "Syntax added in PostgreSQL 16 (IS JSON, the JSON constructors) or 17 (the JSON query functions, JSON_TABLE, MERGE RETURNING). Doltgres reports itself as PostgreSQL 15.5."
+    cite: "server/functions/version.go at v1.5.3: version() returns \"PostgreSQL 15.5\"; PostgreSQL 16 and 17 release notes"
+  - members: ["sql.command/CREATE EXTENSION", "sql.command/ALTER EXTENSION", "sql.command/DROP EXTENSION"]
+    why: "Doltgres lists limited extension support among its limitations."
+    cite: "README.md, Limitations and differences from Dolt: \"Limited extension support.\""

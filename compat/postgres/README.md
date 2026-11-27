@@ -21,6 +21,7 @@ make check-compat-postgres RESULTS=../compat-results  # check the committed resu
 |---|---|
 | Reference | `reference`: PostgreSQL 17.12, matching `recipe/oracle/PG_TAG`. |
 | Subjects | `pg_duckdb`: pg_duckdb 1.2.2 on PostgreSQL 17.12. Side b sets `duckdb.force_execution`. |
+|  | `doltgres`: Doltgres 1.5.3, its own server, against two PostgreSQL 17.12 servers. The oracle times out its statements after 30 seconds, because Doltgres ignores `statement_timeout`. |
 | Oracle | `recipe/oracle`: Python. `docker compose run --rm oracle pytest -q` runs its tests. |
 
 ## Outcomes

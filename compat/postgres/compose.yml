@@ -16,6 +16,14 @@ x-pg_duckdb: &pg_duckdb
   volumes: [./recipe/pg_duckdb/init.sql:/docker-entrypoint-initdb.d/zz-compat.sql:ro]
   healthcheck: {test: [CMD, pg_isready, -U, postgres], interval: 2s, retries: 60}
 
+# Doltgres 1.5.3, its own server, pinned to its linux/arm64 manifest. It
+# ignores statement_timeout, so the oracle times out its statements itself.
+x-doltgres: &doltgres
+  image: dolthub/doltgresql:1.5.3@sha256:408ab84bb6f64d05a1c34969674b56eeb5d17859583c802025e21e969ce7ea71
+  platform: linux/arm64
+  environment: {DOLTGRES_USER: postgres, DOLTGRES_PASSWORD: postgres}
+  healthcheck: {test: [CMD, pg_isready, -h, 127.0.0.1, -U, postgres], interval: 2s, retries: 60}
+
 services:
   reference: *reference        # postgres.reference side a; also names types for the oracle
   reference_a2: *reference
@@ -23,6 +31,9 @@ services:
   pg_duckdb_a: *pg_duckdb      # pg_duckdb.release sides a and a2: no force_execution
   pg_duckdb_a2: *pg_duckdb
   pg_duckdb: *pg_duckdb        # pg_duckdb.release side b: SET duckdb.force_execution = true
+  doltgres_ref_a: *reference   # doltgres.release sides a and a2: fresh PostgreSQL servers
+  doltgres_ref_a2: *reference
+  doltgres: *doltgres          # doltgres.release side b
 
   oracle:
     build: recipe/oracle
@@ -44,6 +55,9 @@ services:
       pg_duckdb_a: {condition: service_healthy}
       pg_duckdb_a2: {condition: service_healthy}
       pg_duckdb: {condition: service_healthy}
+      doltgres_ref_a: {condition: service_healthy}
+      doltgres_ref_a2: {condition: service_healthy}
+      doltgres: {condition: service_healthy}
 
   # Capturing application traffic (recipe/capture.sh APP): a reference server
   # that logs every statement, and the application's own test suite run

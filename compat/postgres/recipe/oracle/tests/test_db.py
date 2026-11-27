@@ -29,3 +29,39 @@ def test_side_b_of_pg_duckdb_has_force_execution_on():
         assert c.execute("SHOW duckdb.force_execution").fetchone()[0] == "on"
     with connect("pg_duckdb.release", "a") as c:
         assert c.execute("SHOW duckdb.force_execution").fetchone()[0] == "off"
+
+
+def test_doltgres_runs_against_its_own_postgres_servers():
+    # Fresh reference servers: roles left by another subject's run would
+    # make sides a and a2 disagree with a fresh Doltgres.
+    s = SUBJECTS["doltgres.release"]
+    assert len({s.host_a, s.host_a2, s.host_b}) == 3
+    assert s.host_b == "doltgres"
+    assert {s.host_a, s.host_a2}.isdisjoint({SUBJECTS["postgres.reference"].host_a, SUBJECTS["postgres.reference"].host_a2})
+    assert s.engine_check is None
+
+
+def test_doltgres_sessions_use_a_zone_it_knows_on_every_side():
+    # Doltgres rejects PST8PDT. All three sides use America/Los_Angeles,
+    # which has PST8PDT's current rules, so the comparison stays fair.
+    from compat.replay import session_for
+    for side in ("a", "a2", "b"):
+        assert "SET TimeZone = 'America/Los_Angeles'" in session_for("doltgres.release")
+    assert "SET TimeZone = 'PST8PDT'" in session_for("pg_duckdb.release")
+
+
+def test_doltgres_has_a_client_side_timeout():
+    # Doltgres ignores statement_timeout and cancel requests.
+    assert SUBJECTS["doltgres.release"].client_timeout_s == 30
+    assert SUBJECTS["pg_duckdb.release"].client_timeout_s == 0
+
+
+def test_drop_db_works_without_with_force():
+    from compat.db import connect, drop_db, host, USER, PASSWORD
+    import psycopg
+    with connect("doltgres.release", "b", "cmp_b_dropme") as c:
+        c.execute("SELECT 1")
+    drop_db("doltgres.release", "b", "cmp_b_dropme")
+    with psycopg.connect(host=host("doltgres.release", "b"), user=USER, password=PASSWORD,
+                         dbname="postgres", autocommit=True) as c:
+        assert c.execute("SELECT 1 FROM pg_database WHERE datname = 'cmp_b_dropme'").fetchone() is None

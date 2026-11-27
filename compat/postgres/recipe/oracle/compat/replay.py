@@ -15,8 +15,11 @@ One line per statement, with one outcome:
 """
 import hashlib
 import json
+import os
 import re
+import socket
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -67,8 +70,15 @@ def _text_everything(conn):
         conn.adapters.register_loader(oid, _Text)
 
 
+def session_for(subject: str) -> list:
+    """The session settings every side of a subject gets: pg_regress's, or
+    the subject's own where it can't take them."""
+    own = db.SUBJECTS[subject].session
+    return list(own) if own else list(SESSION)
+
+
 def _settings(conn, subject, side, timeout_ms):
-    for s in SESSION + [f"SET statement_timeout = {int(timeout_ms)}"]:
+    for s in session_for(subject) + [f"SET statement_timeout = {int(timeout_ms)}"]:
         conn.execute(s)
     for s in db.setup(subject, side):
         conn.execute(s)
@@ -106,10 +116,35 @@ def _digest(rows):
     return hashlib.sha256(json.dumps(rows).encode()).hexdigest()[:16]
 
 
+def _drop_after(conn, seconds):
+    """A timer that shuts the connection's socket after seconds, for a server
+    that ignores statement_timeout and cancel requests. Its .fired says
+    whether it did."""
+    timer = threading.Timer(seconds, lambda: None)
+
+    def fire():
+        timer.fired = True
+        try:
+            s = socket.socket(fileno=os.dup(conn.fileno()))
+            s.shutdown(socket.SHUT_RDWR)
+            s.close()
+        except OSError:
+            pass
+    timer.fired = False
+    timer.function = fire
+    timer.daemon = True
+    return timer
+
+
 def execute(conn, stmt, side, **kw):
-    """Run one statement; return {cols, rows, digest, sqlstate, error}."""
+    """Run one statement; return {cols, rows, digest, sqlstate, error}. With
+    timeout_s, a statement that hasn't answered by then drops the connection
+    and returns PostgreSQL's timeout code, 57014, marked "timeout"."""
     sql = kw.get("sql") or stmt.sql
     out = {"cols": None, "rows": None, "digest": None, "sqlstate": None, "error": None}
+    timer = _drop_after(conn, kw["timeout_s"]) if kw.get("timeout_s") else None
+    if timer:
+        timer.start()
     try:
         with conn.cursor(binary=False) as cur:
             if COPY_OUT.search(sql):
@@ -136,6 +171,10 @@ def execute(conn, stmt, side, **kw):
                 if len(rows) >= MAX_ROWS:
                     out["truncated"] = True
     except psycopg.OperationalError as e:
+        if timer and timer.fired:
+            out.update(sqlstate="57014", error=f"harness: no answer within {kw['timeout_s']:g}s; the connection was dropped",
+                       timeout=True)
+            return out
         if conn.closed or conn.broken:
             raise  # the session is gone: a crash, for the caller to record
         out["sqlstate"] = getattr(e, "sqlstate", None) or "08000"
@@ -151,7 +190,10 @@ def execute(conn, stmt, side, **kw):
         out["sqlstate"] = "HX000"
         out["error"] = f"harness: {e}"[:300]
     finally:
-        _utf8(conn)
+        if timer:
+            timer.cancel()
+        if not out.get("timeout"):
+            _utf8(conn)
     return out
 
 
@@ -410,7 +452,13 @@ def _one(subject, subj, sides, stmt, rules, inv=None) -> dict:
     for side in ("a", "a2", "b"):
         conn = sides.get(side)
         try:
-            results[side] = execute(conn, stmt, side, sql=sql)
+            results[side] = execute(conn, stmt, side, sql=sql,
+                                    timeout_s=subj.client_timeout_s if side == "b" else 0)
+            if results[side].get("timeout"):
+                # The dropped session's state is gone: later differences are knock-ons.
+                sides.tainted = True
+                sides.conns.pop(side, None)
+                continue
             if side == "b" and subj.engine_check:
                 engine = _engine_after(conn, sql, query, results["b"])
         except psycopg.OperationalError as e:
