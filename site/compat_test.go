@@ -276,6 +276,34 @@ func TestMethodPageMatchesTheHarness(t *testing.T) {
 	}
 }
 
+// The method page reads in skimming order: why to trust it, the score,
+// how statements end, what it checks, its limits, then reference material,
+// with the terms in a glossary at the end.
+func TestMethodPageReadsInSkimmingOrder(t *testing.T) {
+	temper.Covers(t, "site.compatibility")
+	page := html.UnescapeString(read(t, filepath.Join(build(t, false), "compatibility", "method", "index.html")))
+	last := -1
+	for _, h := range []string{"Fairness", "The score", "Outcomes", "The inventory", "The corpus", "Limits", "Pinned versions", "Reproduce it", "Glossary"} {
+		i := strings.Index(page, "<h2>"+h+"</h2>")
+		if i < 0 {
+			t.Fatalf("method page has no %q section", h)
+		}
+		if i < last {
+			t.Errorf("%q comes too early", h)
+		}
+		last = i
+	}
+	if !strings.Contains(page, "The score always appears with its coverage and the counts of crashes and silent wrong answers.") {
+		t.Error("the score section lacks the headline rule")
+	}
+	if strings.Contains(page, "This page uses four terms") {
+		t.Error("the terms paragraph is still at the top")
+	}
+	if strings.Count(page, "<h1>PostgreSQL compatibility, tested</h1>") > 0 {
+		t.Error("the method page repeats the short page's headline")
+	}
+}
+
 // The Compatibility page is one screen for a buyer: a headline, one
 // sentence, three points and a button that opens an email asking for the
 // product, the Postgres version it targets and a reply address. The method
@@ -285,13 +313,17 @@ func TestCompatibilityPageIsOneScreenForABuyer(t *testing.T) {
 	out := build(t, false)
 	page := html.UnescapeString(read(t, filepath.Join(out, "compatibility", "index.html")))
 	for _, want := range []string{
-		"<h1>Is your database really Postgres-compatible?</h1>",
-		"plain Postgres 17",
-		"Wrong answers first.", "one-line repro",
-		"Scored feature by feature.", "2,301 Postgres 17 features", "Django, psycopg and pg_dump",
-		"Private by default.", "review it before anything is published",
-		"Get a compatibility report",
-		"reproducible with one command", `href="method/"`,
+		"<h1>PostgreSQL compatibility, tested</h1>",
+		"We run tens of thousands of real PostgreSQL statements on your product and on PostgreSQL 17, and compare every answer.",
+		// The headline every report opens with, blank until a published
+		// report can fill it.
+		"Every report opens with one line:",
+		"Matches PostgreSQL on __% of tested features · __ features tested · __ crashes · __ silent wrong answers",
+		"Real workloads.", "2,301 PostgreSQL 17 features, exercised by PostgreSQL's own tests and by Django, psycopg and pg_dump.",
+		"Every finding reproduces.", "Run against PostgreSQL itself, the harness finds no differences.",
+		"Fair by design.", "You review results first. Payment never changes them.",
+		"Get a compatibility report →",
+		`<a href="method/">How the method works</a>`, `<a href="postgres-17/">PostgreSQL 17 inventory</a>`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("compatibility page lacks %q", want)

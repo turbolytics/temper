@@ -2,15 +2,17 @@
 {{with .Inventory}}
 <section class="offer">
 <p class="eyebrow">Compatibility</p>
-<h1>Is your database really Postgres-compatible?</h1>
-<p class="lead">We run thousands of real Postgres statements against your product and plain Postgres 17, and show you exactly where the answers differ.</p>
+<h1>PostgreSQL compatibility, tested</h1>
+<p class="lead">We run tens of thousands of real PostgreSQL statements on your product and on PostgreSQL 17, and compare every answer.</p>
+<p><strong>Every report opens with one line:</strong></p>
+<p class="breadth">Matches PostgreSQL on __% of tested features · __ features tested · __ crashes · __ silent wrong answers</p>
 <ul>
-<li><strong>Wrong answers first.</strong> Crashes and silent wrong results, each with a one-line repro.</li>
-<li><strong>Scored feature by feature.</strong> {{commas .Total}} Postgres 17 features, weighted by what {{.AppNames}} actually use.</li>
-<li><strong>Private by default.</strong> You see the report first, and you review it before anything is published.</li>
+<li><strong>Real workloads.</strong> {{commas .Total}} PostgreSQL 17 features, exercised by PostgreSQL's own tests and by {{.AppNames}}.</li>
+<li><strong>Every finding reproduces.</strong> Each one shows the statement, both answers and one command to rerun it. Run against PostgreSQL itself, the harness finds no differences.</li>
+<li><strong>Fair by design.</strong> You review results first. Payment never changes them.</li>
 </ul>
 <p><a class="button" data-ph="cta-compatibility" href="{{$.ReportRequest}}">Get a compatibility report →</a></p>
-<p>Open method, reproducible with one command. <a href="method/">How it works →</a></p>
+<p><a href="method/">How the method works</a> · <a href="postgres-17/">PostgreSQL 17 inventory</a></p>
 </section>
 {{end}}
 {{end}}

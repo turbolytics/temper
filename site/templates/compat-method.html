@@ -1,7 +1,7 @@
 {{define "content"}}
 {{with .Inventory}}
 <p class="eyebrow">Compatibility</p>
-<h1>PostgreSQL compatibility, tested</h1>
+<h1>How the compatibility method works</h1>
 <p class="breadth">Method version {{.Version}} · updated {{.Date}}</p>
 <p class="lead">Many products sell on a claim such as "Postgres-compatible". We test that claim. The harness runs the same SQL statements on PostgreSQL and on your product, and compares every answer.</p>
 <ul>
@@ -10,7 +10,8 @@
 <li><strong>What you get.</strong> A report that leads with crashes and silent wrong answers, followed by a score and how much of your product it covers.</li>
 <li><strong>What gets published.</strong> Open-source results, after at least 7 days of review by the maintainers. A paid or private report, only with the vendor's approval. See <a href="#fairness">Fairness</a>.</li>
 </ul>
-<p>This page uses four terms. <strong>The method</strong> is the approach described here. <strong>The harness</strong> is the open-source code that carries it out, in <a href="https://github.com/turbolytics/temper/tree/main/compat/postgres"><code>compat/postgres</code></a>. <strong>A report</strong> is the result for one product. <strong>Your product</strong> is the system under test. The <a href="../postgres-17/">PostgreSQL 17 feature inventory</a> lists every feature the method checks.</p>
+<p>Your product is compatible with PostgreSQL when it gives PostgreSQL's answer to the same statement. That means the same rows, the same column types, or the same error code. The method checks this for every statement in its corpus and every feature in its inventory.</p>
+
 
 <section id="fairness">
 <h2>Fairness</h2>
@@ -26,39 +27,24 @@
 </section>
 
 <section>
-<h2>What the method measures</h2>
-<p>Your product is compatible with PostgreSQL when it gives PostgreSQL's answer to the same statement. That means the same rows, the same column types, or the same error code. The method checks this for every statement in its corpus and every feature in its inventory.</p>
+<h2>The score</h2>
+<p>Version {{.Version}} scores five lists: SQL commands, query syntax, functions, operators and data types, less what your product doesn't claim. Server settings, error codes, system catalogs and SQL-standard features appear in the report but aren't scored yet.</p>
+<p>The score is the share of tested features that pass, weighted by how often the captured applications use each one. A feature is tested when the corpus decided it: it passed, failed, or hit a documented difference. Untested and undecided features are left out of the score. The report shows them as coverage, right beside the score. A feature no application uses still counts, at a small floor weight.</p>
+<p>The score always appears with its coverage and the counts of crashes and silent wrong answers.</p>
+<p>A feature that passes in one statement and fails in another counts as a pass. So the score measures how many features work at all, not how often they give the right answer. Read it beside the findings.</p>
 </section>
 
 <section>
-<h2>The inventory</h2>
-<p>The inventory is the list of features the method checks. The harness generates it from PostgreSQL's own source at tag <code>{{.Tag}}</code> and from a running server's catalogs. A function, operator or type enters the inventory only if PostgreSQL both documents it and has it. The same input always generates the same inventory.</p>
-<table class="statuses">
-<thead><tr><th>List</th><th>Features</th></tr></thead>
-<tbody>
-{{range .Lists}}<tr><td><a href="../postgres-17/#{{.Anchor}}">{{.Title}}</a></td><td>{{commas (len .Members)}}</td></tr>
-{{end}}<tr><td><strong>Total</strong></td><td><strong>{{commas .Total}}</strong></td></tr>
-</tbody>
-</table>
-<p><a data-ph="inventory-json" href="../postgres-17/inventory.json">Download the inventory as JSON</a></p>
+<h2>From statements to features</h2>
+<p>A feature passes when a statement that uses it matches PostgreSQL, and PostgreSQL itself answered without an error. When a statement fails, the method looks for the features in it that no matching statement has proven. If only one is unproven, the failure is attributed to that feature, and the statement becomes its reproduction. If several are unproven, each one is marked undecided. The method never guesses between them. If every feature in the statement is already proven, the failure is attributed to none of them. The report still counts that statement.</p>
+<p>An attribution can be wrong when a failure comes from how two features interact. That is why each one is shown with its statement and both answers.</p>
 </section>
 
-<section>
-<h2>The corpus</h2>
-<p>The corpus is the set of SQL statements the harness runs. It comes from three sources:</p>
-<ul>
-<li><strong>PostgreSQL's regression tests.</strong> They run in the order of PostgreSQL's own test schedule, on one shared database, with a new session for each file.</li>
-<li><strong>PostgreSQL's documentation.</strong> The examples in the docs, including the examples in the function tables.</li>
-<li><strong>Real applications.</strong> A PostgreSQL server logged every statement while each application's tests ran. Each distinct statement shape enters the corpus once.</li>
-</ul>
-<table class="statuses">
-<thead><tr><th>Application</th><th>Version</th><th>Traffic</th><th>Statements logged</th><th>Share</th></tr></thead>
-<tbody>
-{{range .Apps}}<tr><td>{{.Name}}</td><td>{{.Version}}</td><td>{{.What}}</td><td>{{commas .Statements}}</td><td>{{.Share}}</td></tr>
-{{end}}</tbody>
-</table>
-{{if .Skew}}<p>{{.Skew}}. So the usage weights mostly reflect an ORM's queries and a driver's own tests. The next applications to capture are JDBC, node-postgres, and the catalog queries BI tools send to discover a database.</p>
-{{end}}</section>
+<section id="claims">
+<h2>Claims</h2>
+<p>We set your product's scope from its public documentation, not from the vendor's say-so. That way, a product can't raise its score by claiming less. Each part of PostgreSQL a product doesn't claim is recorded in the method, citing the page and the words it comes from. A vendor can dispute the scope during the review.</p>
+<p>Separately, the harness detects, statement by statement, when your product hands a statement to PostgreSQL instead of running it. That statement counts as not claimed, never as a match.</p>
+</section>
 
 <section>
 <h2>How a statement is compared</h2>
@@ -101,25 +87,6 @@
 </table>
 </section>
 
-<section id="claims">
-<h2>Claims</h2>
-<p>We set your product's scope from its public documentation, not from the vendor's say-so. That way, a product can't raise its score by claiming less. Each part of PostgreSQL a product doesn't claim is recorded in the method, citing the page and the words it comes from. A vendor can dispute the scope during the review.</p>
-<p>Separately, the harness detects, statement by statement, when your product hands a statement to PostgreSQL instead of running it. That statement counts as not claimed, never as a match.</p>
-</section>
-
-<section>
-<h2>From statements to features</h2>
-<p>A feature passes when a statement that uses it matches PostgreSQL, and PostgreSQL itself answered without an error. When a statement fails, the method looks for the features in it that no matching statement has proven. If only one is unproven, the failure is attributed to that feature, and the statement becomes its reproduction. If several are unproven, each one is marked undecided. The method never guesses between them. If every feature in the statement is already proven, the failure is attributed to none of them. The report still counts that statement.</p>
-<p>An attribution can be wrong when a failure comes from how two features interact. That is why each one is shown with its statement and both answers.</p>
-</section>
-
-<section>
-<h2>The score</h2>
-<p>Version {{.Version}} scores five lists: SQL commands, query syntax, functions, operators and data types, less what your product doesn't claim. Server settings, error codes, system catalogs and SQL-standard features appear in the report but aren't scored yet.</p>
-<p>The score is the share of tested features that pass, weighted by how often the captured applications use each one. A feature is tested when the corpus decided it: it passed, failed, or hit a documented difference. Untested and undecided features are left out of the score. The report shows them as coverage, right beside the score. A feature no application uses still counts, at a small floor weight.</p>
-<p>A feature that passes in one statement and fails in another counts as a pass. So the score measures how many features work at all, not how often they give the right answer. Read it beside the findings.</p>
-</section>
-
 <section>
 <h2>A sample finding</h2>
 <p><strong>Illustrative.</strong> This finding is made up, and comes from no real product. It shows the shape every finding in a report takes.</p>
@@ -136,9 +103,48 @@
 </section>
 
 <section>
+<h2>The inventory</h2>
+<p>The inventory is the list of features the method checks. The harness generates it from PostgreSQL's own source at tag <code>{{.Tag}}</code> and from a running server's catalogs. A function, operator or type enters the inventory only if PostgreSQL both documents it and has it. The same input always generates the same inventory.</p>
+<table class="statuses">
+<thead><tr><th>List</th><th>Features</th></tr></thead>
+<tbody>
+{{range .Lists}}<tr><td><a href="../postgres-17/#{{.Anchor}}">{{.Title}}</a></td><td>{{commas (len .Members)}}</td></tr>
+{{end}}<tr><td><strong>Total</strong></td><td><strong>{{commas .Total}}</strong></td></tr>
+</tbody>
+</table>
+<p><a data-ph="inventory-json" href="../postgres-17/inventory.json">Download the inventory as JSON</a></p>
+</section>
+
+<section>
+<h2>The corpus</h2>
+<p>The corpus is the set of SQL statements the harness runs. It comes from three sources:</p>
+<ul>
+<li><strong>PostgreSQL's regression tests.</strong> They run in the order of PostgreSQL's own test schedule, on one shared database, with a new session for each file.</li>
+<li><strong>PostgreSQL's documentation.</strong> The examples in the docs, including the examples in the function tables.</li>
+<li><strong>Real applications.</strong> A PostgreSQL server logged every statement while each application's tests ran. Each distinct statement shape enters the corpus once.</li>
+</ul>
+<table class="statuses">
+<thead><tr><th>Application</th><th>Version</th><th>Traffic</th><th>Statements logged</th><th>Share</th></tr></thead>
+<tbody>
+{{range .Apps}}<tr><td>{{.Name}}</td><td>{{.Version}}</td><td>{{.What}}</td><td>{{commas .Statements}}</td><td>{{.Share}}</td></tr>
+{{end}}</tbody>
+</table>
+{{if .Skew}}<p>{{.Skew}}. So the usage weights mostly reflect an ORM's queries and a driver's own tests. The next applications to capture are JDBC, node-postgres, and the catalog queries BI tools send to discover a database.</p>
+{{end}}</section>
+
+<section>
 <h2>Checking the harness</h2>
 <p>Before any result counts, the harness runs against PostgreSQL itself. On PostgreSQL 17.12, {{commas .Control.Matched}} of the {{commas .Control.Statements}} statements matched. The other {{commas .Control.Noise}} ({{.Control.NoiseShare}}) were dropped as noise, because the two PostgreSQL servers disagreed. None differed.</p>
 <p>When your product can switch its own engine off, the harness also runs against your product with that engine off. That run must show no differences either. Both checks have caught harness bugs that would otherwise have read as the product's bugs.</p>
+</section>
+
+<section>
+<h2>Limits</h2>
+<ul>
+<li>SQL-standard feature IDs aren't scored yet, because no statement maps to one.</li>
+<li>Casts between types aren't separate features yet.</li>
+<li>The method checks answers. It doesn't measure performance or behavior under concurrent load.</li>
+</ul>
 </section>
 
 <section>
@@ -170,12 +176,14 @@ cd temper
 make compat-postgres RESULTS=../results</code></pre>
 </section>
 
-<section>
-<h2>Limits</h2>
+<section id="glossary">
+<h2>Glossary</h2>
 <ul>
-<li>SQL-standard feature IDs aren't scored yet, because no statement maps to one.</li>
-<li>Casts between types aren't separate features yet.</li>
-<li>The method checks answers. It doesn't measure performance or behavior under concurrent load.</li>
+<li><strong>The method</strong> is the approach this page describes.</li>
+<li><strong>The harness</strong> is the open-source code that carries it out, in <a href="https://github.com/turbolytics/temper/tree/main/compat/postgres"><code>compat/postgres</code></a>.</li>
+<li><strong>A report</strong> is the result for one product.</li>
+<li><strong>Your product</strong> is the system under test.</li>
+<li><strong>The inventory</strong> is the list of features the method checks. The <a href="../postgres-17/">PostgreSQL 17 feature inventory</a> lists every one.</li>
 </ul>
 </section>
 {{end}}
