@@ -3,7 +3,7 @@
 TEMPER  := go run ./cmd/temper
 EXAMPLE := examples/inventory
 
-.PHONY: test evidence matrix check-matrix example example-matrix compat-postgres check-compat-postgres site serve-site refresh-projects og-image
+.PHONY: test evidence matrix check-matrix example example-matrix compat-postgres check-compat-postgres site serve-site refresh-projects findings-check og-image
 
 test:
 	go vet ./...
@@ -76,5 +76,10 @@ refresh-projects:
 
 # Re-render the link-preview image from its source. Needs rsvg-convert
 # (brew install librsvg). Commit both files.
+# Check every finding's GitHub issue, PR or Discussion against
+# findings/snapshot.json. The GraphQL API that serves Discussions needs a token.
+findings-check:
+	GITHUB_TOKEN=$${GITHUB_TOKEN:-$$(gh auth token 2>/dev/null)} go run ./site -check-findings
+
 og-image:
 	rsvg-convert -w 1200 -h 630 site/og.svg -o site/og.png

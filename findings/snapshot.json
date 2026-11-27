@@ -1,0 +1,349 @@
+{
+  "https://github.com/ArroyoSystems/arroyo/issues/1229": {
+    "state": "open",
+    "others_comments": 0
+  },
+  "https://github.com/ThreeDotsLabs/watermill-kafka/pull/50": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "ThreeDotsLabs/watermill#707",
+        "state": "open"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/ThreeDotsLabs/watermill/issues/705": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "ThreeDotsLabs/watermill#706",
+        "state": "open"
+      },
+      {
+        "ref": "ThreeDotsLabs/watermill#707",
+        "state": "open"
+      },
+      {
+        "ref": "ThreeDotsLabs/watermill#708",
+        "state": "draft"
+      },
+      {
+        "ref": "ThreeDotsLabs/watermill-kafka#50",
+        "state": "open"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/ThreeDotsLabs/watermill/pull/706": {
+    "state": "open",
+    "others_comments": 0
+  },
+  "https://github.com/ThreeDotsLabs/watermill/pull/707": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "ThreeDotsLabs/watermill-kafka#50",
+        "state": "open"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/ThreeDotsLabs/watermill/pull/708": {
+    "state": "open",
+    "draft": true,
+    "others_comments": 0
+  },
+  "https://github.com/apache/iceberg-python/issues/4403": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "apache/iceberg-python#4407",
+        "state": "draft"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/apache/iceberg-python/issues/4404": {
+    "state": "closed",
+    "state_reason": "completed",
+    "closed": "2026-11-27",
+    "closed_by": "Fokko",
+    "linked_prs": [
+      {
+        "ref": "apache/iceberg-python#4406",
+        "state": "merged"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/dolthub/doltgresql/issues/3617": {
+    "state": "closed",
+    "state_reason": "completed",
+    "closed": "2026-11-18",
+    "closed_by": "zachmu",
+    "labels": [
+      "customer issue"
+    ],
+    "linked_prs": [
+      {
+        "ref": "Homebrew/homebrew-core#327487",
+        "state": "merged"
+      },
+      {
+        "ref": "dolthub/doltgresql#3634",
+        "state": "closed"
+      },
+      {
+        "ref": "dolthub/doltgresql#3887",
+        "state": "merged"
+      },
+      {
+        "ref": "nicia-ai/typegraph#372",
+        "state": "draft"
+      }
+    ],
+    "others_comments": 2,
+    "newest": {
+      "id": "6964224099",
+      "author": "zachmu",
+      "association": "MEMBER",
+      "date": "2026-11-17"
+    }
+  },
+  "https://github.com/dolthub/doltgresql/issues/3879": {
+    "state": "closed",
+    "state_reason": "completed",
+    "closed": "2026-11-19",
+    "closed_by": "macneale4",
+    "labels": [
+      "customer issue"
+    ],
+    "linked_prs": [
+      {
+        "ref": "dolthub/doltgresql#3911",
+        "state": "merged"
+      },
+      {
+        "ref": "dolthub/go-mysql-server#4185",
+        "state": "merged"
+      }
+    ],
+    "others_comments": 1,
+    "newest": {
+      "id": "7112343092",
+      "author": "bpf120",
+      "association": "NONE",
+      "date": "2026-11-23"
+    }
+  },
+  "https://github.com/duckdb/pg_duckdb/discussions/1152": {
+    "state": "open",
+    "others_comments": 0
+  },
+  "https://github.com/feldera/feldera/discussions/8029": {
+    "state": "open",
+    "others_comments": 2,
+    "newest": {
+      "id": "DC_kwDOJh-Clc4BLdGm",
+      "author": "mihaibudiu",
+      "association": "CONTRIBUTOR",
+      "date": "2026-11-20"
+    }
+  },
+  "https://github.com/feldera/feldera/issues/8032": {
+    "state": "open",
+    "labels": [
+      "QA",
+      "rust"
+    ],
+    "others_comments": 3,
+    "newest": {
+      "id": "7111741143",
+      "author": "blp",
+      "association": "MEMBER",
+      "date": "2026-11-23"
+    }
+  },
+  "https://github.com/feldera/feldera/issues/8033": {
+    "state": "closed",
+    "state_reason": "completed",
+    "closed": "2026-11-22",
+    "closed_by": "mihaibudiu",
+    "labels": [
+      "SQL compiler"
+    ],
+    "linked_prs": [
+      {
+        "ref": "feldera/feldera#8034",
+        "state": "merged"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/fsspec/filesystem_spec/issues/2470": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "fsspec/filesystem_spec#2473",
+        "state": "merged"
+      },
+      {
+        "ref": "fsspec/filesystem_spec#2481",
+        "state": "merged"
+      },
+      {
+        "ref": "fsspec/filesystem_spec#2482",
+        "state": "merged"
+      },
+      {
+        "ref": "fsspec/filesystem_spec#2486",
+        "state": "open"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/lovoo/goka/issues/505": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "lovoo/goka#506",
+        "state": "open"
+      },
+      {
+        "ref": "lovoo/goka#507",
+        "state": "draft"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/lovoo/goka/pull/506": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "lovoo/goka#507",
+        "state": "draft"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/lovoo/goka/pull/507": {
+    "state": "open",
+    "draft": true,
+    "others_comments": 0
+  },
+  "https://github.com/narwhals-dev/narwhals/issues/4165": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "narwhals-dev/narwhals#4167",
+        "state": "open"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/polarsignals/frostdb/issues/1013": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "polarsignals/frostdb#1012",
+        "state": "open"
+      },
+      {
+        "ref": "polarsignals/frostdb#1014",
+        "state": "draft"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/polarsignals/frostdb/pull/1012": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "polarsignals/frostdb#1014",
+        "state": "draft"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/polarsignals/frostdb/pull/1014": {
+    "state": "open",
+    "draft": true,
+    "linked_prs": [
+      {
+        "ref": "polarsignals/frostdb#1012",
+        "state": "open"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/psycopg/psycopg/issues/1499": {
+    "state": "closed",
+    "state_reason": "completed",
+    "closed": "2026-11-17",
+    "closed_by": "dvarrazzo",
+    "others_comments": 1,
+    "newest": {
+      "id": "6961461100",
+      "author": "dvarrazzo",
+      "association": "MEMBER",
+      "date": "2026-11-17"
+    }
+  },
+  "https://github.com/pydata/xarray/issues/11899": {
+    "state": "closed",
+    "state_reason": "completed",
+    "closed": "2026-11-18",
+    "closed_by": "headtr1ck",
+    "linked_prs": [
+      {
+        "ref": "pydata/xarray#11900",
+        "state": "merged"
+      }
+    ],
+    "others_comments": 0
+  },
+  "https://github.com/risingwavelabs/risingwave/discussions/28176": {
+    "state": "open",
+    "others_comments": 0
+  },
+  "https://github.com/risingwavelabs/risingwave/issues/28175": {
+    "state": "open",
+    "others_comments": 0
+  },
+  "https://github.com/riverqueue/river/discussions/1603": {
+    "state": "open",
+    "others_comments": 0
+  },
+  "https://github.com/turbolytics/sql-flow/pull/472": {
+    "state": "merged",
+    "closed": "2026-11-15",
+    "closed_by": "turbolytics",
+    "merged": "2026-11-15",
+    "others_comments": 0
+  },
+  "https://github.com/zarr-developers/zarr-python/issues/4645": {
+    "state": "open",
+    "linked_prs": [
+      {
+        "ref": "d-v-b/zarr-python#461",
+        "state": "draft"
+      },
+      {
+        "ref": "zarr-developers/zarr-python#4652",
+        "state": "closed"
+      },
+      {
+        "ref": "zarr-developers/zarr-python#4653",
+        "state": "open"
+      }
+    ],
+    "others_comments": 2,
+    "newest": {
+      "id": "7063149550",
+      "author": "sheikhayaan",
+      "association": "CONTRIBUTOR",
+      "date": "2026-11-21"
+    }
+  }
+}
