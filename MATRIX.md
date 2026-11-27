@@ -2,9 +2,9 @@
 <!-- temper matrix format: 3 -->
 # temper matrix
 
-**25 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
+**27 features and 23 invariants on 2 subjects, at levels `unit` and `integration`.**
 
-✅ 68 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
+✅ 70 covered · ❌ 0 failing · ⬜ 0 missing · ☑️ 0 exempt · ⛔ 0 unsupported · ⏳ 0 unenforced
 
 Each cell is one claim in `temper/` at one level. It is covered when a test that ran
 at that level passed and none failed: a skip proves nothing, and a pass never hides
@@ -44,7 +44,9 @@ What the system does. Each feature is proven at the levels it requires.
 | `site.case_studies` | Builds the Case Studies pages, audits written up with the project's approval, linked from the top-level nav and from each project's findings. | ✅ | — |
 | `site.contact` | Builds the Contact page, the consulting offers grouped by who buys them with a call link and email, and points every contact link on the site to it so no visitor leaves the site to reach us. | ✅ | — |
 | `site.compatibility_reports` | Features compatibility reports on the home page and the Contact page, saying what a report tests and delivers (a co-branded hosted matrix, a PDF, a badge and reruns on every release) and that it stays independent. | ✅ | — |
-| `site.compatibility` | Builds the Compatibility pages: the method behind Temper's compatibility matrices, and the full PostgreSQL 17 feature inventory generated from compat/postgres with each member linked to its source. They name no system under test. | ✅ | — |
+| `site.compatibility` | Builds the Compatibility pages: the method behind Temper's compatibility matrices (at /compatibility/method/), led by what a report gives a technical leader, with the method in one paragraph, and the full PostgreSQL 17 feature inventory generated from compat/postgres with each member linked to its source. They name no system under test. | ✅ | — |
+| `site.compatibility_offer` | The Compatibility page is one short page for a buyer: what is checked, the one line every report opens with, why to trust it, and a button that opens an email asking for the product, the Postgres version it targets and a reply address. It links to the method page and the inventory. | ✅ | — |
+| `site.reading_measure` | Prose on every page shares one right edge: each paragraph and list placed directly in a page or in a top-level section stops at the same reading width, and the larger lead text stops there too. | ✅ | — |
 | `cli.scenarios_run` | Runs runner-temper scenarios against a Docker Compose topology, injecting named faults on a seeded schedule, and records one verdict per check as evidence. | ✅ | ✅ |
 | `declarations.recipe_packs` | Includes Temper's recipe packs from temper.yml and the project's named commands from commands.yml, so a scenario names each command once. | ✅ | ✅ |
 | `cli.recipes` | Lists the built-in recipe packs and prints any one of them. | ✅ | ✅ |

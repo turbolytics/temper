@@ -15,7 +15,7 @@ import (
 )
 
 var pages = []string{"index.html", "findings/index.html", "tutorial/index.html", "case-studies/index.html", "case-studies/feldera/index.html", "contact/index.html",
-	"compatibility/index.html", "compatibility/postgres-17/index.html"}
+	"compatibility/index.html", "compatibility/method/index.html", "compatibility/postgres-17/index.html"}
 
 // build builds the real repository into a temp directory.
 func build(t *testing.T, analytics bool) string {
@@ -478,7 +478,7 @@ func TestContactOnEveryPage(t *testing.T) {
 	out := build(t, false)
 	rel := map[string]string{"index.html": "./", "findings/index.html": "../", "tutorial/index.html": "../",
 		"case-studies/index.html": "../", "case-studies/feldera/index.html": "../../", "contact/index.html": "../",
-		"compatibility/index.html": "../", "compatibility/postgres-17/index.html": "../../"}
+		"compatibility/index.html": "../", "compatibility/method/index.html": "../../", "compatibility/postgres-17/index.html": "../../"}
 	for _, p := range pages {
 		page := read(t, filepath.Join(out, p))
 		if !strings.Contains(page, `<a data-ph="nav-contact" href="`+rel[p]+`contact/">Contact</a>`) {

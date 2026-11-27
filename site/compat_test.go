@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"html"
+	"net/url"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -22,7 +22,7 @@ func TestCompatibilityPagesInNavAndSitemap(t *testing.T) {
 		}
 	}
 	sm := read(t, filepath.Join(out, "sitemap.xml"))
-	for _, u := range []string{"compatibility/", "compatibility/postgres-17/"} {
+	for _, u := range []string{"compatibility/", "compatibility/method/", "compatibility/postgres-17/"} {
 		if !strings.Contains(sm, "https://temper.turbolytics.io/"+u+"</loc>") {
 			t.Errorf("sitemap lacks %s", u)
 		}
@@ -101,11 +101,11 @@ func TestInventoryShowsApplicationUse(t *testing.T) {
 
 func TestMethodPagePinsVersionsAndReproduces(t *testing.T) {
 	temper.Covers(t, "site.compatibility")
-	page := read(t, filepath.Join(build(t, false), "compatibility", "index.html"))
+	page := read(t, filepath.Join(build(t, false), "compatibility", "method", "index.html"))
 	for _, want := range []string{
 		"postgres:17.12@sha256:87c8b42f423b45d5247e6aa8fdb2e7762fec164c68a50fe3eb07e7bfcaf4dbcf",
-		"REL_17_12", "pglast", "7.25", "psycopg", "3.3.9", "Django", "6.1.3", "pg_dump", "31,484",
-		"make compat-postgres", `href="postgres-17/"`,
+		"REL_17_12", "pglast", "7.25", "psycopg", "3.3.9", "Django", "6.1.3", "pg_dump",
+		"make compat-postgres", `href="../postgres-17/"`,
 		"github.com/turbolytics/temper/tree/main/compat/postgres",
 	} {
 		if !strings.Contains(page, want) {
@@ -120,7 +120,7 @@ func TestMethodPagePinsVersionsAndReproduces(t *testing.T) {
 func TestCompatibilityPagesNameNoSystem(t *testing.T) {
 	temper.Covers(t, "site.compatibility")
 	out := build(t, false)
-	for _, p := range []string{"compatibility/index.html", "compatibility/postgres-17/index.html"} {
+	for _, p := range []string{"compatibility/index.html", "compatibility/method/index.html", "compatibility/postgres-17/index.html"} {
 		page := strings.ToLower(read(t, filepath.Join(out, p)))
 		// Whole words: PostgreSQL's own MATERIALIZED VIEW is not Materialize.
 		for _, name := range []string{"pg_duckdb", "duckdb", "motherduck", "doltgres", "dolthub", "cockroachdb", "yugabytedb", "neon", "supabase", "aurora", "alloydb", "risingwave", "materialize"} {
@@ -186,7 +186,7 @@ func TestInventoryDownloadsAsJSON(t *testing.T) {
 	if doc.Total != total {
 		t.Errorf("total %d, want %d", doc.Total, total)
 	}
-	for _, page := range []string{"compatibility/index.html", "compatibility/postgres-17/index.html"} {
+	for _, page := range []string{"compatibility/method/index.html", "compatibility/postgres-17/index.html"} {
 		if !strings.Contains(read(t, filepath.Join(out, page)), `inventory.json"`) {
 			t.Errorf("%s does not link inventory.json", page)
 		}
@@ -194,19 +194,15 @@ func TestInventoryDownloadsAsJSON(t *testing.T) {
 }
 
 // The method page carries the method's version and date, the publication
-// rules, the noise count, and the corpus skew.
+// rules, and the corpus skew among its limits.
 func TestMethodPageVersionRulesAndSkew(t *testing.T) {
 	temper.Covers(t, "site.compatibility")
 	out := build(t, false)
-	page := html.UnescapeString(read(t, filepath.Join(out, "compatibility", "index.html")))
+	page := html.UnescapeString(read(t, filepath.Join(out, "compatibility", "method", "index.html")))
 	for _, want := range []string{
 		"Method version 1.0", "2026-11-26",
 		"at least 7 days", "only with the vendor's approval",
-		"139", "0.27%",
-		"Different column name", "?column?",
-		"attributed to",
 		"Django and psycopg make up 99.4% of the logged statements", "JDBC", "node-postgres",
-		"<td>64.1%</td>",
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("method page lacks %q", want)
@@ -228,25 +224,27 @@ func TestMethodPageVersionRulesAndSkew(t *testing.T) {
 	}
 }
 
-// The method page states the score, the outcomes, the scope and fairness the
+// The method page states the score, the scope and fairness the
 // way the harness computes them, and reads the control run from METHOD.
 func TestMethodPageMatchesTheHarness(t *testing.T) {
 	temper.Covers(t, "site.compatibility")
-	page := html.UnescapeString(read(t, filepath.Join(build(t, false), "compatibility", "index.html")))
+	page := html.UnescapeString(read(t, filepath.Join(build(t, false), "compatibility", "method", "index.html")))
 	for _, want := range []string{
 		// The score: five lists, tested features only, coverage beside it.
-		"SQL commands, query syntax, functions, operators and data types",
-		"Untested and undecided features are left out of the score", "coverage",
-		// Outcomes, grouped as the score treats them.
-		"Lowers the score", "Counts as a pass", "Removed before scoring",
-		"0A000", "not supported, unsupported or not implemented",
-		"Crashes and silent wrong answers are the most serious outcomes",
+		"scores five lists, less what your product doesn't claim:",
+		"<li>SQL commands</li>", "<li>Query syntax</li>", "<li>Functions</li>", "<li>Operators</li>", "<li>Data types</li>",
+		"The score always appears with its coverage and the counts of crashes and silent wrong answers.",
+		// The method in one paragraph: two PostgreSQL servers, noise dropped,
+		// clean against itself.
+		"two PostgreSQL 17.12 servers", "When the two PostgreSQL servers disagree, we drop the statement",
+		"Run against PostgreSQL itself, the harness finds no differences.",
+		// The outcomes live in the harness's README, one link away.
+		"compat/postgres#outcomes",
 		// Scope and fairness.
 		"public documentation", "claiming less",
-		"Payment never changes results", "without being asked", "only with the vendor's permission",
+		"We'll never change our answers based on payment.", `We test <a href="../../findings/">popular open-source projects</a>.`,
 		"dispute",
-		// The four terms, and a sample.
-		"The method", "The harness", "A report", "Your product",
+		// A sample finding.
 		"Illustrative",
 		"What a paid report includes",
 	} {
@@ -254,16 +252,122 @@ func TestMethodPageMatchesTheHarness(t *testing.T) {
 			t.Errorf("method page lacks %q", want)
 		}
 	}
-	// The control numbers come from compat/postgres/METHOD.
-	method := read(t, "../compat/postgres/METHOD")
-	for _, key := range []string{"control_statements", "control_matched", "control_noise"} {
-		m := regexp.MustCompile(`(?m)^` + key + `:\s*(\d+)`).FindStringSubmatch(method)
-		if m == nil {
-			t.Fatalf("METHOD has no %s", key)
+	if strings.Contains(page, "<h2>Outcomes</h2>") {
+		t.Error("the method page still lists the outcomes; they live in compat/postgres/README.md")
+	}
+	// The harness's README lists the outcomes, grouped as the score treats them.
+	readme := read(t, "../compat/postgres/README.md")
+	for _, want := range []string{
+		"## Outcomes",
+		"Lowers the score", "Counts as a pass", "Removed before scoring",
+		"0A000", "not supported, unsupported or not implemented",
+		"Crashes and silent wrong answers are the most serious outcomes",
+		"Different column name", "?column?",
+	} {
+		if !strings.Contains(readme, want) {
+			t.Errorf("compat/postgres/README.md lacks %q", want)
 		}
-		n, _ := strconv.Atoi(m[1])
-		if !strings.Contains(page, commas(n)) {
-			t.Errorf("method page lacks %s = %s", key, commas(n))
+	}
+}
+
+// The method page leads with what a report gives a technical leader, then
+// the method in one paragraph, a sample finding, independence, what a paid
+// report includes and its limits. Reference material comes last.
+func TestMethodPageLeadsWithTheValue(t *testing.T) {
+	temper.Covers(t, "site.compatibility")
+	page := html.UnescapeString(read(t, filepath.Join(build(t, false), "compatibility", "method", "index.html")))
+	for _, want := range []string{
+		"<h1>What a compatibility report gives you</h1>",
+		"as an independent third party",
+		"Bugs found before your customers find them.",
+		"Your bug surface area.",
+		"A claim you can back up.",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("method page lacks %q", want)
 		}
+	}
+	last := -1
+	for _, h := range []string{"What you get", "How it works", "What a finding looks like", "Independent by design", "What a paid report includes", "Limits", "Pinned versions", "Reproduce it"} {
+		i := strings.Index(page, "<h2>"+h+"</h2>")
+		if i < 0 {
+			t.Fatalf("method page has no %q section", h)
+		}
+		if i < last {
+			t.Errorf("%q comes too early", h)
+		}
+		last = i
+	}
+	// The method is one paragraph, not a section per mechanism.
+	for _, gone := range []string{"From statements to features", "How a statement is compared", "Checking the harness", "<h2>Glossary</h2>", "<h2>The corpus</h2>"} {
+		if strings.Contains(page, gone) {
+			t.Errorf("method page still carries %q", gone)
+		}
+	}
+	if strings.Contains(page, "<h1>PostgreSQL compatibility, tested</h1>") {
+		t.Error("the method page repeats the short page's headline")
+	}
+}
+
+// The Compatibility page is one screen for a buyer: a headline, one
+// sentence, three points and a button that opens an email asking for the
+// product, the Postgres version it targets and a reply address. The method
+// lives on its own page, for the engineer the buyer forwards it to.
+func TestCompatibilityPageIsOneScreenForABuyer(t *testing.T) {
+	temper.Covers(t, "site.compatibility_offer")
+	out := build(t, false)
+	page := html.UnescapeString(read(t, filepath.Join(out, "compatibility", "index.html")))
+	for _, want := range []string{
+		"<h1>PostgreSQL compatibility, tested</h1>",
+		"We run tens of thousands of real PostgreSQL statements on your product and on PostgreSQL 17, and compare every answer.",
+		// The headline every report opens with, blank until a published
+		// report can fill it.
+		"Every report opens with one line:",
+		"Matches PostgreSQL on __% of tested features · __ features tested · __ crashes · __ silent wrong answers",
+		"Real workloads.", "2,301 PostgreSQL 17 features, exercised by PostgreSQL's own tests and by Django, psycopg and pg_dump.",
+		"Every finding reproduces.", "Run against PostgreSQL itself, the harness finds no differences.",
+		"Fair by design.", "You review results first. Payment never changes them.",
+		"Get a compatibility report →",
+		`<a href="method/">How the method works</a>`, `<a href="postgres-17/">PostgreSQL 17 inventory</a>`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("compatibility page lacks %q", want)
+		}
+	}
+	// The button opens an email that asks for the three things.
+	m := regexp.MustCompile(`<a class="button" data-ph="cta-compatibility" href="(mailto:[^"]+)"`).FindStringSubmatch(page)
+	if m == nil {
+		t.Fatal("the button is not a mailto link")
+	}
+	u, err := url.Parse(m[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := u.Query().Get("body")
+	for _, want := range []string{"Product:", "Postgres version you target:", "Email:"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the email body lacks %q: %q", want, body)
+		}
+	}
+	if u.Query().Get("subject") == "" {
+		t.Error("the email has no subject")
+	}
+	// The method stays off this page.
+	for _, gone := range []string{`id="fairness"`, "Lowers the score", "Pinned versions"} {
+		if strings.Contains(page, gone) {
+			t.Errorf("compatibility page still carries the method: %q", gone)
+		}
+	}
+	if n := strings.Count(page, "<h2"); n > 0 {
+		t.Errorf("compatibility page has %d sections; it is one screen", n)
+	}
+	// The method page and the inventory lead back to each other and to the offer.
+	method := read(t, filepath.Join(out, "compatibility", "method", "index.html"))
+	if !strings.Contains(method, `href="`+m[1]+`"`) && !strings.Contains(html.UnescapeString(method), `href="`+m[1]+`"`) {
+		t.Error("the method page's button does not open the same email")
+	}
+	inv := read(t, filepath.Join(out, "compatibility", "postgres-17", "index.html"))
+	if !strings.Contains(inv, `href="../method/"`) {
+		t.Error("the inventory page does not link the method page")
 	}
 }

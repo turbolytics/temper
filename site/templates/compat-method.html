@@ -1,0 +1,105 @@
+{{define "content"}}
+{{with .Inventory}}
+<p class="eyebrow">Compatibility</p>
+<h1>What a compatibility report gives you</h1>
+<p class="breadth">Method version {{.Version}} · updated {{.Date}}</p>
+<p class="lead">Your customers test your "Postgres-compatible" claim in production. A compatibility report tests it first, as an independent third party.</p>
+
+<section>
+<h2>What you get</h2>
+<ul>
+<li><strong>Bugs found before your customers find them.</strong> Every crash and silent wrong answer, each with the statement, both answers and one command to reproduce it.</li>
+<li><strong>Your bug surface area.</strong> Which of PostgreSQL 17's {{commas .Total}} features pass, which fail, and which no test reached, weighted by what {{.AppNames}} use.</li>
+<li><strong>A claim you can back up.</strong> A score with its coverage, from an independent third party, for your sales team, your docs and your customers' security reviews.</li>
+</ul>
+</section>
+
+<section>
+<h2>How it works</h2>
+<p>We run {{commas .Control.Statements}} real SQL statements on your product and on two PostgreSQL 17.12 servers, and compare every answer: the rows, the column types and the error codes. The statements come from PostgreSQL's own regression tests and documentation, and from the test suites of {{.AppNames}}. When the two PostgreSQL servers disagree, we drop the statement, so every difference we report is your product's. Run against PostgreSQL itself, the harness finds no differences. Each difference is traced to the PostgreSQL feature it exercises. The score is the share of tested features that pass, weighted by how often applications use them. The score always appears with its coverage and the counts of crashes and silent wrong answers. The harness is open source, and its <a href="https://github.com/turbolytics/temper/tree/main/compat/postgres#outcomes">README</a> lists every outcome a statement can end with.</p>
+<p>Version {{.Version}} scores five lists, less what your product doesn't claim:</p>
+<ul>
+<li>SQL commands</li>
+<li>Query syntax</li>
+<li>Functions</li>
+<li>Operators</li>
+<li>Data types</li>
+</ul>
+</section>
+
+<section>
+<h2>What a finding looks like</h2>
+<p><strong>Illustrative.</strong> This finding is made up, and comes from no real product. Every finding in a report takes this shape.</p>
+<table class="statuses">
+<tbody>
+<tr><td>Feature</td><td><code>sql.function/length</code></td></tr>
+<tr><td>Outcome</td><td>Silent wrong answer</td></tr>
+<tr><td>Statement</td><td><code>SELECT length('héllo')</code></td></tr>
+<tr><td>PostgreSQL</td><td><code>5</code></td></tr>
+<tr><td>Your product</td><td><code>6</code></td></tr>
+<tr><td>Reproduce</td><td><code>oracle repro your-product 'sql.function/length'</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fairness">
+<h2>Independent by design</h2>
+<p>Turbolytics runs every test. We'll never change our answers based on payment. We test <a href="{{$.Base}}findings/">popular open-source projects</a>.</p>
+<p>We set your product's scope from its public documentation, not from your say-so. That way, no product can raise its score by claiming less.</p>
+<p>Results follow two publication rules:</p>
+<ul>
+<li>For an open-source product, results are published after its maintainers have had at least 7 days to review them. Their corrections are included.</li>
+<li>A paid or private report is published only with the vendor's approval.</li>
+</ul>
+<p>To dispute a finding or your product's scope, reply during the review, or open an issue on the <a href="https://github.com/turbolytics/temper/issues">Temper repository</a>. A finding that turns out to be the harness's fault is removed before publication.</p>
+</section>
+
+<section>
+<h2>What a paid report includes</h2>
+<ul>
+<li>A private report first, with every finding and its reproduction.</li>
+<li>A review period to dispute findings and scope before anything is published.</li>
+<li>A hosted report page with your branding, dated with the versions tested.</li>
+<li>A PDF for enterprise sales and security reviews, and a badge that links to the hosted page.</li>
+<li>A rerun on every release of your product and of PostgreSQL.</li>
+</ul>
+</section>
+
+<section>
+<h2>Limits</h2>
+<ul>
+<li>The method checks answers. It doesn't measure performance or behavior under concurrent load.</li>
+{{if .Skew}}<li>{{.Skew}}. So the usage weights mostly reflect an ORM's queries and a driver's own tests. JDBC, node-postgres and the catalog queries BI tools send come next.</li>
+{{end}}<li>Server settings, error codes, system catalogs and SQL-standard features appear in the report but aren't scored yet.</li>
+<li>Casts between types aren't separate features yet.</li>
+</ul>
+</section>
+
+<section>
+<h2>Pinned versions</h2>
+<table class="statuses">
+<thead><tr><th>What</th><th>Version</th></tr></thead>
+<tbody>
+{{range .Pins}}<tr><td>{{.What}}</td><td>{{if .URL}}<a href="{{.URL}}"><code>{{.Value}}</code></a>{{else}}<code>{{.Value}}</code>{{end}}</td></tr>
+{{end}}{{range .Apps}}<tr><td>{{.Name}}</td><td><code>{{.Version}}</code></td></tr>
+{{end}}</tbody>
+</table>
+</section>
+
+<section>
+<h2>Reproduce it</h2>
+<p>The run needs Docker. Results go to the folder you name, never into the repository. The harness lives in <a href="https://github.com/turbolytics/temper/tree/main/compat/postgres"><code>compat/postgres</code></a>.</p>
+<pre><code>git clone https://github.com/turbolytics/temper
+cd temper
+make compat-postgres RESULTS=../results</code></pre>
+<p>Browse the <a href="../postgres-17/">{{commas .Total}} PostgreSQL 17 features</a> it checks, or <a data-ph="inventory-json" href="../postgres-17/inventory.json">download them as JSON</a>.</p>
+</section>
+{{end}}
+
+<section class="cta">
+<p class="eyebrow">Compatibility reports</p>
+<h2>Is your product Postgres-compatible?</h2>
+<p>Ask for a report on your product. You see it privately first, and a paid report is published only with your approval.</p>
+<p><a class="button" data-ph="cta-compatibility" href="{{.ReportRequest}}">Get a compatibility report</a></p>
+</section>
+{{end}}

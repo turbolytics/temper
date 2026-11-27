@@ -358,3 +358,21 @@ func commas(n int) string {
 	}
 	return s
 }
+
+// AppNames names the captured applications, most statements first:
+// "Django, psycopg and pg_dump".
+func (inv inventory) AppNames() string {
+	apps := append([]app(nil), inv.Apps...)
+	sort.SliceStable(apps, func(i, j int) bool { return apps[i].Statements > apps[j].Statements })
+	names := make([]string, len(apps))
+	for i, a := range apps {
+		names[i] = a.Name
+	}
+	switch len(names) {
+	case 0:
+		return ""
+	case 1:
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
