@@ -248,7 +248,7 @@ func TestMethodPageMatchesTheHarness(t *testing.T) {
 		"compat/postgres#outcomes",
 		// Scope and fairness.
 		"public documentation", "claiming less",
-		"Payment never changes results", "without being asked", "only with the vendor's permission",
+		"Payment never changes results", `We test <a href="../../findings/">popular open-source projects</a>.`,
 		"dispute",
 		// The four terms, and a sample.
 		"The method", "The harness", "A report", "Your product",
