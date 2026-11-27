@@ -65,8 +65,22 @@ class _Text(Loader):
 
 
 def _text_everything(conn):
-    """Every value as PostgreSQL's text output, so values compare as printed."""
-    for (oid,) in conn.execute("SELECT oid FROM pg_type").fetchall():
+    """Every value as PostgreSQL's text output, so values compare as printed.
+    If the server can't read its own pg_type (Doltgres can leave it broken),
+    use the types psycopg knows: it returns any other type as text anyway."""
+    try:
+        oids = [oid for (oid,) in conn.execute("SELECT oid FROM pg_type").fetchall()]
+    except psycopg.Error:
+        try:
+            conn.rollback()
+        except psycopg.Error:
+            pass
+        oids = []
+        for t in psycopg.adapters.types:
+            oids.append(t.oid)
+            if getattr(t, "array_oid", 0):
+                oids.append(t.array_oid)
+    for oid in oids:
         conn.adapters.register_loader(oid, _Text)
 
 
