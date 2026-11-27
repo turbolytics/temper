@@ -2,6 +2,7 @@ repo,stars,language,checked,ours
 apache/iceberg-python,1171,Python,2026-11-17,no
 ArroyoSystems/arroyo,5084,Rust,2026-11-19,no
 dolthub/doltgresql,2214,Go,2026-11-17,no
+duckdb/pg_duckdb,3320,C++,2026-11-27,no
 feldera/feldera,2181,Rust,2026-11-20,no
 fsspec/filesystem_spec,1385,Python,2026-11-17,no
 lovoo/goka,2552,Go,2026-11-17,no
